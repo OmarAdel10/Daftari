@@ -33,8 +33,8 @@ scripts:
     run: melos exec --dir-exists=lib -- dart format --set-exit-if-changed lib test
 
   build:
-    description: "Compile-proof build for Flutter packages"
-    run: melos exec --flutter -- flutter build apk --debug
+    description: "Compile-proof build for Flutter packages (Linux desktop)"
+    run: melos exec --flutter -- flutter build linux --debug
 
   flutter:analyze:
     description: "Format check + analyze Flutter packages"
