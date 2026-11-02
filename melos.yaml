@@ -1,5 +1,5 @@
 name: daftari
-repository: https://github.com/your-org/daftari
+repository: https://github.com/OmarAdel10/Daftari
 
 # Melos manages Dart/Flutter packages only.
 # TypeScript (backend/*) and C# (PrintServer*) packages are orchestrated
@@ -17,59 +17,41 @@ scripts:
   analyze:
     description: "Format check + analyze every Dart/Flutter package"
     run: |
-      if grep -q "sdk: flutter" pubspec.yaml; then
-        if [ -d lib ] && [ -d test ]; then
-          dart format --set-exit-if-changed lib test && flutter analyze
-        fi
-      else
-        if [ -d lib ]; then
-          dart format --set-exit-if-changed lib test && dart analyze
-        fi
-      fi
+      melos exec --flutter -- dart format --set-exit-if-changed lib test
+      melos exec --flutter -- flutter analyze
+      melos exec --no-flutter --dir-exists=lib -- dart format --set-exit-if-changed lib test
+      melos exec --no-flutter --dir-exists=lib -- dart analyze
 
   test:
     description: "Run tests in every Dart/Flutter package"
     run: |
-      if [ -d test ]; then
-        if grep -q "sdk: flutter" pubspec.yaml; then
-          flutter test
-        else
-          dart test
-        fi
-      fi
+      melos exec --flutter --dir-exists=test -- flutter test
+      melos exec --no-flutter --dir-exists=test -- dart test
 
   format:
-    description: "Format Dart code in every Dart/Flutter package"
-    run: dart format lib test
+    description: "Format check for Dart code in every Dart/Flutter package"
+    run: melos exec --dir-exists=lib -- dart format --set-exit-if-changed lib test
 
   build:
     description: "Compile-proof build for Flutter packages"
-    run: flutter build apk --debug
-    packageFilters:
-      flutter: true
+    run: melos exec --flutter -- flutter build apk --debug
 
   flutter:analyze:
     description: "Format check + analyze Flutter packages"
-    run: dart format --set-exit-if-changed lib test && flutter analyze
-    packageFilters:
-      flutter: true
+    run: |
+      melos exec --flutter -- dart format --set-exit-if-changed lib test
+      melos exec --flutter -- flutter analyze
 
   flutter:test:
     description: "Run Flutter package tests"
-    run: flutter test
-    packageFilters:
-      flutter: true
+    run: melos exec --flutter --dir-exists=test -- flutter test
 
   dart:analyze:
     description: "Format check + analyze pure Dart packages"
-    run: dart format --set-exit-if-changed lib test && dart analyze
-    packageFilters:
-      flutter: false
-      dirExists: lib
+    run: |
+      melos exec --no-flutter --dir-exists=lib -- dart format --set-exit-if-changed lib test
+      melos exec --no-flutter --dir-exists=lib -- dart analyze
 
   dart:test:
     description: "Run pure Dart package tests"
-    run: dart test
-    packageFilters:
-      flutter: false
-      dirExists: test
+    run: melos exec --no-flutter --dir-exists=test -- dart test
