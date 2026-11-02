@@ -50,9 +50,10 @@ jobs:
           dotnet test PrintServer.Tests/PrintServer.Tests.csproj --configuration Release
       - name: Push Instant Shorebird Patch
         working-directory: apps/daftari
-        run: shorebird patch windows --dart-define=ED25519_PUBKEY_HEX=bd6b436ee74d9a8a6fae5c720488574c0aac04b561a1810fe8cef0d7cdd84a7c
+        run: shorebird patch windows --dart-define=ED25519_PUBKEY_HEX=${ED25519_PUBKEY_HEX}
         env:
           SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
+          ED25519_PUBKEY_HEX: ${{ secrets.ED25519_PUBKEY_HEX }}
 
   release:
     name: Release (Windows Installer + Linux AppImage/RPM)
@@ -115,9 +116,10 @@ jobs:
         if: matrix.platform == 'windows'
         working-directory: apps/daftari
         run: |
-          shorebird release windows -- --obfuscate --split-debug-info=symbols --dart-define=ED25519_PUBKEY_HEX=bd6b436ee74d9a8a6fae5c720488574c0aac04b561a1810fe8cef0d7cdd84a7c
+          shorebird release windows -- --obfuscate --split-debug-info=symbols --dart-define=ED25519_PUBKEY_HEX=${ED25519_PUBKEY_HEX}
         env:
           SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
+          ED25519_PUBKEY_HEX: ${{ secrets.ED25519_PUBKEY_HEX }}
       - name: Compile Inno Setup Installer Package
         if: matrix.platform == 'windows'
         uses: Minionguyjpro/Inno-Setup-Action@b8e8eb5936437c243592fda645c96dfc6488c275  # v1.2.2
