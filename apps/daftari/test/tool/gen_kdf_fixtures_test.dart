@@ -8,6 +8,10 @@ import 'package:daftari/core/crypto/password_hasher.dart';
 void main() {
   const scriptPath = 'tool/gen_kdf_fixtures.dart';
 
+  final isRoot =
+      Platform.isLinux &&
+      Process.runSync('id', ['-u']).stdout.toString().trim() == '0';
+
   group('gen_kdf_fixtures', () {
     late Directory tempDir;
 
@@ -120,6 +124,26 @@ void main() {
       expect((vectors[4] as Map)['salt_b64url'], 'c2FsdHNhbHQ=');
     });
 
+    test('main() falls back to the current directory when unset', () {
+      // Run the tool from a temp working directory with no
+      // KDF_FIXTURES_OUTPUT_DIR override: the script defaults to
+      // Directory.current.path inside the spawned process.
+      final result = Process.runSync('dart', [
+        File(scriptPath).absolute.path,
+      ], workingDirectory: tempDir.path);
+      expect(
+        result.exitCode,
+        0,
+        reason:
+            'gen_kdf_fixtures.dart exited ${result.exitCode}: ${result.stderr}',
+      );
+
+      final file = File(outputPath());
+      expect(file.existsSync(), isTrue);
+      final vectors = jsonDecode(file.readAsStringSync()) as List<dynamic>;
+      expect(vectors.length, 5);
+    });
+
     test('main() surfaces a clear failure when output dir is unwritable', () {
       // Point output at a read-only directory
       final readOnlyDir = Directory.systemTemp.createTempSync('readonly_test_');
@@ -147,6 +171,6 @@ void main() {
         Process.runSync('chmod', ['755', readOnlyDir.path]);
         readOnlyDir.deleteSync(recursive: true);
       }
-    });
+    }, skip: isRoot ? 'root bypasses chmod 555 permissions' : false);
   });
 }

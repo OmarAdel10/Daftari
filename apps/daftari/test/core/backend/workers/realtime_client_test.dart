@@ -373,12 +373,12 @@ void main() {
       final sub = bloc.stream.listen(states.add);
       bloc.add(const OverviewRequested());
       await Future<void>.delayed(const Duration(milliseconds: 20));
-      final loadsAfterFirst = states.where((s) => s is DashboardLoaded).length;
+      final loadsAfterFirst = states.whereType<DashboardLoaded>().length;
       controller.add(
         jsonDecode('{"type": "sale", "count": 1}') as Map<String, dynamic>,
       );
       await Future<void>.delayed(const Duration(milliseconds: 50));
-      final loadsAfterEvent = states.where((s) => s is DashboardLoaded).length;
+      final loadsAfterEvent = states.whereType<DashboardLoaded>().length;
       expect(loadsAfterEvent, greaterThan(loadsAfterFirst));
       await sub.cancel();
       await bloc.close(); // also closes the realtime client
