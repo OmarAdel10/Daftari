@@ -41,6 +41,7 @@ jobs:
           cache: true
 
       - name: Install Flutter Dependencies
+        working-directory: apps/daftari
         run: flutter pub get
 
       - name: Remove checkout authentication

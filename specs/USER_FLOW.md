@@ -2575,13 +2575,15 @@ Service      Service    Service
 ### 34. Cross-Runtime KDF Verification Flow
 
 ```
-[ Developer runs tool/gen_kdf_fixtures.dart ]
+[ Developer runs apps/daftari/tool/gen_kdf_fixtures.dart (from apps/daftari) ]
                 │
                 ▼
 [ Dart: hashTagged(password, iterations, salt) ]
                 │
                 ▼
-[ Writes backend/shared/fixtures/kdf_vectors.json ]
+[ Writes kdf_vectors.json to $KDF_FIXTURES_OUTPUT_DIR ]
+[ (default: package root; regenerate the tracked file with ]
+[  KDF_FIXTURES_OUTPUT_DIR=../backend/shared/fixtures) ]
                 │
                 ▼
 [ CI: vitest runs password_kdf.test.ts ]

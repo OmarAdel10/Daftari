@@ -103,8 +103,8 @@ Future<void> _scanBurst(WidgetTester tester, {String barcode = '111'}) async {
 /// Dispatches a key-down with an explicit platform timestamp so the gate's
 /// inter-character gap logic can be exercised deterministically. Synthesized
 /// [KeyData] is dispatched immediately, exactly like the platform path.
-// ignore: deprecated_member_use, deprecated_member_use
 void _sendKeyDownAt(Duration timeStamp, String character) {
+  // ignore: deprecated_member_use
   ServicesBinding.instance.keyEventManager.handleKeyData(
     ui.KeyData(
       timeStamp: timeStamp,

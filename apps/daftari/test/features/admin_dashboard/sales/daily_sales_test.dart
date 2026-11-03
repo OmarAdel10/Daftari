@@ -29,14 +29,14 @@ void main() {
       today,
     );
     expect(buckets, hasLength(7));
-    expect(buckets[0]!.day, DateTime(2026, 9, 21)); // 6 days ago
-    expect(buckets[0]!.totalPiastres, 0); // zero-filled
-    expect(buckets[4]!.day, DateTime(2026, 9, 25));
-    expect(buckets[4]!.totalPiastres, 8000); // 5000 + 3000 same day
-    expect(buckets[4]!.count, 2);
-    expect(buckets[5]!.totalPiastres, 12000);
-    expect(buckets[6]!.day, DateTime(2026, 9, 27)); // today
-    expect(buckets[6]!.totalPiastres, 0);
+    expect(buckets[0].day, DateTime(2026, 9, 21)); // 6 days ago
+    expect(buckets[0].totalPiastres, 0); // zero-filled
+    expect(buckets[4].day, DateTime(2026, 9, 25));
+    expect(buckets[4].totalPiastres, 8000); // 5000 + 3000 same day
+    expect(buckets[4].count, 2);
+    expect(buckets[5].totalPiastres, 12000);
+    expect(buckets[6].day, DateTime(2026, 9, 27)); // today
+    expect(buckets[6].totalPiastres, 0);
   });
 
   test('handles sales outside the window (ignored) and empty input', () {
@@ -68,10 +68,10 @@ void main() {
       3,
       endOfMonth,
     );
-    expect(buckets[0]!.day, DateTime(2026, 9, 29));
-    expect(buckets[1]!.day, DateTime(2026, 9, 30));
-    expect(buckets[1]!.totalPiastres, 100);
-    expect(buckets[2]!.day, DateTime(2026, 10, 1));
+    expect(buckets[0].day, DateTime(2026, 9, 29));
+    expect(buckets[1].day, DateTime(2026, 9, 30));
+    expect(buckets[1].totalPiastres, 100);
+    expect(buckets[2].day, DateTime(2026, 10, 1));
   });
 
   test('SaleModel.fromJson is lenient on numerics and strict on the id', () {

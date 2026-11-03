@@ -12,9 +12,19 @@
 .swiftpm/
 migrate_working_dir/
 
-# Local libsql/Turso artifacts
-auth
-auth-wal
+# Local libsql/Turso artifacts (root-only; narrower /auth and /auth-wal below)
+/auth
+/auth-wal
+
+# Do not ignore the app's auth feature (moved into apps/daftari/ by Melos
+# restructure). These negations are defensive: /auth is root-anchored, so it
+# already stops matching apps/daftari/**/auth — never use a bare `auth` pattern.
+!apps/daftari/lib/features/auth/
+!apps/daftari/test/features/auth/
+
+# Default output of tool/gen_kdf_fixtures.dart; the canonical fixture is
+# backend/shared/fixtures/kdf_vectors.json (pass KDF_FIXTURES_OUTPUT_DIR).
+/apps/daftari/kdf_vectors.json
 
 # IntelliJ related
 *.iml
@@ -32,12 +42,13 @@ auth-wal
 **/ios/Flutter/.last_build_id
 # Local Hive test box dirs (created at test runtime; per-file directories
 # eliminate FUSE lock contention; boxes are deleted in teardown)
-test/_hive_test*/
+**/test/_hive_test*/
 .dart_tool/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
 /build/
+/apps/daftari/build/
 /coverage/
 docs/*
 .opencode/
@@ -83,4 +94,10 @@ backend/admin_host/public/
 landing_page/.dart_tool/
 landing_page/build/
 landing_page/.jaspr/
+
+# --- Melos ---
+.melos/
+.melos_tool/
+
+# --- Coverage ---
 **/coverage/**

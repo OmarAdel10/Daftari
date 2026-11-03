@@ -32,13 +32,7 @@ Map<String, dynamic> _claims({
   String? usr,
   String? role,
   String? jti,
-}) => {
-  if (exp != null) 'exp': exp,
-  if (tid != null) 'tid': tid,
-  if (usr != null) 'usr': usr,
-  if (role != null) 'role': role,
-  if (jti != null) 'jti': jti,
-};
+}) => {'exp': ?exp, 'tid': ?tid, 'usr': ?usr, 'role': ?role, 'jti': ?jti};
 
 Map<String, dynamic> _fullClaims({
   int exp = 2000000000,

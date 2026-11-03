@@ -4,6 +4,22 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:daftari/core/crypto/password_hasher.dart';
 
+/// Resolves the repository root from the test runner's CWD so this oracle
+/// works from `apps/daftari` (`flutter test`) or the repository root.
+Directory _repoRoot() {
+  var dir = Directory.current;
+  while (true) {
+    if (File('${dir.path}/melos.yaml').existsSync()) return dir;
+    final parent = dir.parent;
+    if (parent.path == dir.path) {
+      throw StateError(
+        'Could not locate melos.yaml above ${Directory.current.path}',
+      );
+    }
+    dir = parent;
+  }
+}
+
 void main() {
   group('generateSalt', () {
     test('should return base64url string of length 44 (padded)', () {
@@ -103,40 +119,44 @@ void main() {
   });
 
   group('hashTagged edge cases & fixture oracle', () {
-    test(
-      'reproduces the frozen values in kdf_vectors.json for valid passwords',
-      () {
-        final vectors = (jsonDecode(
-          File('backend/shared/fixtures/kdf_vectors.json').readAsStringSync(),
-        ) as List).cast<Map<String, dynamic>>();
-        expect(vectors, hasLength(5));
-        for (final v in vectors) {
-          expect(v.keys.toSet(), {
-            'password',
-            'iterations',
-            'salt_b64url',
-            'expected',
-          });
-          // Only test hashTagged for passwords meeting the new min length (12).
-          // The fixture vectors include legacy passwords (< 12 chars) that were
-          // created under the old policy; those hashes must still VERIFY, but
-          // hashTagged now rejects creating NEW hashes with short passwords.
-          final password = v['password'] as String;
-          if (password.length >= 12) {
-            expect(
-              hashTagged(
-                password,
-                iterations: v['iterations'] as int,
-                saltB64Url: v['salt_b64url'] as String,
-              ),
-              equals(v['expected']),
-            );
-          }
-          // All frozen vectors must still verify (backward compatibility).
-          expect(verifyTagged(v['expected'] as String, password), isTrue);
-        }
-      },
-    );
+    test('matches the frozen values in the committed kdf_vectors.json', () {
+      // Read the tracked fixture directly: the tool's own tests cover hermetic
+      // generation, while this oracle guards the actual cross-runtime file.
+      final committed = File(
+        '${_repoRoot().path}/backend/shared/fixtures/kdf_vectors.json',
+      );
+      expect(
+        committed.existsSync(),
+        isTrue,
+        reason: 'missing tracked fixture at ${committed.path}',
+      );
+
+      final vectors = (jsonDecode(committed.readAsStringSync()) as List)
+          .cast<Map<String, dynamic>>();
+      expect(vectors, hasLength(5));
+
+      for (final v in vectors) {
+        expect(v.keys.toSet(), {
+          'password',
+          'iterations',
+          'salt_b64url',
+          'expected',
+        });
+        final password = v['password'] as String;
+        // hashTagged hashes any non-empty password; the 12-char minimum is a
+        // caller/route policy, not a KDF restriction.
+        expect(
+          hashTagged(
+            password,
+            iterations: v['iterations'] as int,
+            saltB64Url: v['salt_b64url'] as String,
+          ),
+          equals(v['expected']),
+        );
+        // All frozen vectors must still verify (backward compatibility).
+        expect(verifyTagged(v['expected'] as String, password), isTrue);
+      }
+    });
 
     test('rejects four-part stored values with a different scheme', () {
       expect(
