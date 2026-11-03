@@ -68,7 +68,6 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
       if (bloc.state is FirebaseStage) break;
     }
-    debugPrint('STATE: ${bloc.state}');
     expect(find.text('دفتري — لوحة التحكم'), findsOneWidget);
     expect(find.textContaining('Sign in with Google'), findsOneWidget);
     // No bloc.close() here: closing inside a widget test can deadlock the
