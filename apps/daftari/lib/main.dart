@@ -238,10 +238,12 @@ Future<bool> ensurePrintServerBuilt() async {
   ]);
 
   if (result.exitCode != 0) {
+    // ignore: avoid_print — TODO: migrate to structured logger (DAFTARI-160)
     print('[PrintServer] Publish failed:\n${result.stderr}');
     return false;
   }
 
+  // ignore: avoid_print — TODO: migrate to structured logger (DAFTARI-160)
   print('[PrintServer] Publish succeeded');
   return true;
 }
@@ -285,10 +287,12 @@ Future<bool> _ensurePrintServerLinuxBuilt() async {
   ]);
 
   if (result.exitCode != 0) {
+    // ignore: avoid_print — TODO: migrate to structured logger (DAFTARI-160)
     print('[PrintServer.Linux] Publish failed:\n${result.stderr}');
     return false;
   }
 
+  // ignore: avoid_print — TODO: migrate to structured logger (DAFTARI-160)
   print('[PrintServer.Linux] Publish succeeded');
   return true;
 }
@@ -412,6 +416,7 @@ Future<void> _bootApp() async {
   await openLazyBoxWithRecovery<AppExpenseModel>('expenses', cipher: cipher);
   final auditService = AuditService(box: auditBox);
 
+  // ignore: avoid_print — TODO: migrate to structured logger (DAFTARI-160)
   print('[PrintServer] Building print server...');
   final printServerManager = PrintServerFactory.create();
 
@@ -421,6 +426,7 @@ Future<void> _bootApp() async {
     if (printServerBuilt) {
       await printServerManager.start();
     } else {
+      // ignore: avoid_print — TODO: migrate to structured logger (DAFTARI-160)
       print(
         '[PrintServer.Linux] Skipping start — publish failed or executable missing',
       );
@@ -430,6 +436,7 @@ Future<void> _bootApp() async {
     if (printServerBuilt) {
       await printServerManager.start();
     } else {
+      // ignore: avoid_print — TODO: migrate to structured logger (DAFTARI-160)
       print(
         '[PrintServer] Skipping start — publish failed or executable missing',
       );

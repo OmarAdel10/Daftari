@@ -31,9 +31,10 @@ analyzer:
     # Treat these as "info" or "ignore" instead of fatal
     prefer_initializing_formals: ignore
     curly_braces_in_flow_control_structures: ignore
-    avoid_print: ignore
     unnecessary_underscores: ignore
 
+  # Scope avoid_print to tool/** only — production code must use structured logging
+  # to prevent credentials/JWTs/PII from leaking via print() in release builds.
   exclude:
     # Picker is only used on web platform
     - web/**
@@ -41,3 +42,5 @@ analyzer:
     - build/**
     - windows/**
     - linux/**
+    # Tool scripts may use print for CLI output
+    - tool/**
