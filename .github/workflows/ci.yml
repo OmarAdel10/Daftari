@@ -55,7 +55,7 @@ jobs:
 
       - name: Check Formatting
         working-directory: apps/daftari
-        run: dart format --set-exit-if-changed lib test
+        run: dart format --set-exit-if-changed lib test tool
 
       - name: Analyze
         working-directory: apps/daftari
@@ -85,6 +85,41 @@ jobs:
           dart pub get
           dart pub global activate jaspr_cli 0.23.4
           jaspr build
+
+      - name: Test landing page
+        run: |
+          cd landing_page
+          dart test
+
+  # Validates the Melos workspace scripts that AGENTS.md documents as the gate.
+  melos-verify:
+    name: Melos Workspace Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@f2c4f6686ca8e8d6e6d0f28410eeef506ed66aff  # v2.18.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+          cache-key: flutter-linux-${{ hashFiles('apps/daftari/pubspec.lock') }}
+
+      - name: Activate Melos
+        run: |
+          dart pub global activate melos 6.3.3
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+
+      - name: Bootstrap workspace
+        run: melos bootstrap
+
+      - name: Verify melos scripts
+        run: melos run analyze
 
   # TypeScript workers: api, realtime (DO hub), admin_host, paymob webhook, shared.
   backend-tests:
@@ -252,7 +287,7 @@ jobs:
 
       - name: Check Formatting
         working-directory: apps/daftari
-        run: dart format --set-exit-if-changed lib test
+        run: dart format --set-exit-if-changed lib test tool
 
       - name: Analyze
         working-directory: apps/daftari
@@ -317,7 +352,8 @@ jobs:
     permissions:
       contents: read
     env:
-      ED25519_PUBKEY_HEX: ${{ secrets.ED25519_PUBKEY_HEX }}
+      # Public Ed25519 verification key (committed deliberately; see release.yml).
+      ED25519_PUBKEY_HEX: bd6b436ee74d9a8a6fae5c720488574c0aac04b561a1810fe8cef0d7cdd84a7c
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
@@ -450,7 +486,7 @@ jobs:
   # when the result is exactly 'skipped' — failure/cancelled still fail.
   ci-summary:
     name: CI Summary (Required)
-    needs: [fast-verify, flutter-matrix, backend-tests, printserver-build, packaging-verify-linux, packaging-verify-windows, security-scan]
+    needs: [fast-verify, melos-verify, flutter-matrix, backend-tests, printserver-build, packaging-verify-linux, packaging-verify-windows, security-scan]
     runs-on: ubuntu-latest
     if: always()
     permissions:
@@ -482,6 +518,7 @@ jobs:
             failed=1
           }
           check fast-verify                  "${{ needs.fast-verify.result }}"                  false
+          check melos-verify                 "${{ needs.melos-verify.result }}"                 false
           check flutter-matrix               "${{ needs.flutter-matrix.result }}"               true
           check backend-tests                "${{ needs.backend-tests.result }}"                false
           check printserver-build            "${{ needs.printserver-build.result }}"            false
