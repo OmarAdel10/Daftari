@@ -17,25 +17,22 @@ scripts:
   analyze:
     description: "Format check + analyze every Dart/Flutter package"
     run: |
-      set -e
-      melos exec --flutter -- dart format --set-exit-if-changed lib test tool
-      melos exec --flutter -- flutter analyze
-      melos exec --no-flutter --dir-exists=lib -- dart format --set-exit-if-changed lib test
-      melos exec --no-flutter --dir-exists=lib -- dart analyze
+      melos exec --flutter --fail-fast -- dart format --set-exit-if-changed lib test tool
+      melos exec --flutter --fail-fast -- flutter analyze
+      melos exec --no-flutter --fail-fast --dir-exists=lib -- dart format --set-exit-if-changed lib test
+      melos exec --no-flutter --fail-fast --dir-exists=lib -- dart analyze
 
   test:
     description: "Run tests in every Dart/Flutter package"
     run: |
-      set -e
-      melos exec --flutter --dir-exists=test -- flutter test
-      melos exec --no-flutter --dir-exists=test -- dart test
+      melos exec --flutter --fail-fast --dir-exists=test -- flutter test
+      melos exec --no-flutter --fail-fast --dir-exists=test -- dart test
 
   format:
     description: "Format check for Dart code in every Dart/Flutter package"
     run: |
-      set -e
-      melos exec --flutter -- dart format --set-exit-if-changed lib test tool
-      melos exec --no-flutter --dir-exists=lib -- dart format --set-exit-if-changed lib test
+      melos exec --flutter --fail-fast -- dart format --set-exit-if-changed lib test tool
+      melos exec --no-flutter --fail-fast --dir-exists=lib -- dart format --set-exit-if-changed lib test
 
   build:
     description: "Compile-proof build for Flutter packages (Linux desktop)"
@@ -44,21 +41,19 @@ scripts:
   flutter:analyze:
     description: "Format check + analyze Flutter packages"
     run: |
-      set -e
-      melos exec --flutter -- dart format --set-exit-if-changed lib test tool
-      melos exec --flutter -- flutter analyze
+      melos exec --flutter --fail-fast -- dart format --set-exit-if-changed lib test tool
+      melos exec --flutter --fail-fast -- flutter analyze
 
   flutter:test:
     description: "Run Flutter package tests"
-    run: melos exec --flutter --dir-exists=test -- flutter test
+    run: melos exec --flutter --fail-fast --dir-exists=test -- flutter test
 
   dart:analyze:
     description: "Format check + analyze pure Dart packages"
     run: |
-      set -e
-      melos exec --no-flutter --dir-exists=lib -- dart format --set-exit-if-changed lib test
-      melos exec --no-flutter --dir-exists=lib -- dart analyze
+      melos exec --no-flutter --fail-fast --dir-exists=lib -- dart format --set-exit-if-changed lib test
+      melos exec --no-flutter --fail-fast --dir-exists=lib -- dart analyze
 
   dart:test:
     description: "Run pure Dart package tests"
-    run: melos exec --no-flutter --dir-exists=test -- dart test
+    run: melos exec --no-flutter --fail-fast --dir-exists=test -- dart test
