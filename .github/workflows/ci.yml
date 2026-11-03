@@ -91,25 +91,7 @@ jobs:
           cd landing_page
           dart test
 
-  # Validates the Melos workspace scripts that AGENTS.md documents as the gate.
-  melos-verify:
-    name: Melos Workspace Validation
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@f2c4f6686ca8e8d6e6d0f28410eeef506ed66aff  # v2.18.0
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: ${{ env.FLUTTER_CHANNEL }}
-          cache: true
-          cache-key: flutter-linux-${{ hashFiles('apps/daftari/pubspec.lock') }}
-
+      # Verify Melos workspace scripts (analyze for all packages including landing_page)
       - name: Activate Melos
         run: |
           dart pub global activate melos 6.3.3
@@ -118,7 +100,7 @@ jobs:
       - name: Bootstrap workspace
         run: melos bootstrap
 
-      - name: Verify melos scripts
+      - name: Verify melos analyze
         run: melos run analyze
 
   # TypeScript workers: api, realtime (DO hub), admin_host, paymob webhook, shared.
@@ -352,9 +334,18 @@ jobs:
     permissions:
       contents: read
     env:
-      # Public Ed25519 verification key (committed deliberately; see release.yml).
-      ED25519_PUBKEY_HEX: bd6b436ee74d9a8a6fae5c720488574c0aac04b561a1810fe8cef0d7cdd84a7c
+      ED25519_PUBKEY_HEX: ${{ vars.ED25519_PUBKEY_HEX }}
     steps:
+      - name: Verify ED25519_PUBKEY_HEX variable
+        run: |
+          if [ -z "${ED25519_PUBKEY_HEX}" ]; then
+            echo "::error::ED25519_PUBKEY_HEX variable not set"
+            exit 1
+          fi
+          if [ ${#ED25519_PUBKEY_HEX} -ne 64 ]; then
+            echo "::error::ED25519_PUBKEY_HEX must be 64 hex characters"
+            exit 1
+          fi
       - name: Checkout Source Code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
@@ -486,7 +477,7 @@ jobs:
   # when the result is exactly 'skipped' — failure/cancelled still fail.
   ci-summary:
     name: CI Summary (Required)
-    needs: [fast-verify, melos-verify, flutter-matrix, backend-tests, printserver-build, packaging-verify-linux, packaging-verify-windows, security-scan]
+    needs: [fast-verify, flutter-matrix, backend-tests, printserver-build, packaging-verify-linux, packaging-verify-windows, security-scan]
     runs-on: ubuntu-latest
     if: always()
     permissions:
@@ -518,7 +509,6 @@ jobs:
             failed=1
           }
           check fast-verify                  "${{ needs.fast-verify.result }}"                  false
-          check melos-verify                 "${{ needs.melos-verify.result }}"                 false
           check flutter-matrix               "${{ needs.flutter-matrix.result }}"               true
           check backend-tests                "${{ needs.backend-tests.result }}"                false
           check printserver-build            "${{ needs.printserver-build.result }}"            false
