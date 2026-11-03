@@ -385,6 +385,7 @@ jobs:
       - name: Build PrintServer.Linux
         run: dotnet build PrintServer.Linux/PrintServer.Linux.csproj -c Release -r linux-x64
       - name: Run PrintServer.Linux Unit Tests
+        if: always()
         run: dotnet test PrintServer.Linux.Tests/PrintServer.Linux.Tests.csproj -c Release --blame-hang-timeout 2m
       # Packaging runs even when the .NET tests above hang/fail, so a red test
       # step no longer prevents the artifacts from being produced and inspected.
