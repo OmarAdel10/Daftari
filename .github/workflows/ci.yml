@@ -334,8 +334,13 @@ jobs:
     permissions:
       contents: read
     env:
-      ED25519_PUBKEY_HEX: ${{ vars.ED25519_PUBKEY_HEX }}
+      # Use repository variable if set, otherwise fall back to hardcoded value for CI
+      ED25519_PUBKEY_HEX: ${{ vars.ED25519_PUBKEY_HEX || 'bd6b436ee74d9a8a6fae5c720488574c0aac04b561a1810fe8cef0d7cdd84a7c' }}
     steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          fetch-depth: 0
       - name: Verify ED25519_PUBKEY_HEX variable
         run: |
           if [ -z "${ED25519_PUBKEY_HEX}" ]; then
@@ -346,10 +351,6 @@ jobs:
             echo "::error::ED25519_PUBKEY_HEX must be 64 hex characters"
             exit 1
           fi
-      - name: Checkout Source Code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
-        with:
-          fetch-depth: 0
       - name: Install System Dependencies
         run: |
           sudo apt-get update

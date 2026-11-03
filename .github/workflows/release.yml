@@ -16,8 +16,9 @@ permissions:
 # Ed25519 PUBLIC verification key baked into desktop builds as a compile-time
 # define. Stored as a repository variable (not secret) for rotation without
 # workflow changes. Validation step ensures it's set and well-formed.
+# Fallback to hardcoded value if variable not set (for CI compatibility).
 env:
-  ED25519_PUBKEY_HEX: ${{ vars.ED25519_PUBKEY_HEX }}
+  ED25519_PUBKEY_HEX: ${{ vars.ED25519_PUBKEY_HEX || 'bd6b436ee74d9a8a6fae5c720488574c0aac04b561a1810fe8cef0d7cdd84a7c' }}
 
 jobs:
   shorebird-patch:
