@@ -134,7 +134,7 @@ gtk-update-icon-cache -f %{_datadir}/icons/hicolor &> /dev/null || :
 /opt/daftari/
 /usr/bin/daftari
 /usr/share/applications/daftari.desktop
-/usr/share/icons/hicolor/256x256/apps/daftari.png
+/usr/share/icons/hicolor/32x32/apps/daftari.png
 /usr/share/metainfo/daftari.metainfo.xml
 /usr/lib/systemd/user/cashier-printserver.service
 
