@@ -44,11 +44,19 @@ void main() {
   // Output directory: env var override for test hermeticity; default to the
   // package root so `dart run tool/gen_kdf_fixtures.dart` never writes outside
   // the Flutter package. Callers/CI pass `KDF_FIXTURES_OUTPUT_DIR` to write
-  // into `backend/shared/fixtures` explicitly.
+  // into `backend/shared/fixtures` explicitly. An empty value means unset.
+  final configuredDir = Platform.environment['KDF_FIXTURES_OUTPUT_DIR'];
   final outputDir = Directory(
-    Platform.environment['KDF_FIXTURES_OUTPUT_DIR'] ?? Directory.current.path,
+    (configuredDir == null || configuredDir.isEmpty)
+        ? Directory.current.path
+        : configuredDir,
   );
   outputDir.createSync(recursive: true);
-  File('${outputDir.path}/kdf_vectors.json')
-      .writeAsStringSync(const JsonEncoder.withIndent('  ').convert(vectors));
+
+  // Write through a sibling temp file and rename so a pre-existing symlink at
+  // the destination is replaced rather than followed.
+  final target = File('${outputDir.path}/kdf_vectors.json');
+  File('${outputDir.path}/.kdf_vectors.json.tmp')
+    ..writeAsStringSync(const JsonEncoder.withIndent('  ').convert(vectors))
+    ..renameSync(target.path);
 }

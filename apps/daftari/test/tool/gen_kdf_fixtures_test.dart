@@ -5,12 +5,25 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:daftari/core/crypto/password_hasher.dart';
 
-void main() {
-  const scriptPath = 'tool/gen_kdf_fixtures.dart';
+/// Resolves the repository root from the test runner's CWD so these tests work
+/// from `apps/daftari` (`flutter test`) or from the repository root.
+Directory _repoRoot() {
+  var dir = Directory.current;
+  while (true) {
+    if (File('${dir.path}/melos.yaml').existsSync()) return dir;
+    final parent = dir.parent;
+    if (parent.path == dir.path) {
+      throw StateError(
+        'Could not locate melos.yaml above ${Directory.current.path}',
+      );
+    }
+    dir = parent;
+  }
+}
 
-  final isRoot =
-      Platform.isLinux &&
-      Process.runSync('id', ['-u']).stdout.toString().trim() == '0';
+void main() {
+  final repoRoot = _repoRoot();
+  final scriptPath = '${repoRoot.path}/apps/daftari/tool/gen_kdf_fixtures.dart';
 
   group('gen_kdf_fixtures', () {
     late Directory tempDir;
@@ -25,18 +38,32 @@ void main() {
 
     String outputPath() => '${tempDir.path}/kdf_vectors.json';
 
-    test('main() writes valid JSON fixture with 5 vectors', () {
-      final result = Process.runSync(
+    ProcessResult runTool({
+      Map<String, String>? environment,
+      String? workingDirectory,
+    }) {
+      return Process.runSync(
         'dart',
         [scriptPath],
-        environment: {'KDF_FIXTURES_OUTPUT_DIR': tempDir.path},
+        environment: environment,
+        workingDirectory: workingDirectory,
       );
+    }
+
+    void expectSuccess(ProcessResult result) {
       expect(
         result.exitCode,
         0,
         reason:
             'gen_kdf_fixtures.dart exited ${result.exitCode}: ${result.stderr}',
       );
+    }
+
+    test('main() writes valid JSON fixture with 5 vectors', () {
+      final result = runTool(
+        environment: {'KDF_FIXTURES_OUTPUT_DIR': tempDir.path},
+      );
+      expectSuccess(result);
 
       final file = File(outputPath());
       expect(file.existsSync(), isTrue);
@@ -56,26 +83,19 @@ void main() {
     });
 
     test('main() is idempotent — re-run produces identical output', () {
-      Process.runSync(
-        'dart',
-        [scriptPath],
-        environment: {'KDF_FIXTURES_OUTPUT_DIR': tempDir.path},
-      );
+      final env = {'KDF_FIXTURES_OUTPUT_DIR': tempDir.path};
+      expectSuccess(runTool(environment: env));
       final first = File(outputPath()).readAsStringSync();
-      Process.runSync(
-        'dart',
-        [scriptPath],
-        environment: {'KDF_FIXTURES_OUTPUT_DIR': tempDir.path},
-      );
+
+      expectSuccess(runTool(environment: env));
       final second = File(outputPath()).readAsStringSync();
+
       expect(second, equals(first));
     });
 
     test('each expected hash matches hashTagged round-trip', () {
-      Process.runSync(
-        'dart',
-        [scriptPath],
-        environment: {'KDF_FIXTURES_OUTPUT_DIR': tempDir.path},
+      expectSuccess(
+        runTool(environment: {'KDF_FIXTURES_OUTPUT_DIR': tempDir.path}),
       );
 
       final vectors = jsonDecode(File(outputPath()).readAsStringSync()) as List;
@@ -91,11 +111,9 @@ void main() {
       }
     });
 
-    test('fixture values are pinned per vector index', () {
-      Process.runSync(
-        'dart',
-        [scriptPath],
-        environment: {'KDF_FIXTURES_OUTPUT_DIR': tempDir.path},
+    test('fixture values and frozen hashes are pinned per vector index', () {
+      expectSuccess(
+        runTool(environment: {'KDF_FIXTURES_OUTPUT_DIR': tempDir.path}),
       );
 
       final vectors = jsonDecode(File(outputPath()).readAsStringSync()) as List;
@@ -103,14 +121,26 @@ void main() {
       expect((vectors[0] as Map)['password'], 'abc123');
       expect((vectors[0] as Map)['iterations'], 1000);
       expect((vectors[0] as Map)['salt_b64url'], 'c2FsdHNhbHQ');
+      expect(
+        (vectors[0] as Map)['expected'],
+        r'pbkdf2-sha512$1000$c2FsdHNhbHQ$Eco9WRT2ISifrauSAE7fKpTReo4CJ3d88LINw4A6yeE=',
+      );
 
       expect((vectors[1] as Map)['password'], 'سلام123');
       expect((vectors[1] as Map)['iterations'], 1000);
       expect((vectors[1] as Map)['salt_b64url'], 'c2FsdHNhbHQ');
+      expect(
+        (vectors[1] as Map)['expected'],
+        r'pbkdf2-sha512$1000$c2FsdHNhbHQ$R8m9GqMxQgX4B1Ql6klEagOUKH1Qx65PBiCySbbiUoY=',
+      );
 
       expect((vectors[2] as Map)['password'], 'p@ssw0rd!9');
       expect((vectors[2] as Map)['iterations'], 5000);
       expect((vectors[2] as Map)['salt_b64url'], 'c2hvcnQ');
+      expect(
+        (vectors[2] as Map)['expected'],
+        r'pbkdf2-sha512$5000$c2hvcnQ$N5hrgGog1Fmd6gZqwPfOwYBCyjThM3bmWgztfBHasF8=',
+      );
 
       expect(
         (vectors[3] as Map)['password'],
@@ -118,25 +148,43 @@ void main() {
       );
       expect((vectors[3] as Map)['iterations'], 1000);
       expect((vectors[3] as Map)['salt_b64url'], 'MTIzNDU2Nzg5MGFiY2RlZg');
+      expect(
+        (vectors[3] as Map)['expected'],
+        r'pbkdf2-sha512$1000$MTIzNDU2Nzg5MGFiY2RlZg$wpYYUpelyvFL5rEQEXSbTAR/dNylHt1rxbrIl5bMS8w=',
+      );
 
       expect((vectors[4] as Map)['password'], 'abc123');
       expect((vectors[4] as Map)['iterations'], 1000);
       expect((vectors[4] as Map)['salt_b64url'], 'c2FsdHNhbHQ=');
+      expect(
+        (vectors[4] as Map)['expected'],
+        r'pbkdf2-sha512$1000$c2FsdHNhbHQ=$Eco9WRT2ISifrauSAE7fKpTReo4CJ3d88LINw4A6yeE=',
+      );
+    });
+
+    test('generated fixture matches the committed backend fixture', () {
+      expectSuccess(
+        runTool(environment: {'KDF_FIXTURES_OUTPUT_DIR': tempDir.path}),
+      );
+
+      final generated = File(outputPath()).readAsStringSync();
+      final committed = File(
+        '${repoRoot.path}/backend/shared/fixtures/kdf_vectors.json',
+      ).readAsStringSync();
+
+      expect(
+        generated,
+        equals(committed),
+        reason: 'Regenerate with KDF_FIXTURES_OUTPUT_DIR=../backend/shared/fixtures',
+      );
     });
 
     test('main() falls back to the current directory when unset', () {
       // Run the tool from a temp working directory with no
       // KDF_FIXTURES_OUTPUT_DIR override: the script defaults to
       // Directory.current.path inside the spawned process.
-      final result = Process.runSync('dart', [
-        File(scriptPath).absolute.path,
-      ], workingDirectory: tempDir.path);
-      expect(
-        result.exitCode,
-        0,
-        reason:
-            'gen_kdf_fixtures.dart exited ${result.exitCode}: ${result.stderr}',
-      );
+      final result = runTool(workingDirectory: tempDir.path);
+      expectSuccess(result);
 
       final file = File(outputPath());
       expect(file.existsSync(), isTrue);
@@ -144,33 +192,47 @@ void main() {
       expect(vectors.length, 5);
     });
 
-    test('main() surfaces a clear failure when output dir is unwritable', () {
-      // Point output at a read-only directory
-      final readOnlyDir = Directory.systemTemp.createTempSync('readonly_test_');
-      final chmodResult = Process.runSync('chmod', ['555', readOnlyDir.path]);
-      expect(
-        chmodResult.exitCode,
-        0,
-        reason: 'chmod 555 failed: ${chmodResult.stderr}',
+    test('main() treats an empty override as unset', () {
+      final result = runTool(
+        environment: {'KDF_FIXTURES_OUTPUT_DIR': ''},
+        workingDirectory: tempDir.path,
+      );
+      expectSuccess(result);
+
+      final file = File(outputPath());
+      expect(file.existsSync(), isTrue);
+      final vectors = jsonDecode(file.readAsStringSync()) as List<dynamic>;
+      expect(vectors.length, 5);
+    });
+
+    test('main() creates nested output directories recursively', () {
+      final nested = '${tempDir.path}/nested/a/b';
+      final result = runTool(environment: {'KDF_FIXTURES_OUTPUT_DIR': nested});
+      expectSuccess(result);
+
+      final file = File('$nested/kdf_vectors.json');
+      expect(file.existsSync(), isTrue);
+      final vectors = jsonDecode(file.readAsStringSync()) as List<dynamic>;
+      expect(vectors.length, 5);
+    });
+
+    test('main() surfaces a clear failure when the output path is a file', () {
+      // A file where a directory is expected fails identically on POSIX,
+      // Windows, and as root (unlike chmod-based permission tests).
+      final blocker = File('${tempDir.path}/not-a-dir')..writeAsStringSync('x');
+
+      final result = runTool(
+        environment: {'KDF_FIXTURES_OUTPUT_DIR': '${blocker.path}/sub'},
       );
 
-      try {
-        final result = Process.runSync(
-          'dart',
-          [scriptPath],
-          environment: {'KDF_FIXTURES_OUTPUT_DIR': readOnlyDir.path},
-        );
-        expect(
-          result.exitCode,
-          isNot(0),
-          reason:
-              'expected non-zero exit when output dir is unwritable, '
-              'got ${result.exitCode}',
-        );
-      } finally {
-        Process.runSync('chmod', ['755', readOnlyDir.path]);
-        readOnlyDir.deleteSync(recursive: true);
-      }
-    }, skip: isRoot ? 'root bypasses chmod 555 permissions' : false);
+      expect(
+        result.exitCode,
+        isNot(0),
+        reason:
+            'expected non-zero exit when the output path is a file, '
+            'got ${result.exitCode}',
+      );
+      expect(result.stderr.toString(), isNotEmpty);
+    });
   });
 }

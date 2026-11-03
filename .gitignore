@@ -16,9 +16,15 @@ migrate_working_dir/
 /auth
 /auth-wal
 
-# Do not ignore the app's auth feature (moved into apps/daftari/ by Melos restructure)
+# Do not ignore the app's auth feature (moved into apps/daftari/ by Melos
+# restructure). These negations are defensive: /auth is root-anchored, so it
+# already stops matching apps/daftari/**/auth — never use a bare `auth` pattern.
 !apps/daftari/lib/features/auth/
 !apps/daftari/test/features/auth/
+
+# Default output of tool/gen_kdf_fixtures.dart; the canonical fixture is
+# backend/shared/fixtures/kdf_vectors.json (pass KDF_FIXTURES_OUTPUT_DIR).
+/apps/daftari/kdf_vectors.json
 
 # IntelliJ related
 *.iml
