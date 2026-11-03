@@ -27,28 +27,47 @@ void main() {
 
   group('gen_kdf_fixtures', () {
     late Directory tempDir;
+    late String generatedFixturePath;
+    late List<dynamic> cachedVectors;
+    late String toolBinary;
 
-    setUp(() {
+    setUpAll(() async {
       tempDir = Directory.systemTemp.createTempSync('gen_kdf_fixtures_test_');
+      generatedFixturePath = '${tempDir.path}/kdf_vectors.json';
+      toolBinary = '${tempDir.path}/gen_kdf_fixtures';
+
+      // Compile the tool ONCE (avoids build_runner hooks on every run).
+      final compileResult = Process.runSync('dart', [
+        'compile',
+        'exe',
+        scriptPath,
+        '-o',
+        toolBinary,
+      ]);
+      if (compileResult.exitCode != 0) {
+        throw StateError(
+          'setUpAll: compile failed ${compileResult.exitCode}: ${compileResult.stderr}',
+        );
+      }
+
+      // Generate the fixture ONCE for all tests (hermetic, fast, deterministic).
+      final result = Process.runSync(
+        toolBinary,
+        [],
+        environment: {'KDF_FIXTURES_OUTPUT_DIR': tempDir.path},
+      );
+      if (result.exitCode != 0) {
+        throw StateError(
+          'setUpAll: gen_kdf_fixtures.dart exited ${result.exitCode}: ${result.stderr}',
+        );
+      }
+      final content = File(generatedFixturePath).readAsStringSync();
+      cachedVectors = jsonDecode(content) as List<dynamic>;
     });
 
-    tearDown(() {
+    tearDownAll(() {
       tempDir.deleteSync(recursive: true);
     });
-
-    String outputPath() => '${tempDir.path}/kdf_vectors.json';
-
-    ProcessResult runTool({
-      Map<String, String>? environment,
-      String? workingDirectory,
-    }) {
-      return Process.runSync(
-        'dart',
-        [scriptPath],
-        environment: environment,
-        workingDirectory: workingDirectory,
-      );
-    }
 
     void expectSuccess(ProcessResult result) {
       expect(
@@ -60,18 +79,9 @@ void main() {
     }
 
     test('main() writes valid JSON fixture with 5 vectors', () {
-      final result = runTool(
-        environment: {'KDF_FIXTURES_OUTPUT_DIR': tempDir.path},
-      );
-      expectSuccess(result);
+      expect(cachedVectors.length, 5);
 
-      final file = File(outputPath());
-      expect(file.existsSync(), isTrue);
-
-      final vectors = jsonDecode(file.readAsStringSync()) as List<dynamic>;
-      expect(vectors.length, 5);
-
-      for (final v in vectors) {
+      for (final v in cachedVectors) {
         final map = v as Map<String, dynamic>;
         expect(map.keys.toSet(), {
           'password',
@@ -83,24 +93,18 @@ void main() {
     });
 
     test('main() is idempotent — re-run produces identical output', () {
-      final env = {'KDF_FIXTURES_OUTPUT_DIR': tempDir.path};
-      expectSuccess(runTool(environment: env));
-      final first = File(outputPath()).readAsStringSync();
-
-      expectSuccess(runTool(environment: env));
-      final second = File(outputPath()).readAsStringSync();
-
-      expect(second, equals(first));
+      final result = Process.runSync(
+        toolBinary,
+        [],
+        environment: {'KDF_FIXTURES_OUTPUT_DIR': tempDir.path},
+      );
+      expectSuccess(result);
+      final second = jsonDecode(File(generatedFixturePath).readAsStringSync());
+      expect(second, equals(cachedVectors));
     });
 
     test('each expected hash matches hashTagged round-trip', () {
-      expectSuccess(
-        runTool(environment: {'KDF_FIXTURES_OUTPUT_DIR': tempDir.path}),
-      );
-
-      final vectors = jsonDecode(File(outputPath()).readAsStringSync()) as List;
-
-      for (final v in vectors) {
+      for (final v in cachedVectors) {
         final map = v as Map<String, dynamic>;
         final expected = hashTagged(
           map['password'] as String,
@@ -112,102 +116,111 @@ void main() {
     });
 
     test('fixture values and frozen hashes are pinned per vector index', () {
-      expectSuccess(
-        runTool(environment: {'KDF_FIXTURES_OUTPUT_DIR': tempDir.path}),
-      );
-
-      final vectors = jsonDecode(File(outputPath()).readAsStringSync()) as List;
-
-      expect((vectors[0] as Map)['password'], 'abc123');
-      expect((vectors[0] as Map)['iterations'], 1000);
-      expect((vectors[0] as Map)['salt_b64url'], 'c2FsdHNhbHQ');
+      expect((cachedVectors[0] as Map)['password'], 'abc123');
+      expect((cachedVectors[0] as Map)['iterations'], 1000);
+      expect((cachedVectors[0] as Map)['salt_b64url'], 'c2FsdHNhbHQ');
       expect(
-        (vectors[0] as Map)['expected'],
+        (cachedVectors[0] as Map)['expected'],
         r'pbkdf2-sha512$1000$c2FsdHNhbHQ$Eco9WRT2ISifrauSAE7fKpTReo4CJ3d88LINw4A6yeE=',
       );
 
-      expect((vectors[1] as Map)['password'], 'سلام123');
-      expect((vectors[1] as Map)['iterations'], 1000);
-      expect((vectors[1] as Map)['salt_b64url'], 'c2FsdHNhbHQ');
+      expect((cachedVectors[1] as Map)['password'], 'سلام123');
+      expect((cachedVectors[1] as Map)['iterations'], 1000);
+      expect((cachedVectors[1] as Map)['salt_b64url'], 'c2FsdHNhbHQ');
       expect(
-        (vectors[1] as Map)['expected'],
+        (cachedVectors[1] as Map)['expected'],
         r'pbkdf2-sha512$1000$c2FsdHNhbHQ$R8m9GqMxQgX4B1Ql6klEagOUKH1Qx65PBiCySbbiUoY=',
       );
 
-      expect((vectors[2] as Map)['password'], 'p@ssw0rd!9');
-      expect((vectors[2] as Map)['iterations'], 5000);
-      expect((vectors[2] as Map)['salt_b64url'], 'c2hvcnQ');
+      expect((cachedVectors[2] as Map)['password'], 'p@ssw0rd!9');
+      expect((cachedVectors[2] as Map)['iterations'], 5000);
+      expect((cachedVectors[2] as Map)['salt_b64url'], 'c2hvcnQ');
       expect(
-        (vectors[2] as Map)['expected'],
+        (cachedVectors[2] as Map)['expected'],
         r'pbkdf2-sha512$5000$c2hvcnQ$N5hrgGog1Fmd6gZqwPfOwYBCyjThM3bmWgztfBHasF8=',
       );
 
       expect(
-        (vectors[3] as Map)['password'],
+        (cachedVectors[3] as Map)['password'],
         'a-very-long-password-with-ن-و-ع-و-م-ر-06',
       );
-      expect((vectors[3] as Map)['iterations'], 1000);
-      expect((vectors[3] as Map)['salt_b64url'], 'MTIzNDU2Nzg5MGFiY2RlZg');
+      expect((cachedVectors[3] as Map)['iterations'], 1000);
       expect(
-        (vectors[3] as Map)['expected'],
+        (cachedVectors[3] as Map)['salt_b64url'],
+        'MTIzNDU2Nzg5MGFiY2RlZg',
+      );
+      expect(
+        (cachedVectors[3] as Map)['expected'],
         r'pbkdf2-sha512$1000$MTIzNDU2Nzg5MGFiY2RlZg$wpYYUpelyvFL5rEQEXSbTAR/dNylHt1rxbrIl5bMS8w=',
       );
 
-      expect((vectors[4] as Map)['password'], 'abc123');
-      expect((vectors[4] as Map)['iterations'], 1000);
-      expect((vectors[4] as Map)['salt_b64url'], 'c2FsdHNhbHQ=');
+      expect((cachedVectors[4] as Map)['password'], 'abc123');
+      expect((cachedVectors[4] as Map)['iterations'], 1000);
+      expect((cachedVectors[4] as Map)['salt_b64url'], 'c2FsdHNhbHQ=');
       expect(
-        (vectors[4] as Map)['expected'],
+        (cachedVectors[4] as Map)['expected'],
         r'pbkdf2-sha512$1000$c2FsdHNhbHQ=$Eco9WRT2ISifrauSAE7fKpTReo4CJ3d88LINw4A6yeE=',
       );
     });
 
     test('generated fixture matches the committed backend fixture', () {
-      expectSuccess(
-        runTool(environment: {'KDF_FIXTURES_OUTPUT_DIR': tempDir.path}),
+      final committed = jsonDecode(
+        File('${repoRoot.path}/backend/shared/fixtures/kdf_vectors.json')
+            .readAsStringSync(),
       );
-
-      final generated = File(outputPath()).readAsStringSync();
-      final committed = File(
-        '${repoRoot.path}/backend/shared/fixtures/kdf_vectors.json',
-      ).readAsStringSync();
-
-      expect(
-        generated,
-        equals(committed),
-        reason: 'Regenerate with KDF_FIXTURES_OUTPUT_DIR=../backend/shared/fixtures',
-      );
+      expect(cachedVectors, equals(committed));
     });
 
     test('main() falls back to the current directory when unset', () {
-      // Run the tool from a temp working directory with no
-      // KDF_FIXTURES_OUTPUT_DIR override: the script defaults to
-      // Directory.current.path inside the spawned process.
-      final result = runTool(workingDirectory: tempDir.path);
-      expectSuccess(result);
+      final fallbackDir = Directory.systemTemp.createTempSync(
+        'gen_kdf_fixtures_fallback_',
+      );
+      try {
+        final result = Process.runSync(
+          toolBinary,
+          [],
+          workingDirectory: fallbackDir.path,
+        );
+        expectSuccess(result);
 
-      final file = File(outputPath());
-      expect(file.existsSync(), isTrue);
-      final vectors = jsonDecode(file.readAsStringSync()) as List<dynamic>;
-      expect(vectors.length, 5);
+        final file = File('${fallbackDir.path}/kdf_vectors.json');
+        expect(file.existsSync(), isTrue);
+        final vectors = jsonDecode(file.readAsStringSync()) as List<dynamic>;
+        expect(vectors.length, 5);
+      } finally {
+        fallbackDir.deleteSync(recursive: true);
+      }
     });
 
     test('main() treats an empty override as unset', () {
-      final result = runTool(
-        environment: {'KDF_FIXTURES_OUTPUT_DIR': ''},
-        workingDirectory: tempDir.path,
+      final fallbackDir = Directory.systemTemp.createTempSync(
+        'gen_kdf_fixtures_empty_',
       );
-      expectSuccess(result);
+      try {
+        final result = Process.runSync(
+          toolBinary,
+          [],
+          environment: {'KDF_FIXTURES_OUTPUT_DIR': ''},
+          workingDirectory: fallbackDir.path,
+        );
+        expectSuccess(result);
 
-      final file = File(outputPath());
-      expect(file.existsSync(), isTrue);
-      final vectors = jsonDecode(file.readAsStringSync()) as List<dynamic>;
-      expect(vectors.length, 5);
+        final file = File('${fallbackDir.path}/kdf_vectors.json');
+        expect(file.existsSync(), isTrue);
+        final vectors = jsonDecode(file.readAsStringSync()) as List<dynamic>;
+        expect(vectors.length, 5);
+      } finally {
+        fallbackDir.deleteSync(recursive: true);
+      }
     });
 
     test('main() creates nested output directories recursively', () {
       final nested = '${tempDir.path}/nested/a/b';
-      final result = runTool(environment: {'KDF_FIXTURES_OUTPUT_DIR': nested});
+      final result = Process.runSync(
+        toolBinary,
+        [],
+        environment: {'KDF_FIXTURES_OUTPUT_DIR': nested},
+      );
       expectSuccess(result);
 
       final file = File('$nested/kdf_vectors.json');
@@ -221,7 +234,9 @@ void main() {
       // Windows, and as root (unlike chmod-based permission tests).
       final blocker = File('${tempDir.path}/not-a-dir')..writeAsStringSync('x');
 
-      final result = runTool(
+      final result = Process.runSync(
+        toolBinary,
+        [],
         environment: {'KDF_FIXTURES_OUTPUT_DIR': '${blocker.path}/sub'},
       );
 
