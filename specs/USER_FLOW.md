@@ -2581,7 +2581,9 @@ Service      Service    Service
 [ Dart: hashTagged(password, iterations, salt) ]
                 │
                 ▼
-[ Writes backend/shared/fixtures/kdf_vectors.json ]
+[ Writes kdf_vectors.json to $KDF_FIXTURES_OUTPUT_DIR ]
+[ (default: package root; regenerate the tracked file with ]
+[  KDF_FIXTURES_OUTPUT_DIR=../backend/shared/fixtures) ]
                 │
                 ▼
 [ CI: vitest runs password_kdf.test.ts ]

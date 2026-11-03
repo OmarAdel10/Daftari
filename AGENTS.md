@@ -50,8 +50,8 @@ global contract disagree, the stricter rule applies.
 melos bootstrap     # flutter pub get for every Dart package
 melos run analyze   # format check + analyze (flutter analyze / dart analyze)
 melos run test      # flutter test / dart test
-melos run format    # dart format
-melos run build     # flutter build apk --debug (Flutter packages)
+melos run format    # format CHECK only (dart format --set-exit-if-changed)
+melos run build     # flutter build linux --debug (no android target in this repo)
 ```
 
 Non-Dart gates (run from repo root):
