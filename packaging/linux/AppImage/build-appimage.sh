@@ -5,6 +5,8 @@ set -euo pipefail
 # Usage: ./build-appimage.sh [version]
 
 VERSION="${1:-$(git describe --tags --always --dirty)}"
+# Ref-derived names may contain characters that break output paths.
+VERSION="${VERSION//[^A-Za-z0-9._-]/_}"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 APP_DIR="${PROJECT_ROOT}/apps/daftari"
 BUILD_DIR="${APP_DIR}/build/linux/x64/release/bundle"

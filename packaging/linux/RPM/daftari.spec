@@ -38,8 +38,8 @@ printing via CUPS, with full Arabic RTL support.
 %build
 # 1. Flutter Linux release build (Flutter app lives in apps/daftari)
 cd apps/daftari
-export ED25519_PUBKEY_HEX=%{?ed25519_pubkey_hex}
-flutter build linux --release --dart-define=ED25519_PUBKEY_HEX=%{?ed25519_pubkey_hex}
+export ED25519_PUBKEY_HEX='%{?ed25519_pubkey_hex}'
+flutter build linux --release --dart-define=ED25519_PUBKEY_HEX="%{?ed25519_pubkey_hex}"
 
 # 2. PrintServer.Linux self-contained build
 cd ../../PrintServer.Linux
@@ -72,9 +72,9 @@ StartupNotify=true
 StartupWMClass=daftari
 EOF
 
-# Icon
-mkdir -p %{buildroot}/usr/share/icons/hicolor/256x256/apps
-cp apps/daftari/assets/icon/daftari_icon.png %{buildroot}/usr/share/icons/hicolor/256x256/apps/daftari.png
+# Icon (asset is 32x32 — install into the matching hicolor bucket)
+mkdir -p %{buildroot}/usr/share/icons/hicolor/32x32/apps
+cp apps/daftari/assets/icon/daftari_icon.png %{buildroot}/usr/share/icons/hicolor/32x32/apps/daftari.png
 
 # AppStream metadata (optional, for software centers)
 mkdir -p %{buildroot}/usr/share/metainfo

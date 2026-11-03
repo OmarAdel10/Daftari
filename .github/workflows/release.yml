@@ -13,6 +13,13 @@ on:
 permissions:
   contents: write
 
+# Ed25519 PUBLIC verification key baked into desktop builds as a compile-time
+# define. It is deliberately committed here (public key, reviewable, single
+# source of truth): do NOT move it to a secret — an unset secret expands to an
+# empty define and ships a build that cannot launch (LicenseEngine throws).
+env:
+  ED25519_PUBKEY_HEX: bd6b436ee74d9a8a6fae5c720488574c0aac04b561a1810fe8cef0d7cdd84a7c
+
 jobs:
   shorebird-patch:
     name: Shorebird OTA Patch (Windows)
@@ -53,7 +60,6 @@ jobs:
         run: shorebird patch windows --dart-define=ED25519_PUBKEY_HEX=${ED25519_PUBKEY_HEX}
         env:
           SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
-          ED25519_PUBKEY_HEX: ${{ secrets.ED25519_PUBKEY_HEX }}
 
   release:
     name: Release (Windows Installer + Linux AppImage/RPM)
@@ -119,7 +125,6 @@ jobs:
           shorebird release windows -- --obfuscate --split-debug-info=symbols --dart-define=ED25519_PUBKEY_HEX=${ED25519_PUBKEY_HEX}
         env:
           SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
-          ED25519_PUBKEY_HEX: ${{ secrets.ED25519_PUBKEY_HEX }}
       - name: Compile Inno Setup Installer Package
         if: matrix.platform == 'windows'
         uses: Minionguyjpro/Inno-Setup-Action@b8e8eb5936437c243592fda645c96dfc6488c275  # v1.2.2
@@ -174,7 +179,6 @@ jobs:
           chmod +x packaging/linux/AppImage/build-appimage.sh
           ./packaging/linux/AppImage/build-appimage.sh "${VERSION#v}"
         env:
-          ED25519_PUBKEY_HEX: ${{ secrets.ED25519_PUBKEY_HEX }}
           VERSION: ${{ github.ref_name }}
       - name: Build RPM Release
         if: matrix.platform == 'linux'
@@ -182,7 +186,6 @@ jobs:
           chmod +x packaging/linux/RPM/build-rpm.sh
           ./packaging/linux/RPM/build-rpm.sh "${VERSION#v}"
         env:
-          ED25519_PUBKEY_HEX: ${{ secrets.ED25519_PUBKEY_HEX }}
           VERSION: ${{ github.ref_name }}
       - name: Verify AppImage
         if: matrix.platform == 'linux'

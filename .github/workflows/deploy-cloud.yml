@@ -90,15 +90,26 @@ jobs:
 
       # wrangler pages deploy does NOT auto-create projects non-interactively (fails with
       # "Project not found [code: 8000007]") — create idempotently before the first deploy.
+      - name: Validate Pages inputs
+        if: inputs.deploy_landing
+        env:
+          PAGES_PROJECT: ${{ inputs.pages_project }}
+          PAGES_BRANCH: ${{ inputs.pages_branch }}
+        run: |
+          [[ "$PAGES_PROJECT" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "::error::invalid pages_project"; exit 1; }
+          [[ "$PAGES_BRANCH" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "::error::invalid pages_branch"; exit 1; }
+
       - name: Ensure Pages project exists (idempotent)
         if: inputs.deploy_landing
         working-directory: landing_page
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PAGES_PROJECT: ${{ inputs.pages_project }}
+          PAGES_BRANCH: ${{ inputs.pages_branch }}
         run: |
           set +e
-          OUTPUT=$(npx wrangler pages project create ${{ inputs.pages_project }} --production-branch=${{ inputs.pages_branch }} 2>&1)
+          OUTPUT=$(npx wrangler pages project create "$PAGES_PROJECT" --production-branch="$PAGES_BRANCH" 2>&1)
           STATUS=$?
           set -e
           echo "$OUTPUT"
