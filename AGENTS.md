@@ -93,7 +93,7 @@ dotnet test PrintServer.Tests/PrintServer.Tests.csproj -c Release
 ## 5. Specs Compliance
 
 `specs/` (`PRD.md`, `ARCHITECTURE.md`, `DESIGN.md`, `USER_FLOW.md`,
-`DEVELOPMENT_ENVIRONMENT.md`) is the source of truth. No out-of-spec features.
+`DEVELOPMENT_ENVIRONMENT.md`, `PERFORMANCE_GUIDELINES.md`) is the source of truth. No out-of-spec features.
 Ambiguity → ask the user, never guess.
 
 ---
