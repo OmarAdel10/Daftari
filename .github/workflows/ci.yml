@@ -49,34 +49,19 @@ jobs:
           cache: true
           cache-key: flutter-linux-${{ hashFiles('apps/daftari/pubspec.lock') }}
 
-      - name: Install dependencies
-        working-directory: apps/daftari
-        run: flutter pub get
-
-      - name: Check Formatting
-        working-directory: apps/daftari
-        run: dart format --set-exit-if-changed lib test tool
-
-      - name: Analyze
-        working-directory: apps/daftari
-        run: flutter analyze
-
-      - name: Clean stale Hive locks (FUSE safety)
-        working-directory: apps/daftari
-        shell: bash
+      - name: Activate Melos
         run: |
-          for dir in test/_hive_test*; do
-            [ -d "$dir" ] || continue
-            for lock in "$dir"/*.lock; do
-              [ -e "$lock" ] || continue
-              echo "Removing stale lock: $lock"
-              rm -f "$lock"
-            done
-          done
+          dart pub global activate melos 6.3.3
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
 
-      - name: Unit Tests
-        working-directory: apps/daftari
-        run: flutter test
+      - name: Bootstrap workspace
+        run: melos bootstrap
+
+      - name: Verify melos analyze
+        run: melos run analyze
+
+      - name: Verify melos test
+        run: melos run test
 
       # Landing page is the Jaspr project (not a Flutter flavor) — verify its build too.
       - name: Build landing page
@@ -91,17 +76,18 @@ jobs:
           cd landing_page
           dart test
 
-      # Verify Melos workspace scripts (analyze for all packages including landing_page)
-      - name: Activate Melos
+      - name: Clean stale Hive locks (FUSE safety)
+        working-directory: apps/daftari
+        shell: bash
         run: |
-          dart pub global activate melos 6.3.3
-          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
-
-      - name: Bootstrap workspace
-        run: melos bootstrap
-
-      - name: Verify melos analyze
-        run: melos run analyze
+          for dir in test/_hive_test*; do
+            [ -d "$dir" ] || continue
+            for lock in "$dir"/*.lock; do
+              [ -e "$lock" ] || continue
+              echo "Removing stale lock: $lock"
+              rm -f "$lock"
+            done
+          done
 
   # TypeScript workers: api, realtime (DO hub), admin_host, paymob webhook, shared.
   backend-tests:
@@ -262,18 +248,6 @@ jobs:
               rm -f "$lock"
             done
           done
-
-      - name: Run Tests
-        working-directory: apps/daftari
-        run: flutter test
-
-      - name: Check Formatting
-        working-directory: apps/daftari
-        run: dart format --set-exit-if-changed lib test tool
-
-      - name: Analyze
-        working-directory: apps/daftari
-        run: flutter analyze
 
   # C# print servers.
   printserver-build:
