@@ -1,0 +1,9 @@
+{
+  "name": "daftari-root",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Daftari monorepo root — NO npm install here. Use backend/*/package.json for TypeScript packages.",
+  "scripts": {
+    "install": "echo \"❌ Do not run npm install at repo root. Use: cd backend/<package> && npm ci\" && exit 1"
+  }
+}
