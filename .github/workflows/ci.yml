@@ -47,7 +47,7 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: ${{ env.FLUTTER_CHANNEL }}
           cache: true
-          cache-key: flutter-linux-${{ hashFiles('apps/daftari/pubspec.lock') }}
+          cache-key: flutter-linux-${{ hashFiles('apps/daftari/pubspec.lock', 'landing_page/pubspec.lock') }}
 
       - name: Activate Melos
         run: |
