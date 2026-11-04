@@ -25,8 +25,12 @@ daftari/
 │   └── shared/            # Shared libs (Turso/libSQL, cache, repos)
 ├── PrintServer/           # C# .NET 8 Windows print service
 ├── PrintServer.Linux/     # C# .NET 8 Linux print service
+├── PrintServer.Tests/     # C# Windows print server tests
+├── PrintServer.Linux.Tests/ # C# Linux print server tests
 ├── packaging/             # Linux AppImage/RPM, Windows installers
-├── specs/                 # PRD, ARCHITECTURE, DESIGN, USER_FLOW, DEVELOPMENT_ENVIRONMENT
+├── specs/                 # PRD, ARCHITECTURE, DESIGN, USER_FLOW, DEVELOPMENT_ENVIRONMENT, PERFORMANCE_GUIDELINES
+├── .github/               # CI/CD workflows (GitHub Actions)
+├── docs/                  # Follow-ups, plans, support docs
 ├── melos.yaml             # Melos workspace (Dart/Flutter packages only)
 ├── package.json           # Root npm guard (DO NOT install here)
 ├── .npmrc                 # npm config (prefer-offline, no install-links)
@@ -39,7 +43,7 @@ daftari/
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| Dart SDK | `^3.13.0` (stable) | Flutter, melos, landing_page |
+| Dart SDK | `3.13.x` (stable) | Flutter, melos, landing_page |
 | Flutter | `3.47.x` (stable) | Flutter app builds |
 | Melos | `6.3.3` | Dart workspace orchestration |
 | .NET SDK | `8.0.x` | PrintServer (Windows + Linux) |
@@ -105,7 +109,7 @@ melos run analyze
 # Run tests (both packages)
 melos run test
 
-# Build Flutter Linux debug
+# Build Flutter Linux debug (Linux host only)
 melos run build
 
 # Per-package variants
