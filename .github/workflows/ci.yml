@@ -297,11 +297,23 @@ jobs:
         run: |
           cd PrintServer
           dotnet build -c Release
+      - name: Format check PrintServer (Windows)
+        if: runner.os == 'Windows'
+        run: dotnet format PrintServer/PrintServer.csproj --verify-no-changes
+      - name: Test PrintServer (Windows)
+        if: runner.os == 'Windows'
+        run: dotnet test PrintServer.Tests/PrintServer.Tests.csproj -c Release --blame-hang-timeout 2m
       - name: Build PrintServer (Linux)
         if: runner.os == 'Linux'
         run: |
           cd PrintServer.Linux
-          dotnet build -c Release
+          dotnet build -c Release -r linux-x64
+      - name: Format check PrintServer.Linux (Linux)
+        if: runner.os == 'Linux'
+        run: dotnet format PrintServer.Linux/PrintServer.Linux.csproj --verify-no-changes
+      - name: Test PrintServer.Linux (Linux)
+        if: runner.os == 'Linux'
+        run: dotnet test PrintServer.Linux.Tests/PrintServer.Linux.Tests.csproj -c Release --blame-hang-timeout 2m
 
   # Filesystem vulnerability scan.
   security-scan:
