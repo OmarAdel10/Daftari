@@ -39,8 +39,8 @@ daftari/
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| Dart SDK | `^3.13.0` | Flutter, melos, landing_page |
-| Flutter | `3.47.x` (stable) | Flutter app builds |
+| Dart SDK | `^3.13.0` (stable) | Flutter, melos, landing_page |
+| Flutter | `3.47.1` (stable) | Flutter app builds |
 | Melos | `6.3.3` | Dart workspace orchestration |
 | .NET SDK | `8.0.x` | PrintServer (Windows + Linux) |
 | Node.js | `22.x` | TypeScript backend packages |
@@ -83,10 +83,10 @@ cd ../paymob_webhook && npm ci
 
 ```bash
 # Windows
-cd PrintServer && dotnet restore && dotnet build -c Release
+cd PrintServer && dotnet build -c Release
 
 # Linux
-cd PrintServer.Linux && dotnet restore && dotnet build -c Release -r linux-x64
+cd PrintServer.Linux && dotnet build -c Release -r linux-x64
 ```
 
 ---

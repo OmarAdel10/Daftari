@@ -1,0 +1,9 @@
+{
+  "name": "daftari-root",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Daftari monorepo root — NO npm install here. Dart: melos bootstrap. TypeScript: cd backend/<pkg> && npm ci",
+  "scripts": {
+    "install": "echo \"❌ Do not run npm install at repo root. Use: cd backend/<pkg> && npm ci\" && exit 1"
+  }
+}
