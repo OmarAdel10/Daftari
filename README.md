@@ -40,7 +40,7 @@ daftari/
 | Tool | Version | Purpose |
 |------|---------|---------|
 | Dart SDK | `^3.13.0` (stable) | Flutter, melos, landing_page |
-| Flutter | `3.47.1` (stable) | Flutter app builds |
+| Flutter | `3.47.x` (stable) | Flutter app builds |
 | Melos | `6.3.3` | Dart workspace orchestration |
 | .NET SDK | `8.0.x` | PrintServer (Windows + Linux) |
 | Node.js | `22.x` | TypeScript backend packages |
@@ -208,7 +208,12 @@ Runs on **every push/PR**:
 | `backend/*/package.json` | TypeScript backend deps |
 | `PrintServer*/*.csproj` | C# Print Server projects |
 | `.github/workflows/ci.yml` | CI pipeline |
-| `specs/*.md` | PRD, Architecture, Design, User Flow, Dev Env |
+| `specs/PRD.md` | Product Requirements |
+| `specs/ARCHITECTURE.md` | System Architecture |
+| `specs/DESIGN.md` | Design System |
+| `specs/USER_FLOW.md` | User Flows |
+| `specs/DEVELOPMENT_ENVIRONMENT.md` | Dev Environment Setup |
+| `specs/PERFORMANCE_GUIDELINES.md` | Performance Targets |
 | `AGENTS.md` | Agent operating contract (branch rules, CI gates, melos commands) |
 
 ---
@@ -222,16 +227,6 @@ Runs on **every push/PR**:
 - **Never commit**: `build/`, `.dart_tool/`, `node_modules/`, `*.lock` (except root `pubspec.lock` + per-package locks), `.DS_Store`
 
 ---
-
-## Documentation
-
-- `specs/PRD.md` — Product Requirements
-- `specs/ARCHITECTURE.md` — System Architecture
-- `specs/DESIGN.md` — Design System
-- `specs/USER_FLOW.md` — User Flows
-- `specs/DEVELOPMENT_ENVIRONMENT.md` — Dev Environment Setup
-- `specs/PERFORMANCE_GUIDELINES.md` — Performance Targets
-- `AGENTS.md` — Agent Operating Contract (branch rules, CI gates, melos commands)
 
 ---
 
