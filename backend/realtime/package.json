@@ -3,12 +3,13 @@
   "version": "1.0.0",
   "type": "module",
   "private": true,
+  "description": "Realtime Cloudflare Worker. Requires globally installed wrangler@4.157.0 (see DEVELOPMENT_ENVIRONMENT.md).",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
     "dev": "wrangler dev",
-    "build": "wrangler deploy --dry-run --outdir=dist",
+    "build": "wrangler deploy --dry-run",
     "deploy": "wrangler deploy",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
