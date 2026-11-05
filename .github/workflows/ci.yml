@@ -163,7 +163,7 @@ jobs:
 
       - name: Dry run every worker package in every environment
         run: |
-          set -e
+          set -eo pipefail
           for pkg in api realtime admin_host paymob_webhook; do
             for target in '' '--env staging' '--env production'; do
               echo "== $pkg: ${target:-dev} =="
