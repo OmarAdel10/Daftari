@@ -124,6 +124,62 @@ jobs:
       - name: Typecheck
         run: cd backend/${{ matrix.worker }} && npm run typecheck
 
+  # Bundle-size / startup / Durable-Object-export gate — every package × every env,
+  # zero deploys (dry-run never touches Cloudflare). Caught the missing TenantNotifier
+  # export defect before it could reach production.
+  wrangler-dry-run:
+    name: Workers Dry Run (bundle size + startup + DO export)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6  # v4.0.4
+        with:
+          # Backend workers declare engines.node >=22 (wrangler 4.x needs it).
+          node-version: '22'
+
+      - name: Install pinned wrangler CLI
+        run: npm install -g --prefix "$HOME/.local" wrangler@4.157.0
+
+      - name: Add wrangler to PATH
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Assert pinned wrangler version
+        run: test "$(wrangler --version)" = "4.157.0"
+
+      - name: Install shared dependencies
+        run: npm ci --prefix backend/shared --include=dev --no-audit --no-fund
+
+      - name: Install worker dependencies for dry run
+        run: |
+          for pkg in api realtime admin_host paymob_webhook; do
+            npm ci --prefix backend/$pkg --include=dev --no-audit --no-fund
+          done
+
+      - name: Dry run every Worker package in every environment
+        run: |
+          set -eo pipefail
+          # admin_host is a Cloudflare Pages project (has [assets] in wrangler.toml
+          # pointing to backend/admin_host/public, a build output not present in
+          # source). It is validated via `wrangler pages deploy` in deploy-cloud.yml,
+          # not via `wrangler deploy --dry-run`.
+          for pkg in api realtime paymob_webhook; do
+            for target in '' '--env staging' '--env production'; do
+              echo "== $pkg: ${target:-dev} =="
+              (cd backend/$pkg && wrangler deploy --dry-run $target 2>&1 | tee /tmp/dry-run.out)
+              UPLOAD_KB=$(awk '/Total Upload:/{match($0, /[0-9]+\.[0-9]+/); print substr($0, RSTART, RLENGTH)}' /tmp/dry-run.out)
+              if [ -z "$UPLOAD_KB" ]; then
+                echo "::error::No 'Total Upload:' in wrangler output for $pkg ${target:-dev}; dry-run may have failed or output format changed"; exit 1
+              fi
+              awk "BEGIN { if ($UPLOAD_KB >= 65536) exit 1 }" || { echo "::error::Bundle ${UPLOAD_KB}KiB exceeds 64MiB Free cap for $pkg ${target:-dev}"; exit 1; }
+            done
+          done
+
   # Full flavor×env×platform matrix — main branches and PRs into them only.
   flutter-matrix:
     name: Flutter ${{ matrix.flavor }}/${{ matrix.env }}/${{ matrix.platform }}
@@ -465,7 +521,7 @@ jobs:
   # when the result is exactly 'skipped' — failure/cancelled still fail.
   ci-summary:
     name: CI Summary (Required)
-    needs: [fast-verify, flutter-matrix, backend-tests, printserver-build, packaging-verify-linux, packaging-verify-windows, security-scan]
+    needs: [fast-verify, flutter-matrix, backend-tests, printserver-build, packaging-verify-linux, packaging-verify-windows, security-scan, wrangler-dry-run]
     runs-on: ubuntu-latest
     if: always()
     permissions:
