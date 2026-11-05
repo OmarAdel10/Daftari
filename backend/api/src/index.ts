@@ -18,7 +18,8 @@ import { registerBranding } from './routes/branding';
 import { registerAuth } from './routes/auth';
 import { registerSessions } from './routes/sessions';
 import { createApiRuntime } from './runtime';
-import type { ApiRuntimeEnv } from './application/ports';
+import type { ApiRuntimeEnv, ApiServices } from './application/ports';
+import type { ExecutionContext } from '@cloudflare/workers-types';
 import type { FirebaseTokenVerifier } from './application/ports';
 import type { FetchFn } from '../../shared/src/types';
 import { verifyTagged } from '../../shared/src/password_kdf';
@@ -54,6 +55,10 @@ export interface ApiDeps {
   rateLimit?: (tenantId: string, username: string, ip: string, at: number) => Promise<{ allowed: boolean; retryAfterMs?: number }>;
   /** Shared admin JWT secret used for signing session JWTs. Required — no fallback. */
   adminJwtSecret: string;
+  /** Service container built from the real Worker bindings (`env`), not module
+   *  scope. Passed in by the fetch handler so secrets are read at request time,
+   *  never via `process.env` at load time. */
+  services: ApiServices;
 }
 
 /** Dashboard origin served by the paired admin_host worker in each
@@ -133,29 +138,15 @@ export function createApp(deps: ApiDeps) {
     }, schemaOk ? 200 : 503);
   });
 
-  const runtime = createApiRuntime({
-    getDb,
-    verifyToken: deps.verifyToken ?? verifyFirebaseToken,
-    verify: deps.verify ?? verifyTagged,
-  });
-  const dummyEnv: ApiRuntimeEnv = {
-    TURSO_DATABASE_URL: 'https://dummy.turso.io',
-    TURSO_AUTH_TOKEN: 'dummy-token',
-    ADMIN_JWT_SECRET: deps.adminJwtSecret,
-    FIREBASE_PROJECT_ID: 'dummy-project',
-    POSTHOG_API_KEY: 'phc_test',
-    verifyToken: deps.verifyToken ?? verifyFirebaseToken,
-    verify: deps.verify ?? verifyTagged,
-  };
-  const services = runtime.getServices(dummyEnv);
-  // Use cases are pre-built in runtime.ts via createApiRuntime; index.ts only
-  // delegates to them (Phase 12: DI container integration).
-  const useCases = services.auth;
+  // Services are built from the real Worker bindings (`env`) by the fetch
+  // handler (servicesFor) and passed in via deps.services. No module-scope
+  // dummy env, no process.env reads — secrets are read at request time.
+  const useCases = deps.services.auth;
   registerAuth(app, {
     useCases,
-    sessionRepository: services.auth.sessionRepository,
-    authUserRepository: services.auth.authUserRepository,
-    userRepository: services.auth.userRepository,
+    sessionRepository: deps.services.auth.sessionRepository,
+    authUserRepository: deps.services.auth.authUserRepository,
+    userRepository: deps.services.auth.userRepository,
     verifyToken: deps.verifyToken ?? verifyFirebaseToken,
     verify: deps.verify ?? verifyTagged,
     rateLimit: deps.rateLimit,
@@ -166,16 +157,16 @@ export function createApp(deps: ApiDeps) {
     sessionEnd: useCases.sessionEnd,
     sessionListActive: useCases.sessionListActive,
     verifyToken: deps.verifyToken,
-    sessionRepository: services.auth.sessionRepository,
-    authUserRepository: services.auth.authUserRepository,
-    userRepository: services.auth.userRepository,
+    sessionRepository: deps.services.auth.sessionRepository,
+    authUserRepository: deps.services.auth.authUserRepository,
+    userRepository: deps.services.auth.userRepository,
     rateLimit: deps.rateLimit,
   });
   registerSales(app, {
     verifyToken: deps.verifyToken,
-    sessionRepository: services.auth.sessionRepository,
-    authUserRepository: services.auth.authUserRepository,
-    userRepository: services.auth.userRepository,
+    sessionRepository: deps.services.auth.sessionRepository,
+    authUserRepository: deps.services.auth.authUserRepository,
+    userRepository: deps.services.auth.userRepository,
     saleRecord: useCases.saleRecord,
     saleList: useCases.saleList,
     rateLimit: deps.rateLimit,
@@ -183,18 +174,18 @@ export function createApp(deps: ApiDeps) {
   registerAdmin(app, {
     verifyToken: deps.verifyToken,
     getDb: get,
-    sessionRepository: services.auth.sessionRepository,
-    authUserRepository: services.auth.authUserRepository,
-    userRepository: services.auth.userRepository,
+    sessionRepository: deps.services.auth.sessionRepository,
+    authUserRepository: deps.services.auth.authUserRepository,
+    userRepository: deps.services.auth.userRepository,
     adminSettings: useCases.adminSettings,
     deviceLink: useCases.deviceLink,
   });
   // After registerAdmin: the /admin/* requireAuth middleware covers these.
   registerUsers(app, {
     verifyToken: deps.verifyToken,
-    sessionRepository: services.auth.sessionRepository,
-    authUserRepository: services.auth.authUserRepository,
-    userRepository: services.auth.userRepository,
+    sessionRepository: deps.services.auth.sessionRepository,
+    authUserRepository: deps.services.auth.authUserRepository,
+    userRepository: deps.services.auth.userRepository,
     userList: useCases.userList,
     userCreate: useCases.userCreate,
     userUpdate: useCases.userUpdate,
@@ -202,39 +193,52 @@ export function createApp(deps: ApiDeps) {
   });
   registerAnalytics(app, {
     verifyToken: deps.verifyToken,
-    sessionRepository: services.auth.sessionRepository,
-    authUserRepository: services.auth.authUserRepository,
-    userRepository: services.auth.userRepository,
+    sessionRepository: deps.services.auth.sessionRepository,
+    authUserRepository: deps.services.auth.authUserRepository,
+    userRepository: deps.services.auth.userRepository,
     postHogFetch: deps.postHogFetch,
   });
   registerBranding(app, {
     verifyToken: deps.verifyToken,
-    sessionRepository: services.auth.sessionRepository,
-    authUserRepository: services.auth.authUserRepository,
-    userRepository: services.auth.userRepository,
+    sessionRepository: deps.services.auth.sessionRepository,
+    authUserRepository: deps.services.auth.authUserRepository,
+    userRepository: deps.services.auth.userRepository,
   });
 
   return app;
 }
 
-let app: Hono<{ Bindings: Env; Variables: Vars }>;
-// ADMIN_JWT_SECRET is the only module-load prerequisite (it gates the runtime
-// credential check inside createApp). When absent the deployment is invalid:
-// serve a clean 503 instead of crashing the worker. Any OTHER error from
-// createApp is a real bug and must propagate loudly — masking every failure
-// as 503 hides coding errors behind an 'API not configured' response.
-const moduleAdminJwtSecret = process.env.ADMIN_JWT_SECRET ?? '';
-if (moduleAdminJwtSecret) {
-  app = createApp({ adminJwtSecret: moduleAdminJwtSecret });
-} else {
-  app = new Hono<{ Bindings: Env; Variables: Vars }>();
-  app.all('*', (c) => c.json({ ok: false, error: 'API not configured' }, 503));
+/** Lazily build the service container once from the real Worker bindings,
+ *  then reuse it (all requests to a deployment share the same env). Secrets
+ *  are read at request time via `env`, never via `process.env` at load time. */
+let cachedServices: ApiServices | null = null;
+
+function servicesFor(env: Env): ApiServices {
+  if (!cachedServices) {
+    cachedServices = createApiRuntime({
+      getDb,
+      verifyToken: verifyFirebaseToken,
+      verify: verifyTagged,
+    }).getServices(env as unknown as ApiRuntimeEnv);
+  }
+  return cachedServices;
 }
 
 export default {
-  fetch: app.fetch,
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const services = servicesFor(env);
+    const app = createApp({
+      adminJwtSecret: env.ADMIN_JWT_SECRET,
+      services,
+      getDb,
+      verifyToken: verifyFirebaseToken,
+      verify: verifyTagged,
+      postHogFetch: fetch,
+    });
+    return app.fetch(request, env, ctx);
+  },
   /** Daily cron: mark expired licenses (grace_end in the past). */
-  async scheduled(_event: unknown, env: Env, ctx: unknown): Promise<void> {
+  async scheduled(_event: unknown, env: Env, ctx: ExecutionContext): Promise<void> {
     void _event;
     void ctx;
     const db = getDb(env);

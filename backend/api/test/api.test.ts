@@ -17,7 +17,10 @@ vi.mock('@libsql/client', () => ({
 }));
 
 import { createApp } from '../src/index';
+import { createApiRuntime } from '../src/runtime';
+import { getDb } from '../src/db';
 import type { Env, Vars } from '../src/env';
+import type { ApiRuntimeEnv } from '../src/application/ports';
 import type { SessionStartUseCase } from '../src/application/use-cases/session-start-use-case';
 import type { SessionHeartbeatUseCase } from '../src/application/use-cases/session-heartbeat-use-case';
 import type { SessionEndUseCase } from '../src/application/use-cases/session-end-use-case';
@@ -104,9 +107,11 @@ function realtimeBodies(): Array<Record<string, unknown>> {
 }
 
 function makeApp() {
+  const services = createApiRuntime({ getDb, verifyToken: verifyTokenStub, verify: verifyTagged }).getServices(env as unknown as ApiRuntimeEnv);
   return createApp({
     verifyToken: verifyTokenStub,
     adminJwtSecret: 'test-admin-jwt-secret',
+    services,
     postHogFetch: () => Promise.resolve(new Response('{"status":"Ok"}', { status: 200 })),
   });
 }
@@ -1789,11 +1794,12 @@ describe('login + revoke routes (admin-dashboard T06)', () => {
   it('an unknown username still performs a password derivation (T16)', async () => {
     dbState.authUserRows = [];
     const derive = vi.fn(() => Promise.resolve(false));
+    const services = createApiRuntime({ getDb, verifyToken: verifyTokenStub, verify: derive }).getServices(env as unknown as ApiRuntimeEnv);
     const app = createApp({
       verifyToken: verifyTokenStub,
-      verify: derive,
-      postHogFetch: () => Promise.resolve(new Response('{"status":"Ok"}', { status: 200 })),
       adminJwtSecret: 'test-admin-jwt-secret',
+      services,
+      postHogFetch: () => Promise.resolve(new Response('{"status":"Ok"}', { status: 200 })),
     });
     const res = await app.request('/auth/login', {
       method: 'POST',
@@ -1813,11 +1819,12 @@ describe('login + revoke routes (admin-dashboard T06)', () => {
   it('a known user derives against their stored hash exactly once (T16)', async () => {
     await seedAuthUser();
     const derive = vi.fn(() => Promise.resolve(true));
+    const services = createApiRuntime({ getDb, verifyToken: verifyTokenStub, verify: derive }).getServices(env as unknown as ApiRuntimeEnv);
     const app = createApp({
       verifyToken: verifyTokenStub,
-      verify: derive,
-      postHogFetch: () => Promise.resolve(new Response('{"status":"Ok"}', { status: 200 })),
       adminJwtSecret: 'test-admin-jwt-secret',
+      services,
+      postHogFetch: () => Promise.resolve(new Response('{"status":"Ok"}', { status: 200 })),
     });
     const res = await app.request('/auth/login', {
       method: 'POST',
