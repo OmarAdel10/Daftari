@@ -63,4 +63,5 @@ export function createRealtimeAppFromEnv(env: Env) {
   return createRealtimeApp(deps);
 }
 
+export { TenantNotifier } from './tenant_notifier';
 export default createRealtimeAppFromEnv;
