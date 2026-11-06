@@ -16,7 +16,7 @@
 16: (Task 10, post-deploy) backend/admin_host/src/index.ts CSP: verify admin CSP in browser console on `admin-dev.daftariapp.workers.dev` after first deploy; relax `connect-src` if a legitimate origin is blocked (e.g. PostHog, Turso direct) — only observable after first deploy.
 17: backend/api/wrangler.toml: [RESOLVED E5] REALTIME service binding now enabled for dev/staging/production; /internal/notify requires X-Internal-Secret and sales broadcasts only a count
 18: backend/realtime/src/index.ts:22/:32: TaftariDurableObjectStub typo for Daftari
-19: cloudflare/wrangler-action@v3 → v4 upgrade (v3 works; v4 is current)
+[RESOLVED] 19: cloudflare/wrangler-action@v3 → v4 upgrade (v3 works; v4 is current) — replaced by pinned global wrangler CLI (4.157.0) in deploy-cloud.yml; wrangler-action removed.
 20: backend/api: CORS is open (app.use('*', cors())) vs spec's fixed origins — tighten to pages.dev/workers.dev origins
 21: GitHub Actions pinned by mutable tags (@v2/@v3/@v4) not commit SHAs — supply-chain hardening candidate repo-wide
 22: backend/admin_host/build.sh: hardcoded local fallback path /mnt/ALL/Daftari/build/web — harmless in CI, tidy up
@@ -33,9 +33,9 @@
 33: cd-* workflows: no permissions: block (least-privilege hardening); `any` filter uses backend/** loose superset
 34: ci.yml flutter-matrix and fast-verify duplicate format/analyze/test on main branches — dedupe if minutes become tight
 35: test/features/sales/presentation/views/sales_workspace_test.dart ~491-586: 'shows session records section with records in playstation mode' hardcodes DateTime(2026, 8, 1) — not future-proofed like the fixed month tests; will rot when it ages out of the 6-month window
-36: backend/realtime/package.json: no wrangler dependency — its deploy step npx-fetches the LATEST wrangler at deploy time (nondeterministic; deploy-cloud.yml comment claiming all workers use a repo-pinned wrangler is wrong for realtime) — pin wrangler like the other workers
-37: backend/{admin_host,api,paymob_webhook}/package-lock.json: wrangler lockfiles drifted from ^4.133.0 (resolved to 4.136.1 / 4.135.0 / 4.133.0) — align versions via a dedicated chore branch
-38: ci.yml backend-tests job + cd-development/cd-staging verify (Dev Gate) jobs still pin node-version 20 — they pass today (never invoke the wrangler CLI, engine mismatch is warn-only) but should bump to 22 for consistency with deploy-cloud.yml
+[RESOLVED] 36: backend/realtime/package.json: no wrangler dependency — wrangler now comes from the pinned global CLI (4.157.0); missing dev/build/deploy scripts added so realtime matches the other workers.
+[RESOLVED] 37: backend/{admin_host,api,paymob_webhook}/package-lock.json: wrangler lockfiles drifted from ^4.133.0 (resolved to 4.136.1 / 4.135.0 / 4.133.0) — wrangler devDependencies removed from all three; lockfiles refreshed; realtime had none.
+[RESOLVED] 38: ci.yml backend-tests job + cd-development/cd-staging verify (Dev Gate) jobs still pin node-version 20 — they pass today (never invoke the wrangler CLI, engine mismatch is warn-only) but should bump to 22 for consistency with deploy-cloud.yml — already using node-version 22 in ci.yml backend-tests and deploy-cloud.yml Setup Node.js.
 39: .github/workflows/opencode.yml sync_specs job: fails on PRs with 'User opencode-agent[bot] does not have write permissions' (seen on PRs #15 and #16; non-blocking — #15 merged regardless) — needs the GitHub App token granted contents: write or the workflow adjusted to not write on pull_request events
 40: test/core/crypto/password_hasher_test.dart:6: stale pre-existing test name — 'should return base64url string of length 24' asserts length 44 (padded) — rename (found in admin-dashboard T02 QA round 1)
 41: lib/core/crypto/password_hasher.dart hashTagged(): performs no input validation while verifyTagged validates everything — hashTagged(password, iterations: 0) emits a stored value verifyTagged forever rejects (account-lockout footgun); add ArgumentError guards in a follow-up branch (admin-dashboard T02 coverage analysis)
@@ -89,3 +89,10 @@ the private Plane work items cited per line.
 59: [OPEN] [DAFTARI-161] No shell lint/tests cover packaging + admin_host build scripts — add `bash -n`/shellcheck to CI and test candidate-selection order (coverage review, PR #90).
 60: [OPEN] [DAFTARI-162] KDF fixture tests spawn `dart` from PATH and regenerate the fixture per test — resolve the SDK binary explicitly and share one generation via setUpAll (security/coverage review, PR #90).
 61: [OPEN] [DAFTARI-163] landing_page uses flutter_lints ^5 while the app uses the shared v6 ruleset — extract a shared analysis_options include or record the split explicitly (QA review, PR #90).
+62: backend/api/src/routes/sales.ts:147-162 → sale-list-use-case.ts:43-56 → shared/src/turso.ts:454-460: GET /sales does unbounded `SELECT *` incl. receipt_json (≤1MiB/sale) then slices to 50 rows — 10k sales ≈ 10 GiB deserialized per request; Free tier 10ms CPU/invocation → Error 1102 risk. Paginate + projection before POS client is wired (Plane DAFTARI-166).
+63: shared/src/password_kdf.ts:27,60-62,101-118: POST /auth/login PBKDF2-HMAC-SHA512 at 210,000 iterations for new hashes (legacy verify 10,000) — ≫10ms CPU on Free tier → Error 1102. Source comment admits free-tier breach. Move to WebCrypto or reduce iterations (Plane DAFTARI-169).
+64: backend/api/src/middleware/auth.ts:111-150; shared/src/jwt.ts:12,30-42: requireAuth = JWT verify + 2 uncached DB reads/request + JWKS refresh every 300s — multiplicative cost on every authed request once dashboard/POS traffic materializes (Plane DAFTARI-170).
+65: backend/api/src/routes/sales.ts:108-129 → sale-record-use-case.ts:59-87: POST /sales/sync does SERIAL per-sale DB writes then one notify — request count scales linearly with sales batch; batch writes + single notify (Plane DAFTARI-168).
+66: shared/src/turso.ts:211-217,356-360; routes/admin.ts:80-106,219: unbounded re-serialization in /admin/devices and /sessions/active — caps at 50 for sessions but /admin/devices unbounded (Plane DAFTARI-167).
+67: apps/daftari/lib/features/checkout/presentation/services/auto_conversion_service.dart:22: POS heartbeat cadence 288/day/terminal (5-min timer) once the POS Cloudflare client is wired — T×288/day baseline before any sales events (Plane DAFTARI-171).
+68: backend/api/wrangler.toml:2: compatibility_date="2024-09-01" (pre-2026-08-04) — `process` undefined without `nodejs_compat`; bump compatibility_date and decide nodejs_compat before any merge that reads process.env (Plane DAFTARI-165).

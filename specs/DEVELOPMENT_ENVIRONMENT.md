@@ -82,7 +82,8 @@ Every micro-incremental state change must be committed using the standard struct
 
 #### 4e. Cloudflare Workers CI/CD (New)
 * **Workers:** `backend/api/`, `backend/realtime/`, `backend/paymob_webhook/`, `backend/admin_host/`, `backend/shared/`
-* **Deploy:** `wrangler deploy` per worker with environment-specific vars (dev/staging/prod)
+* **Deploy:** `wrangler deploy` per worker with environment-specific vars (dev/staging/prod) using the pinned global wrangler CLI (4.157.0); no repo-pinned local wrangler devDependencies remain.
+* **Dry-run gate:** `ci.yml` runs `wrangler deploy --dry-run` per worker × env (dev/staging/production) to validate bundle size (<64 MiB), startup (<1s), and Durable Object exports before any deploy.
 * **Shared Tests:** `backend/shared/` — 40 unit tests (TypeScript/Vitest)
 * **API Tests:** `backend/api/test/` — integration tests against deployed worker
 * **Secrets:** Cloudflare account ID, API token, Turso DB URL, JWT secret stored in GitHub Secrets
@@ -131,10 +132,11 @@ Three environment-specific deployment pipelines triggered on pushes to protected
 * **Type:** Reusable workflow (`workflow_call`)
 * **Inputs:** `pages_project`, `wrangler_env_flag`, `flutter_env`, `deploy_landing`, `deploy_admin`, `deploy_api`, `deploy_realtime`, `deploy_paymob`
 * **Deploys:**
-  - **Landing page (Jaspr):** `jaspr build` → Cloudflare Pages (`wrangler pages deploy`) via `wrangler-action@v3` (no node_modules conflict)
-  - **Admin dashboard (Flutter Web WASM):** `flutter build web --wasm --dart-define=FLAVOR=admin --dart-define=ENV=<env>` → copy to `backend/admin_host/public` via `build.sh` → `npx wrangler deploy` worker
-  - **Backend workers:** `npx wrangler deploy` per worker (`admin_host`, `api`, `realtime`, `paymob_webhook`) with env flag — uses repo-pinned local wrangler 4.x from each worker's node_modules to avoid `wrangler-action@v3`'s bundled wrangler 3.90.0 conflicting with `workers-types v5`
+  - **Landing page (Jaspr):** `jaspr build` → Cloudflare Pages (`wrangler pages deploy`) via the pinned global wrangler CLI (4.157.0).
+  - **Admin dashboard (Flutter Web WASM):** `flutter build web --wasm --dart-define=FLAVOR=admin --dart-define=ENV=<env>` → copy to `backend/admin_host/public` via `build.sh` → `wrangler deploy` worker.
+  - **Backend workers:** `wrangler deploy` per worker (`admin_host`, `api`, `realtime`, `paymob_webhook`) with env flag — single pinned global CLI replaces both repo-pinned local wrangler devDependencies and `wrangler-action@v3`.
 * **Node.js Runtime:** Node.js **22** is required — all repo-pinned wrangler versions (≥4.133.0) declare `engines: node >=22.0.0` and abort at CLI startup on Node 20. The `setup-node` step uses `node-version: '22'`.
+* **wrangler version policy:** `wrangler@4.157.0` is installed globally in CI (`npm install -g --prefix "$HOME/.local" wrangler@4.157.0`); developers install the same way locally. No `npx wrangler` anywhere (avoids fetching latest at runtime).
 * **Dependency Installation:** `npm ci --include=dev` runs for `backend/shared` (always) and each deploying worker directory before deploy; `admin_host` is included when `deploy_admin=true`
 * **Secrets:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (inherited)
 

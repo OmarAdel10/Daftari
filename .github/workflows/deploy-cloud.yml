@@ -61,7 +61,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6  # v4.0.4
         with:
-          # Workers' repo-pinned wrangler (>=4.133) declares engines node>=22
+          # Globally pinned wrangler@4.157.0 declares engines node>=22
           # and aborts at startup on Node 20, failing every `wrangler deploy`.
           node-version: '22'
 

@@ -146,23 +146,38 @@ jobs:
       - name: Install pinned wrangler CLI
         run: npm install -g --prefix "$HOME/.local" wrangler@4.157.0
 
+      - name: Add wrangler to PATH
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
       - name: Assert pinned wrangler version
         run: test "$(wrangler --version)" = "4.157.0"
 
       - name: Install shared dependencies
         run: npm ci --prefix backend/shared --include=dev --no-audit --no-fund
 
-      - name: Dry run every worker package in every environment
+      - name: Install worker dependencies for dry run
         run: |
-          set -e
           for pkg in api realtime admin_host paymob_webhook; do
-            cd "backend/$pkg"
-            echo "== $pkg: dev =="
-            wrangler deploy --dry-run
-            echo "== $pkg: staging =="
-            wrangler deploy --dry-run --env staging
-            echo "== $pkg: production =="
-            wrangler deploy --dry-run --env production
+            npm ci --prefix backend/$pkg --include=dev --no-audit --no-fund
+          done
+
+      - name: Dry run every Worker package in every environment
+        run: |
+          set -eo pipefail
+          # admin_host is a Cloudflare Pages project (has [assets] in wrangler.toml
+          # pointing to backend/admin_host/public, a build output not present in
+          # source). It is validated via `wrangler pages deploy` in deploy-cloud.yml,
+          # not via `wrangler deploy --dry-run`.
+          for pkg in api realtime paymob_webhook; do
+            for target in '' '--env staging' '--env production'; do
+              echo "== $pkg: ${target:-dev} =="
+              (cd backend/$pkg && wrangler deploy --dry-run $target 2>&1 | tee /tmp/dry-run.out)
+              UPLOAD_KB=$(awk '/Total Upload:/{match($0, /[0-9]+\.[0-9]+/); print substr($0, RSTART, RLENGTH)}' /tmp/dry-run.out)
+              if [ -z "$UPLOAD_KB" ]; then
+                echo "::error::No 'Total Upload:' in wrangler output for $pkg ${target:-dev}; dry-run may have failed or output format changed"; exit 1
+              fi
+              awk "BEGIN { if ($UPLOAD_KB >= 65536) exit 1 }" || { echo "::error::Bundle ${UPLOAD_KB}KiB exceeds 64MiB Free cap for $pkg ${target:-dev}"; exit 1; }
+            done
           done
 
   # Full flavor×env×platform matrix — main branches and PRs into them only.
@@ -506,7 +521,7 @@ jobs:
   # when the result is exactly 'skipped' — failure/cancelled still fail.
   ci-summary:
     name: CI Summary (Required)
-    needs: [fast-verify, flutter-matrix, backend-tests, printserver-build, packaging-verify-linux, packaging-verify-windows, security-scan]
+    needs: [fast-verify, flutter-matrix, backend-tests, printserver-build, packaging-verify-linux, packaging-verify-windows, security-scan, wrangler-dry-run]
     runs-on: ubuntu-latest
     if: always()
     permissions:
