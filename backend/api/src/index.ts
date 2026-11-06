@@ -226,7 +226,12 @@ function servicesFor(env: Env): ApiServices {
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const services = servicesFor(env);
+    let services: ApiServices;
+    try {
+      services = servicesFor(env);
+    } catch {
+      return Response.json({ ok: false, error: 'API not configured' }, { status: 503 });
+    }
     const app = createApp({
       adminJwtSecret: env.ADMIN_JWT_SECRET,
       services,
