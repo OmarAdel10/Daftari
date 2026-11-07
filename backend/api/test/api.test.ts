@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ExecutionContext } from '@cloudflare/workers-types';
 
 // Mock @libsql/client at the lowest level — the api worker reaches Turso
 // exclusively through backend/shared turso.ts.
@@ -16,8 +17,11 @@ vi.mock('@libsql/client', () => ({
   })),
 }));
 
-import { createApp } from '../src/index';
+import api, { createApp } from '../src/index';
+import { createApiRuntime } from '../src/runtime';
+import { getDb } from '../src/db';
 import type { Env, Vars } from '../src/env';
+import type { ApiRuntimeEnv } from '../src/application/ports';
 import type { SessionStartUseCase } from '../src/application/use-cases/session-start-use-case';
 import type { SessionHeartbeatUseCase } from '../src/application/use-cases/session-heartbeat-use-case';
 import type { SessionEndUseCase } from '../src/application/use-cases/session-end-use-case';
@@ -82,6 +86,7 @@ const logosPut = vi.fn(() => Promise.resolve());
 const logosGet = vi.fn(() => Promise.resolve(null as unknown));
 
 const env = {
+  ENVIRONMENT: 'development',
   PAYMOB_HMAC_SECRET: 'hmac',
   ED25519_PRIVATE_KEY: 'priv',
   ED25519_PUBLIC_KEY: 'pub',
@@ -104,9 +109,11 @@ function realtimeBodies(): Array<Record<string, unknown>> {
 }
 
 function makeApp() {
+  const services = createApiRuntime({ getDb, verifyToken: verifyTokenStub, verify: verifyTagged }).getServices(env as unknown as ApiRuntimeEnv);
   return createApp({
     verifyToken: verifyTokenStub,
     adminJwtSecret: 'test-admin-jwt-secret',
+    services,
     postHogFetch: () => Promise.resolve(new Response('{"status":"Ok"}', { status: 200 })),
   });
 }
@@ -1789,11 +1796,12 @@ describe('login + revoke routes (admin-dashboard T06)', () => {
   it('an unknown username still performs a password derivation (T16)', async () => {
     dbState.authUserRows = [];
     const derive = vi.fn(() => Promise.resolve(false));
+    const services = createApiRuntime({ getDb, verifyToken: verifyTokenStub, verify: derive }).getServices(env as unknown as ApiRuntimeEnv);
     const app = createApp({
       verifyToken: verifyTokenStub,
-      verify: derive,
-      postHogFetch: () => Promise.resolve(new Response('{"status":"Ok"}', { status: 200 })),
       adminJwtSecret: 'test-admin-jwt-secret',
+      services,
+      postHogFetch: () => Promise.resolve(new Response('{"status":"Ok"}', { status: 200 })),
     });
     const res = await app.request('/auth/login', {
       method: 'POST',
@@ -1813,11 +1821,12 @@ describe('login + revoke routes (admin-dashboard T06)', () => {
   it('a known user derives against their stored hash exactly once (T16)', async () => {
     await seedAuthUser();
     const derive = vi.fn(() => Promise.resolve(true));
+    const services = createApiRuntime({ getDb, verifyToken: verifyTokenStub, verify: derive }).getServices(env as unknown as ApiRuntimeEnv);
     const app = createApp({
       verifyToken: verifyTokenStub,
-      verify: derive,
-      postHogFetch: () => Promise.resolve(new Response('{"status":"Ok"}', { status: 200 })),
       adminJwtSecret: 'test-admin-jwt-secret',
+      services,
+      postHogFetch: () => Promise.resolve(new Response('{"status":"Ok"}', { status: 200 })),
     });
     const res = await app.request('/auth/login', {
       method: 'POST',
@@ -3301,5 +3310,50 @@ describe('CORS allowlist (T19)', () => {
     }, prodEnv);
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://admin.daftariapp.workers.dev');
     expect(res.headers.get('Access-Control-Allow-Headers')).toBe('Authorization,Content-Type');
+  });
+
+  describe('default export fetch / scheduled (request-time env binding)', () => {
+    it('returns 503 when API credentials are missing (no unhandled 500)', async () => {
+      const bare = {
+        ...env,
+        ADMIN_JWT_SECRET: undefined,
+        POSTHOG_API_KEY: undefined,
+        FIREBASE_PROJECT_ID: undefined,
+      } as unknown as Env;
+      const res = await api.fetch(new Request('http://localhost/health'), bare, {} as ExecutionContext);
+      expect(res.status).toBe(503);
+      const body = await res.json();
+      expect(body).toEqual({ ok: false, error: 'API not configured' });
+    });
+
+    it('serves /health from a request-time-built app', async () => {
+      executeMock.mockResolvedValueOnce({ rows: [{ name: 'auth_users' }, { name: 'sessions' }, { name: 'users' }] });
+      executeMock.mockResolvedValueOnce({ rows: [{ name: 'last_owner_login_at' }] });
+      const res = await api.fetch(new Request('http://localhost/health'), env as unknown as Env, {} as ExecutionContext);
+      expect(res.status).toBe(200);
+      const body = await res.json() as { ok: boolean; db: string };
+      expect(body.ok).toBe(true);
+      expect(body.db).toBe('ok');
+    });
+
+    it('reuses cached services across requests (servicesFor cache hit)', async () => {
+      executeMock.mockResolvedValueOnce({ rows: [{ name: 'auth_users' }, { name: 'sessions' }, { name: 'users' }] });
+      executeMock.mockResolvedValueOnce({ rows: [{ name: 'last_owner_login_at' }] });
+      executeMock.mockResolvedValueOnce({ rows: [{ name: 'auth_users' }, { name: 'sessions' }, { name: 'users' }] });
+      executeMock.mockResolvedValueOnce({ rows: [{ name: 'last_owner_login_at' }] });
+      const r1 = await api.fetch(new Request('http://localhost/health'), env as unknown as Env, {} as ExecutionContext);
+      const r2 = await api.fetch(new Request('http://localhost/health'), env as unknown as Env, {} as ExecutionContext);
+      expect(r1.status).toBe(200);
+      expect(r2.status).toBe(200);
+    });
+
+    it('scheduled sweeps expired licenses', async () => {
+      executeMock.mockResolvedValueOnce(undefined);
+      await api.scheduled({}, env as unknown as Env, {} as ExecutionContext);
+      expect(executeMock).toHaveBeenCalled();
+      const call = executeMock.mock.calls[0]!;
+      expect(call[0].sql).toContain('UPDATE licenses');
+      expect(typeof call[0].args[0]).toBe('number');
+    });
   });
 });
