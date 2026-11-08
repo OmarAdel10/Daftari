@@ -59,9 +59,11 @@ class RealtimeClient {
     final ticket = await ticketProvider();
     if (_closed) return;
     if (ticket == null) {
-      // No auth ticket yet: retry on the backoff ladder instead of giving up
-      // silently (the caller has no other signal that auth is pending).
-      _scheduleReconnect();
+      // No auth ticket yet: retry on a short fixed interval without consuming
+      // a backoff ladder rung, so pending auth doesn't burn rungs and go
+      // silent once the ladder caps.
+      _reconnectTimer?.cancel();
+      _reconnectTimer = Timer(const Duration(seconds: 2), connect);
       return;
     }
     try {
@@ -69,10 +71,11 @@ class RealtimeClient {
       _channel = _channelFactory != null
           ? _channelFactory(uri)
           : WebSocketChannel.connect(uri);
-      // Wait for the handshake to complete before resetting the backoff
-      // ladder (T26): a channel that never opens must let the ladder
+      // Wait for the handshake to complete, bounded by a timeout so a stalled
+      // socket escalates the backoff ladder instead of freezing connect()
+      // indefinitely (T26). A channel that never opens lets the ladder
       // escalate rather than reset to the 2s rung on every connect().
-      await _channel!.ready;
+      await _channel!.ready.timeout(const Duration(seconds: 10));
       if (_closed) return;
       // A successful open resets the backoff ladder: a transient drop after
       // a healthy connect retries on the 2s rung, never the escalated one.

@@ -420,6 +420,69 @@ void main() {
         client.close();
       });
     });
+
+    test('a rejecting handshake schedules a reconnect', () {
+      fakeAsync((async) {
+        var failReady = true;
+        final client = RealtimeClient(
+          wsUrl: 'wss://x/ws',
+          ticketProvider: () async => 'tok',
+          channelFactory: (uri) {
+            final c = MockWebSocketChannel();
+            final ctrl = StreamController<dynamic>();
+            final sink = MockWebSocketSink();
+            when(() => sink.close()).thenAnswer((_) async {});
+            when(() => c.stream).thenAnswer((_) => ctrl.stream);
+            when(() => c.sink).thenReturn(sink);
+            when(() => c.ready).thenAnswer((_) {
+              if (failReady) {
+                failReady = false;
+                return Future<void>.error(StateError('handshake failed'));
+              }
+              return Future.value();
+            });
+            return c;
+          },
+        );
+        client.connect();
+        async.elapse(const Duration(milliseconds: 10));
+        expect(client.isConnected, isFalse); // handshake failed, not connected
+        async.elapse(const Duration(seconds: 3)); // 2s backoff → retry succeeds
+        expect(client.isConnected, isTrue);
+        client.close();
+      });
+    });
+
+    test('a close during a pending handshake does not connect', () {
+      fakeAsync((async) {
+        final readyCompleter = Completer<void>();
+        final client = RealtimeClient(
+          wsUrl: 'wss://x/ws',
+          ticketProvider: () async => 'tok',
+          channelFactory: (uri) {
+            final c = MockWebSocketChannel();
+            final ctrl = StreamController<dynamic>();
+            final sink = MockWebSocketSink();
+            when(() => sink.close()).thenAnswer((_) async {});
+            when(() => c.stream).thenAnswer((_) => ctrl.stream);
+            when(() => c.sink).thenReturn(sink);
+            when(() => c.ready).thenAnswer((_) => readyCompleter.future);
+            return c;
+          },
+        );
+        client.connect();
+        async.elapse(
+          const Duration(milliseconds: 10),
+        ); // reach await ready (stalled)
+        client.close(); // close while ready is pending (sets _closed)
+        async.elapse(
+          const Duration(milliseconds: 10),
+        ); // flush close() microtasks
+        readyCompleter.complete();
+        async.elapse(const Duration(milliseconds: 10));
+        expect(client.isConnected, isFalse); // _closed guard short-circuits
+      });
+    });
   });
 
   group('DashboardBloc realtime wiring', () {
