@@ -483,6 +483,65 @@ void main() {
         expect(client.isConnected, isFalse); // _closed guard short-circuits
       });
     });
+
+    test('a stalled handshake times out and schedules a reconnect', () {
+      fakeAsync((async) {
+        final readyCompleter = Completer<void>(); // never completes
+        var channels = 0;
+        final client = RealtimeClient(
+          wsUrl: 'wss://x/ws',
+          ticketProvider: () async => 'tok',
+          channelFactory: (uri) {
+            channels++;
+            final c = MockWebSocketChannel();
+            final ctrl = StreamController<dynamic>();
+            final sink = MockWebSocketSink();
+            when(() => sink.close()).thenAnswer((_) async {});
+            when(() => c.stream).thenAnswer((_) => ctrl.stream);
+            when(() => c.sink).thenReturn(sink);
+            when(() => c.ready).thenAnswer((_) => readyCompleter.future);
+            return c;
+          },
+        );
+        client.connect(); // channel #1, ready stalls
+        async.elapse(const Duration(milliseconds: 10));
+        expect(client.isConnected, isFalse);
+        expect(channels, 1);
+        // Elapse past the 10s ready timeout → TimeoutException → reconnect scheduled
+        async.elapse(const Duration(seconds: 12));
+        // Retry fired after the timeout → channel #2 created, ready stalls again
+        expect(channels, 2);
+        expect(client.isConnected, isFalse);
+        client.close();
+      });
+    });
+
+    test(
+      'repeated null tickets retry on fixed interval without burning rungs',
+      () {
+        fakeAsync((async) {
+          final tickets = <String?>[null, null, null, 'tok'];
+          var ticketCalls = 0;
+          final client = RealtimeClient(
+            wsUrl: 'wss://x/ws',
+            ticketProvider: () async => tickets[ticketCalls++],
+            channelFactory: makeChannel,
+          );
+          client.connect(); // null → fixed 2s retry, no socket
+          async.elapse(const Duration(milliseconds: 10));
+          expect(_channelLedger, isEmpty);
+          // 3 null retries at 2s fixed interval → 'tok' on the 4th call
+          async.elapse(const Duration(seconds: 7));
+          expect(
+            _channelLedger,
+            hasLength(1),
+          ); // channel opened on fixed interval
+          expect(ticketCalls, 4); // null, null, null, tok
+          expect(client.isConnected, isTrue);
+          client.close();
+        });
+      },
+    );
   });
 
   group('DashboardBloc realtime wiring', () {
