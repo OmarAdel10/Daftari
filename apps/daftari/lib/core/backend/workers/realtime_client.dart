@@ -57,15 +57,25 @@ class RealtimeClient {
   Future<void> connect() async {
     if (_closed) return;
     final ticket = await ticketProvider();
-    if (ticket == null || _closed) return;
+    if (_closed) return;
+    if (ticket == null) {
+      // No auth ticket yet: retry on the backoff ladder instead of giving up
+      // silently (the caller has no other signal that auth is pending).
+      _scheduleReconnect();
+      return;
+    }
     try {
       final uri = Uri.parse(wsUrl).replace(queryParameters: {'ticket': ticket});
       _channel = _channelFactory != null
           ? _channelFactory(uri)
           : WebSocketChannel.connect(uri);
-      // A successful open — not only a live message — resets the backoff
-      // ladder (T26): a transient drop after a healthy connect retries on
-      // the 2s rung, never the escalated one the old attempt count implied.
+      // Wait for the handshake to complete before resetting the backoff
+      // ladder (T26): a channel that never opens must let the ladder
+      // escalate rather than reset to the 2s rung on every connect().
+      await _channel!.ready;
+      if (_closed) return;
+      // A successful open resets the backoff ladder: a transient drop after
+      // a healthy connect retries on the 2s rung, never the escalated one.
       _attempts = 0;
       _setConnected(true);
       _sub = _channel!.stream.listen(
