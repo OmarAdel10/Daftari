@@ -29,6 +29,9 @@ MockWebSocketChannel makeChannel(Uri uri) {
   final sink = MockWebSocketSink();
   when(() => sink.close()).thenAnswer((_) async {});
   when(() => c.sink).thenReturn(sink);
+  // The client now awaits channel.ready before resetting the backoff ladder;
+  // a mocked channel opens immediately.
+  when(() => c.ready).thenAnswer((_) async {});
   _channelLedger.add(c);
   _controllerLedger.add(controller);
   return c;
@@ -297,6 +300,8 @@ void main() {
           final sink = MockWebSocketSink();
           when(() => sink.close()).thenAnswer((_) async {});
           when(() => c.sink).thenReturn(sink);
+          // The client now awaits channel.ready before resetting the backoff ladder.
+          when(() => c.ready).thenAnswer((_) async {});
           controllers.add(controller);
           return c;
         },
@@ -314,6 +319,229 @@ void main() {
       await sub.cancel();
       await client.close();
     });
+
+    test('a null ticket schedules a reconnect on the backoff ladder', () {
+      fakeAsync((async) {
+        final tickets = <String?>[null, 'tok'];
+        final client = RealtimeClient(
+          wsUrl: 'wss://x/ws',
+          ticketProvider: () async => tickets.removeAt(0),
+          channelFactory: makeChannel,
+        );
+        client.connect();
+        async.elapse(const Duration(milliseconds: 10));
+        expect(_channelLedger, isEmpty); // no socket opened on null ticket
+        async.elapse(const Duration(seconds: 3)); // 2s backoff rung → retry
+        expect(_channelLedger, hasLength(1)); // retry succeeded, socket opened
+        client.close();
+      });
+    });
+
+    test('a stalled handshake does not connect or reset the ladder', () {
+      fakeAsync((async) {
+        var calls = 0;
+        final readyCompleter = Completer<void>();
+        final connectivity = <bool>[];
+        final client = RealtimeClient(
+          wsUrl: 'wss://x/ws',
+          ticketProvider: () async => 'tok',
+          channelFactory: (uri) {
+            calls++;
+            if (calls <= 2) throw StateError('down');
+            final c = MockWebSocketChannel();
+            final ctrl = StreamController<dynamic>();
+            final sink = MockWebSocketSink();
+            when(() => sink.close()).thenAnswer((_) async {});
+            when(() => c.stream).thenAnswer((_) => ctrl.stream);
+            when(() => c.sink).thenReturn(sink);
+            when(() => c.ready).thenAnswer((_) => readyCompleter.future);
+            return c;
+          },
+        );
+        final sub = client.connected.listen(connectivity.add);
+        client.connect(); // call 1: throw → 2s, attempts→1
+        async.elapse(
+          const Duration(seconds: 2),
+        ); // call 2: throw → 4s, attempts→2
+        async.elapse(
+          const Duration(seconds: 4),
+        ); // call 3: channel created, awaiting ready (stalled)
+        expect(connectivity, [
+          false,
+          false,
+        ]); // two failed connects, not connected
+        expect(client.isConnected, isFalse);
+        async.elapse(
+          const Duration(seconds: 8),
+        ); // past the 8s rung: no false retry
+        expect(connectivity, [
+          false,
+          false,
+        ]); // no new emission while awaiting ready
+        expect(client.isConnected, isFalse);
+        readyCompleter
+            .complete(); // handshake completes → reset applies post-ready
+        async.elapse(const Duration(milliseconds: 10));
+        expect(connectivity, [false, false, true]);
+        expect(client.isConnected, isTrue);
+        sub.cancel();
+        client.close();
+      });
+    });
+
+    test('backoff ladder resets only after the handshake completes', () {
+      fakeAsync((async) {
+        final readyCompleter = Completer<void>();
+        final connectivity = <bool>[];
+        final client = RealtimeClient(
+          wsUrl: 'wss://x/ws',
+          ticketProvider: () async => 'tok',
+          channelFactory: (uri) {
+            final c = MockWebSocketChannel();
+            final ctrl = StreamController<dynamic>();
+            final sink = MockWebSocketSink();
+            when(() => sink.close()).thenAnswer((_) async {});
+            when(() => c.stream).thenAnswer((_) => ctrl.stream);
+            when(() => c.sink).thenReturn(sink);
+            when(() => c.ready).thenAnswer((_) => readyCompleter.future);
+            return c;
+          },
+        );
+        final sub = client.connected.listen(connectivity.add);
+        client.connect();
+        async.elapse(const Duration(seconds: 2));
+        expect(connectivity, isEmpty); // reset not applied before handshake
+        expect(client.isConnected, isFalse);
+        readyCompleter.complete();
+        async.elapse(const Duration(milliseconds: 10));
+        expect(connectivity, [true]); // reset applied after handshake
+        expect(client.isConnected, isTrue);
+        sub.cancel();
+        client.close();
+      });
+    });
+
+    test('a rejecting handshake schedules a reconnect', () {
+      fakeAsync((async) {
+        var failReady = true;
+        final client = RealtimeClient(
+          wsUrl: 'wss://x/ws',
+          ticketProvider: () async => 'tok',
+          channelFactory: (uri) {
+            final c = MockWebSocketChannel();
+            final ctrl = StreamController<dynamic>();
+            final sink = MockWebSocketSink();
+            when(() => sink.close()).thenAnswer((_) async {});
+            when(() => c.stream).thenAnswer((_) => ctrl.stream);
+            when(() => c.sink).thenReturn(sink);
+            when(() => c.ready).thenAnswer((_) {
+              if (failReady) {
+                failReady = false;
+                return Future<void>.error(StateError('handshake failed'));
+              }
+              return Future.value();
+            });
+            return c;
+          },
+        );
+        client.connect();
+        async.elapse(const Duration(milliseconds: 10));
+        expect(client.isConnected, isFalse); // handshake failed, not connected
+        async.elapse(const Duration(seconds: 3)); // 2s backoff → retry succeeds
+        expect(client.isConnected, isTrue);
+        client.close();
+      });
+    });
+
+    test('a close during a pending handshake does not connect', () {
+      fakeAsync((async) {
+        final readyCompleter = Completer<void>();
+        final client = RealtimeClient(
+          wsUrl: 'wss://x/ws',
+          ticketProvider: () async => 'tok',
+          channelFactory: (uri) {
+            final c = MockWebSocketChannel();
+            final ctrl = StreamController<dynamic>();
+            final sink = MockWebSocketSink();
+            when(() => sink.close()).thenAnswer((_) async {});
+            when(() => c.stream).thenAnswer((_) => ctrl.stream);
+            when(() => c.sink).thenReturn(sink);
+            when(() => c.ready).thenAnswer((_) => readyCompleter.future);
+            return c;
+          },
+        );
+        client.connect();
+        async.elapse(
+          const Duration(milliseconds: 10),
+        ); // reach await ready (stalled)
+        client.close(); // close while ready is pending (sets _closed)
+        async.elapse(
+          const Duration(milliseconds: 10),
+        ); // flush close() microtasks
+        readyCompleter.complete();
+        async.elapse(const Duration(milliseconds: 10));
+        expect(client.isConnected, isFalse); // _closed guard short-circuits
+      });
+    });
+
+    test('a stalled handshake times out and schedules a reconnect', () {
+      fakeAsync((async) {
+        final readyCompleter = Completer<void>(); // never completes
+        var channels = 0;
+        final client = RealtimeClient(
+          wsUrl: 'wss://x/ws',
+          ticketProvider: () async => 'tok',
+          channelFactory: (uri) {
+            channels++;
+            final c = MockWebSocketChannel();
+            final ctrl = StreamController<dynamic>();
+            final sink = MockWebSocketSink();
+            when(() => sink.close()).thenAnswer((_) async {});
+            when(() => c.stream).thenAnswer((_) => ctrl.stream);
+            when(() => c.sink).thenReturn(sink);
+            when(() => c.ready).thenAnswer((_) => readyCompleter.future);
+            return c;
+          },
+        );
+        client.connect(); // channel #1, ready stalls
+        async.elapse(const Duration(milliseconds: 10));
+        expect(client.isConnected, isFalse);
+        expect(channels, 1);
+        // Elapse past the 10s ready timeout → TimeoutException → reconnect scheduled
+        async.elapse(const Duration(seconds: 12));
+        // Retry fired after the timeout → channel #2 created, ready stalls again
+        expect(channels, 2);
+        expect(client.isConnected, isFalse);
+        client.close();
+      });
+    });
+
+    test(
+      'repeated null tickets retry on fixed interval without burning rungs',
+      () {
+        fakeAsync((async) {
+          final tickets = <String?>[null, null, null, 'tok'];
+          var ticketCalls = 0;
+          final client = RealtimeClient(
+            wsUrl: 'wss://x/ws',
+            ticketProvider: () async => tickets[ticketCalls++],
+            channelFactory: makeChannel,
+          );
+          client.connect(); // null → fixed 2s retry, no socket
+          async.elapse(const Duration(milliseconds: 10));
+          expect(_channelLedger, isEmpty);
+          // 3 null retries at 2s fixed interval → 'tok' on the 4th call
+          async.elapse(const Duration(seconds: 7));
+          expect(
+            _channelLedger,
+            hasLength(1),
+          ); // channel opened on fixed interval
+          expect(ticketCalls, 4); // null, null, null, tok
+          expect(client.isConnected, isTrue);
+          client.close();
+        });
+      },
+    );
   });
 
   group('DashboardBloc realtime wiring', () {
