@@ -11,7 +11,13 @@ void main() {
   late AuditService service;
 
   setUpAll(() async {
-    Hive.init('test/_hive_test_audit_service');
+    try {
+      Hive.init('test/_hive_test_audit_service');
+    } on StateError {
+      // Hive is a per-isolate singleton; another test file already
+      // initialized it in this suite run. Boxes are still isolated by name
+      // and cleaned up in tearDown, so this is safe.
+    }
   });
 
   setUp(() async {

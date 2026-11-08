@@ -219,7 +219,13 @@ void main() {
     late LazyBox<AppReceiptModel> box;
 
     setUpAll(() async {
-      Hive.init('test/_hive_test_receipts_model');
+      try {
+        Hive.init('test/_hive_test_receipts_model');
+      } on StateError {
+        // Hive is a per-isolate singleton; another test file already
+        // initialized it in this suite run. Boxes are still isolated by name
+        // and cleaned up in tearDown, so this is safe.
+      }
       Hive.registerAdapter(AppReceiptModelAdapter());
       Hive.registerAdapter(ReceiptItemAdapter());
     });
