@@ -41,7 +41,13 @@ void main() {
     );
 
     setUpAll(() async {
-      Hive.init('test/_hive_test_rounds_repo');
+      try {
+        Hive.init('test/_hive_test_rounds_repo');
+      } on StateError {
+        // Hive is a per-isolate singleton; another test file already
+        // initialized it in this suite run. Boxes are still isolated by name
+        // and cleaned up in tearDown, so this is safe.
+      }
       Hive.registerAdapter(AppTableOrderLineModelAdapter());
       Hive.registerAdapter(AppTableRoundModelAdapter());
     });

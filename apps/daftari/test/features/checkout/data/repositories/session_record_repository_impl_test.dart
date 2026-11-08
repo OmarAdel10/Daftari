@@ -10,7 +10,13 @@ void main() {
     late SessionRecordRepositoryImpl repo;
 
     setUpAll(() async {
-      Hive.init('test/_hive_test_session_records');
+      try {
+        Hive.init('test/_hive_test_session_records');
+      } on StateError {
+        // Hive is a per-isolate singleton; another test file already
+        // initialized it in this suite run. Boxes are still isolated by name
+        // and cleaned up in tearDown, so this is safe.
+      }
       if (!Hive.isAdapterRegistered(AppSessionRecordModelAdapter().typeId)) {
         Hive.registerAdapter(AppSessionRecordModelAdapter());
       }

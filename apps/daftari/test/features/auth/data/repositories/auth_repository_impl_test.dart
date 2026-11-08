@@ -12,7 +12,13 @@ void main() {
   late AuthRepositoryImpl repository;
 
   setUpAll(() async {
-    Hive.init('test/_hive_test_auth_repo');
+    try {
+      Hive.init('test/_hive_test_auth_repo');
+    } on StateError {
+      // Hive is a per-isolate singleton; another test file already
+      // initialized it in this suite run. Boxes are still isolated by name
+      // and cleaned up in tearDown, so this is safe.
+    }
     Hive.registerAdapter(AppUserModelAdapter());
   });
 
@@ -155,6 +161,62 @@ void main() {
         expect(saved!.passwordHash, 'hash');
         expect(box.get('__setup_completed__'), isNotNull);
       });
+    });
+  });
+
+  group('retrySeeding', () {
+    test('seeds admin user when box is not yet seeded', () async {
+      final result = await repository.retrySeeding();
+      expect(result, isA<Right<Failure, void>>());
+
+      final all = await repository.getAll();
+      final users = all.fold((failure) => throw failure, (list) => list);
+      expect(users.any((u) => u.username == 'admin'), isTrue);
+      expect(users.length, 1);
+    });
+
+    test('does not duplicate admin when already seeded', () async {
+      await repository.getAll(); // seeds
+      final result = await repository.retrySeeding();
+      expect(result, isA<Right<Failure, void>>());
+
+      final all = await repository.getAll();
+      final users = all.fold((failure) => throw failure, (list) => list);
+      expect(users.where((u) => u.username == 'admin').length, 1);
+      expect(users.length, 1);
+    });
+
+    test('creates admin when seeded but admin is missing', () async {
+      await box.put(
+        '__seeded__',
+        AppUserModel(
+          username: '__seeded__',
+          passwordHash: '',
+          passwordSalt: '',
+          mustChangePassword: true,
+          role: UserRole.admin,
+          createdAt: DateTime.now(),
+        ),
+      );
+      final result = await repository.retrySeeding();
+      expect(result, isA<Right<Failure, void>>());
+
+      final all = await repository.getAll();
+      final users = all.fold((failure) => throw failure, (list) => list);
+      expect(users.any((u) => u.username == 'admin'), isTrue);
+      expect(users.length, 1);
+    });
+
+    test('returns Left when the box is closed', () async {
+      await box.close();
+      final result = await repository.retrySeeding();
+      expect(result, isA<Left<Failure, void>>());
+      result.fold(
+        (failure) => expect(failure, isA<DatabaseFailure>()),
+        (_) => fail('Expected Left'),
+      );
+      // Re-open so tearDown can close and delete cleanly.
+      box = await Hive.openBox<AppUserModel>('test_auth_users');
     });
   });
 }

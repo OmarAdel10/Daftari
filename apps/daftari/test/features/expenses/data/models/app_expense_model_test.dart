@@ -6,7 +6,13 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 void main() {
   setUpAll(() async {
-    Hive.init('test/_hive_test_expense_model');
+    try {
+      Hive.init('test/_hive_test_expense_model');
+    } on StateError {
+      // Hive is a per-isolate singleton; another test file already
+      // initialized it in this suite run. Boxes are still isolated by name
+      // and cleaned up in tearDown, so this is safe.
+    }
     Hive.registerAdapter(AppExpenseModelAdapter());
   });
 
