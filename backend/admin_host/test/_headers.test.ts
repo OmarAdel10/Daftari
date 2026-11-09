@@ -77,6 +77,6 @@ describe('_headers security policy', () => {
     expect(csp).not.toContain("'unsafe-inline'");
     expect(csp).toContain("form-action 'self'");
     expect(csp).toContain("script-src 'self' 'wasm-unsafe-eval' https://apis.google.com");
-    expect(csp).not.toContain("'require-trusted-types-for'");
+    expect(csp).not.toContain('require-trusted-types-for');
   });
 });

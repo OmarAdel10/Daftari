@@ -43,7 +43,7 @@ describe('build.sh integration (_headers copy)', () => {
     const scriptDir = join(root, 'backend', 'admin_host');
     mkdirSync(scriptDir, { recursive: true });
 
-    const realBuildSh = join(process.cwd(), 'build.sh');
+    const realBuildSh = join(__dirname, '..', 'build.sh');
     writeFileSync(join(scriptDir, 'build.sh'), readFileSync(realBuildSh, 'utf-8'));
 
     // No _headers file — build should fail
