@@ -52,12 +52,18 @@ describe('build.sh integration (_headers copy)', () => {
     writeFileSync(join(dummyWeb, 'main.dart.js'), 'dummy');
 
     let threw = false;
+    let exitCode = -1;
+    let stderr = '';
     try {
       execSync('bash build.sh', { cwd: scriptDir, shell: '/bin/bash' });
-    } catch (_) {
+    } catch (err: any) {
       threw = true;
+      exitCode = err.status;
+      stderr = err.stderr?.toString() ?? '';
     }
     expect(threw).toBe(true);
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain('refusing to deploy without security headers');
 
     rmSync(root, { recursive: true, force: true });
   });

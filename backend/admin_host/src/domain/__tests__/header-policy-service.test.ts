@@ -2,12 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { HeaderPolicyServiceImpl } from '../services/header-policy-service.impl';
 
 /**
- * Hardened security-header map (DAFTARI-131/132/133/136/143/144/140):
+ * Hardened security-header map (DAFTARI-131/132/133/136/144/140):
  * - CSP wildcards tightened to exact origins
  * - 'unsafe-inline' removed (nonce-based styles)
  * - form-action 'self' + Cross-Origin-Resource-Policy added
  * - HSTS preload removed
- * - require-trusted-types-for 'script' added
  * - CSP report-uri /csp-report added
  * - Permissions-Policy deny list extended
  */
@@ -22,7 +21,7 @@ const EXPECTED_HEADERS: Record<string, string> = {
   'Strict-Transport-Security': 'max-age=63072000; includeSubDomains',
   'Content-Security-Policy':
     "default-src 'self'; object-src 'none'; base-uri 'self'; " +
-    "script-src 'self' 'wasm-unsafe-eval' 'require-trusted-types-for' 'script' https://apis.google.com; " +
+    "script-src 'self' 'wasm-unsafe-eval' https://apis.google.com; " +
     "style-src 'self'; " +
     "font-src 'self' data:; img-src 'self' data:; " +
     "connect-src 'self' https://daftariapp.workers.dev wss://daftariapp.workers.dev " +
@@ -75,9 +74,9 @@ describe('HeaderPolicyServiceImpl', () => {
     expect(hsts).not.toContain('preload');
   });
 
-  it('CSP includes require-trusted-types-for script (DAFTARI-143)', () => {
+  it('CSP does not include require-trusted-types-for script (DAFTARI-143)', () => {
     const csp = svc.securityHeaders()['Content-Security-Policy'];
-    expect(csp).toContain("'require-trusted-types-for' 'script'");
+    expect(csp).not.toContain('require-trusted-types-for');
   });
 
   it('CSP includes report-uri /csp-report (DAFTARI-144)', () => {

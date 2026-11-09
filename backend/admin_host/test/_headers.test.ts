@@ -66,6 +66,7 @@ describe('_headers security policy', () => {
     expect(section).toContain("frame-ancestors 'none'");
     expect(section).toContain("form-action 'self'");
     expect(section).toContain('report-uri /csp-report');
+    expect(section).toContain('Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=()');
   });
 
   it('CSP has no wildcard first-party origin and no unsafe-inline', () => {

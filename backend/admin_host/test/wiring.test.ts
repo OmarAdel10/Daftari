@@ -55,7 +55,7 @@ const SECURITY_HEADERS: Record<string, string> = {
   'Strict-Transport-Security': 'max-age=63072000; includeSubDomains',
   'Content-Security-Policy':
     "default-src 'self'; object-src 'none'; base-uri 'self'; " +
-    "script-src 'self' 'wasm-unsafe-eval' 'require-trusted-types-for' 'script' https://apis.google.com; " +
+    "script-src 'self' 'wasm-unsafe-eval' https://apis.google.com; " +
     "style-src 'self'; font-src 'self' data:; " +
     "img-src 'self' data:; connect-src 'self' " +
     'https://daftariapp.workers.dev wss://daftariapp.workers.dev ' +
