@@ -59,7 +59,7 @@
   Cache-Control: public, max-age=3600
 
 # --- Security headers for all static-asset responses ---
-# Mirrors HeaderPolicyServiceImpl (DAFTARI-131/132/133/136/143/144/140).
+# Mirrors HeaderPolicyServiceImpl (DAFTARI-131/132/133/136/144/140).
 # HSTS without preload: inert on *.workers.dev today (no hstspreload.org
 # submission); preload only after custom-domain confirmation (DAFTARI-137).
 # COOP same-origin-allow-popups: required for Firebase signInWithPopup
