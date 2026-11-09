@@ -14,7 +14,7 @@ describe('build.sh integration (_headers copy)', () => {
     mkdirSync(scriptDir, { recursive: true });
 
     // Copy the real build.sh into the temp script dir
-    const realBuildSh = join(process.cwd(), 'build.sh');
+    const realBuildSh = join(__dirname, '..', 'build.sh');
     const tempBuildSh = join(scriptDir, 'build.sh');
     writeFileSync(tempBuildSh, readFileSync(realBuildSh, 'utf-8'));
 

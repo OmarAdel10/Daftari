@@ -30,20 +30,6 @@ describe('build.sh _headers copy block', () => {
     rmSync(workDir, { recursive: true, force: true });
   });
 
-  it('silently skips when _headers is absent (script still exits 0)', () => {
-    const workDir = mkdtempSync(join(tmpdir(), 'daftari-headers-'));
-    const scriptDir = join(workDir, 'script');
-    const outDir = join(workDir, 'public');
-
-    // No _headers file in scriptDir
-
-    execSync(`mkdir -p "${outDir}"`, { shell: '/bin/bash' });
-
-    expect(existsSync(join(outDir, '_headers'))).toBe(false);
-
-    rmSync(workDir, { recursive: true, force: true });
-  });
-
   it('creates OUT_DIR if missing before copying', () => {
     const workDir = mkdtempSync(join(tmpdir(), 'daftari-headers-'));
     const scriptDir = join(workDir, 'script');
