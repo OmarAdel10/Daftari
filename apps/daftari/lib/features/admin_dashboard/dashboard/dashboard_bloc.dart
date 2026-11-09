@@ -126,9 +126,14 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
 
   @override
   Future<void> close() async {
+    // Close the RealtimeClient first: it sets _closed = true synchronously
+    // and cancels the reconnect timer before any other awaits. This prevents
+    // connect() from resuming mid-close (e.g. after ticketProvider() resolves
+    // a 400 HttpClient response in tests) and scheduling a new timer that
+    // outlives the widget tree — which fails "A Timer is still pending".
+    await _realtime?.close();
     await _connectedSub?.cancel();
     await _realtimeSub?.cancel();
-    await _realtime?.close();
     return super.close();
   }
 
