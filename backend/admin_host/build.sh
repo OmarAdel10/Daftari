@@ -41,5 +41,15 @@ cp -r "$SRC"/* "$OUT_DIR/"
 if [ -f "$SCRIPT_DIR/.assetsignore" ]; then
   cp "$SCRIPT_DIR/.assetsignore" "$OUT_DIR/"
 fi
+# Copy _headers into public/ so Wrangler applies security + cache headers to
+# static assets (DAFTARI-134/135/137/139; CSP/HSTS/CORP/cache policy).
+# _headers is mandatory: a deploy without it ships static assets with zero
+# security headers, so fail the build if it is missing.
+if [ -f "$SCRIPT_DIR/_headers" ]; then
+  cp "$SCRIPT_DIR/_headers" "$OUT_DIR/"
+else
+  echo "ERROR: _headers not found in $SCRIPT_DIR — refusing to deploy without security headers" >&2
+  exit 1
+fi
 echo "Admin WASM build copied to $OUT_DIR/ (from $SRC)"
 ls "$OUT_DIR/" | head -5

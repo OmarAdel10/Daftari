@@ -64,7 +64,7 @@ describe('admin host fetch handler', () => {
     expect(res.headers.get('Cross-Origin-Opener-Policy')).toBe('same-origin-allow-popups');
     expect(res.headers.get('Cross-Origin-Embedder-Policy')).toBe('require-corp');
     const csp = res.headers.get('Content-Security-Policy');
-    expect(csp).toContain("script-src 'self' 'wasm-unsafe-eval' 'require-trusted-types-for' 'script'");
+    expect(csp).not.toContain('require-trusted-types-for');
     expect(csp).toContain("style-src 'self'");
     expect(csp).not.toContain("'unsafe-inline'");
     expect(csp).toContain("frame-src 'self' https://*.firebaseapp.com");

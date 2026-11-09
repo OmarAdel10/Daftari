@@ -10,6 +10,8 @@
  * - require-trusted-types-for 'script' added (DAFTARI-143)
  * - CSP report-uri /csp-report added (DAFTARI-144)
  * - Permissions-Policy deny list extended (DAFTARI-140)
+ * - require-trusted-types-for 'script' removed from CSP (DAFTARI-143 —
+ *   not enforced at runtime; see _headers for static-asset policy)
  */
 import type { HeaderPolicyService } from './header-policy-service';
 
@@ -26,7 +28,7 @@ export class HeaderPolicyServiceImpl implements HeaderPolicyService {
       'Strict-Transport-Security': 'max-age=63072000; includeSubDomains',
       'Content-Security-Policy':
         "default-src 'self'; object-src 'none'; base-uri 'self'; " +
-        "script-src 'self' 'wasm-unsafe-eval' 'require-trusted-types-for' 'script' https://apis.google.com; " +
+        "script-src 'self' 'wasm-unsafe-eval' https://apis.google.com; " +
         "style-src 'self'; " +
         "font-src 'self' data:; img-src 'self' data:; " +
         "connect-src 'self' https://daftariapp.workers.dev wss://daftariapp.workers.dev " +
