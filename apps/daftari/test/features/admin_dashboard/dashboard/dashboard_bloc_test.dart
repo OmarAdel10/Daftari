@@ -552,7 +552,7 @@ void main() {
     test(
       'close() during in-flight connect() does not schedule a new timer',
       () {
-        fakeAsync((async) async {
+        fakeAsync((async) {
           final ticketGate = Completer<String?>();
           final realtime = RealtimeClient(
             wsUrl: 'wss://x/ws',
@@ -567,14 +567,18 @@ void main() {
           // connect() is in-flight awaiting ticketProvider()
           async.elapse(const Duration(milliseconds: 10));
           expect(realtime.isClosed, isFalse);
-          // Close while connect() is mid-flight: _closed = true synchronously,
-          // cancels the reconnect timer before any await.
-          await bloc.close();
-          async.elapse(const Duration(milliseconds: 10));
+          // Close while connect() is mid-flight: RealtimeClient.close() sets
+          // _closed = true synchronously (before any await), so isClosed is
+          // true immediately even though bloc.close() is still async.
+          bloc.close();
           expect(realtime.isClosed, isTrue);
+          async.flushMicrotasks();
           // Resolve the pending ticketProvider — connect() must return early
           // due to _closed, not schedule a new reconnect timer.
           ticketGate.complete(null);
+          async.flushMicrotasks();
+          expect(realtime.isClosed, isTrue);
+          expect(async.pendingTimers, isEmpty);
           async.elapse(const Duration(seconds: 3));
           expect(realtime.isClosed, isTrue);
         });
