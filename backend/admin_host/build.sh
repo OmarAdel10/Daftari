@@ -41,5 +41,10 @@ cp -r "$SRC"/* "$OUT_DIR/"
 if [ -f "$SCRIPT_DIR/.assetsignore" ]; then
   cp "$SCRIPT_DIR/.assetsignore" "$OUT_DIR/"
 fi
+# Copy _headers into public/ so Wrangler applies security + cache headers to
+# static assets (DAFTARI-134/135/137/139; CSP/HSTS/CORP/cache policy).
+if [ -f "$SCRIPT_DIR/_headers" ]; then
+  cp "$SCRIPT_DIR/_headers" "$OUT_DIR/"
+fi
 echo "Admin WASM build copied to $OUT_DIR/ (from $SRC)"
 ls "$OUT_DIR/" | head -5

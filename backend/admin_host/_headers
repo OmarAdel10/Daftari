@@ -1,0 +1,77 @@
+# Cloudflare Workers Assets headers for backend/admin_host/public/
+#
+# Applied to static assets served from the `public/` directory via the
+# `[assets]` binding in wrangler.toml. The HeaderPolicyService applies the
+# same security policy to dynamic responses in the Workers runtime; this file
+# covers the static-asset edge path so both response types are protected.
+#
+# Cache policy (mirrors CachePolicyServiceImpl, hardened per DAFTARI-134/135):
+# - SPA shell: max-age=0, must-revalidate (never long-term cached)
+# - Entry assets (stable-named, NOT fingerprinted): must-revalidate so security
+#   patches reach returning users without waiting a year (entry assets are
+#   main.dart.js/wasm/mjs, flutter.js, flutter_service_worker.js,
+#   flutter_bootstrap.js, canvaskit/*, fonts/*)
+# - Other static assets: public, max-age=3600 (1 hour)
+
+# --- SPA shell ---
+/index.html
+  Cache-Control: max-age=0, must-revalidate
+
+# --- Entry assets (stable-named, must-revalidate) ---
+/main.dart.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+/main.dart.wasm
+  Cache-Control: public, max-age=0, must-revalidate
+
+/main.dart.mjs
+  Cache-Control: public, max-age=0, must-revalidate
+
+/flutter.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+/flutter_service_worker.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+/flutter_bootstrap.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+/canvaskit/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/fonts/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+# --- Other static assets (1 hour) ---
+/assets/*
+  Cache-Control: public, max-age=3600
+
+/icons/*
+  Cache-Control: public, max-age=3600
+
+/favicon.png
+  Cache-Control: public, max-age=3600
+
+/manifest.json
+  Cache-Control: public, max-age=3600
+
+/version.json
+  Cache-Control: public, max-age=3600
+
+# --- Security headers for all static-asset responses ---
+# Mirrors HeaderPolicyServiceImpl (DAFTARI-131/132/133/136/143/144/140).
+# HSTS without preload: inert on *.workers.dev today (no hstspreload.org
+# submission); preload only after custom-domain confirmation (DAFTARI-137).
+# COOP same-origin-allow-popups: required for Firebase signInWithPopup
+# (window.opener credential return); retains opener handles — consumers must
+# use noopener on outbound links (DAFTARI-139).
+/*
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Opener-Policy: same-origin-allow-popups
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=()
+  Strict-Transport-Security: max-age=63072000; includeSubDomains
+  Content-Security-Policy: default-src 'self'; object-src 'none'; base-uri 'self'; script-src 'self' 'wasm-unsafe-eval' 'require-trusted-types-for' 'script' https://apis.google.com; style-src 'self'; font-src 'self' data:; img-src 'self' data:; connect-src 'self' https://daftariapp.workers.dev wss://daftariapp.workers.dev https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-src 'self' https://*.firebaseapp.com; frame-ancestors 'none'; form-action 'self'; report-uri /csp-report
+  Cross-Origin-Resource-Policy: same-origin
