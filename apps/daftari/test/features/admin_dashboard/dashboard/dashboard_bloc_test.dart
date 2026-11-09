@@ -2,6 +2,7 @@
 
 import 'dart:async';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -9,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:daftari/core/backend/workers/api_client.dart';
+import 'package:daftari/core/backend/workers/realtime_client.dart';
 import 'package:daftari/core/config/env_config.dart';
 import 'package:daftari/core/error/either.dart';
 import 'package:daftari/core/error/failure.dart';
@@ -531,6 +533,53 @@ void main() {
       expect(calls, greaterThanOrEqualTo(8)); // 4 sources x 2 rounds
       await bloc.close();
     });
+
+    test('close() closes an injected RealtimeClient', () async {
+      final realtime = RealtimeClient(
+        wsUrl: 'wss://x/ws',
+        ticketProvider: () async => null, // null ticket → no socket opened
+      );
+      final bloc = DashboardBloc(
+        api: api,
+        tokenProvider: () async => 'tok',
+        realtime: realtime,
+      );
+      expect(realtime.isClosed, isFalse);
+      await bloc.close();
+      expect(realtime.isClosed, isTrue);
+    });
+
+    test(
+      'close() during in-flight connect() does not schedule a new timer',
+      () {
+        fakeAsync((async) async {
+          final ticketGate = Completer<String?>();
+          final realtime = RealtimeClient(
+            wsUrl: 'wss://x/ws',
+            ticketProvider: () async => ticketGate.future,
+            incomingForTest: StreamController<Map<String, dynamic>>().stream,
+          );
+          final bloc = DashboardBloc(
+            api: api,
+            tokenProvider: () async => 'tok',
+            realtime: realtime,
+          );
+          // connect() is in-flight awaiting ticketProvider()
+          async.elapse(const Duration(milliseconds: 10));
+          expect(realtime.isClosed, isFalse);
+          // Close while connect() is mid-flight: _closed = true synchronously,
+          // cancels the reconnect timer before any await.
+          await bloc.close();
+          async.elapse(const Duration(milliseconds: 10));
+          expect(realtime.isClosed, isTrue);
+          // Resolve the pending ticketProvider — connect() must return early
+          // due to _closed, not schedule a new reconnect timer.
+          ticketGate.complete(null);
+          async.elapse(const Duration(seconds: 3));
+          expect(realtime.isClosed, isTrue);
+        });
+      },
+    );
   });
 
   group('Dashboard models (isOnline branches)', () {
