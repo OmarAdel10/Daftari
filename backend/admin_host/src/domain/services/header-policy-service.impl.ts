@@ -10,6 +10,8 @@
  * - require-trusted-types-for 'script' added (DAFTARI-143)
  * - CSP report-uri /csp-report added (DAFTARI-144)
  * - Permissions-Policy deny list extended (DAFTARI-140)
+ * - require-trusted-types-for 'script' removed from CSP (DAFTARI-143 —
+ *   not enforced at runtime; see _headers for static-asset policy)
  */
 import type { HeaderPolicyService } from './header-policy-service';
 

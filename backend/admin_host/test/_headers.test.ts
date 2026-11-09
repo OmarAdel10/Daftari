@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { HeaderPolicyServiceImpl } from '../src/domain/services/header-policy-service.impl';
 
 const HEADERS_PATH = join(__dirname, '..', '_headers');
 const headers = readFileSync(HEADERS_PATH, 'utf-8');
@@ -79,5 +80,17 @@ describe('_headers security policy', () => {
     expect(csp).toContain("form-action 'self'");
     expect(csp).toContain("script-src 'self' 'wasm-unsafe-eval' https://apis.google.com");
     expect(csp).not.toContain('require-trusted-types-for');
+  });
+
+  it('CSP in _headers matches runtime HeaderPolicyServiceImpl', () => {
+    const section = sectionOf(headers, '/*');
+    const cspLine = section.split('\n').map((l: string) => l.trim()).find((l: string) => l.startsWith('Content-Security-Policy:'));
+    expect(cspLine).toBeDefined();
+    const headersCsp = cspLine!.replace('Content-Security-Policy: ', '');
+
+    const runtime = new HeaderPolicyServiceImpl();
+    const runtimeCsp = runtime.securityHeaders()['Content-Security-Policy'];
+
+    expect(headersCsp).toBe(runtimeCsp);
   });
 });
