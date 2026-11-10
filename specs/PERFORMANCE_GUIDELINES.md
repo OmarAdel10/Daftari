@@ -192,7 +192,7 @@ The behaviors below are **current code reality** and are documented here as ackn
 ### 8. Cloudflare Workers Backend Performance Considerations
 
 #### 8.1 Network Latency & Caching
-* **API Calls:** All Cloudflare Workers calls (daftari-api, daftari-realtime) add network latency. Use `context.select` to minimize rebuilds while waiting for responses.
+* **API Calls:** All Cloudflare Workers calls (daftari-api) add network latency. Use `context.select` to minimize rebuilds while waiting for responses.
 * **Auth Token Reuse:** Firebase ID tokens are cached by Firebase Auth; `ApiClient` passes the same token for all requests in a session -- no redundant token refresh.
 * **In-Memory Analytics Queue:** `AnalyticsService` batches up to 50 events before flushing -- reduces HTTP overhead. Queue lost on app close (acceptable for analytics).
 
