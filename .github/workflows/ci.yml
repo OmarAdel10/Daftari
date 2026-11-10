@@ -89,7 +89,7 @@ jobs:
             done
           done
 
-  # TypeScript workers: api, realtime (DO hub), admin_host, paymob webhook, shared.
+  # TypeScript workers: api, admin_host, shared.
   backend-tests:
     name: Backend Workers (${{ matrix.worker }})
     runs-on: ubuntu-latest
@@ -99,7 +99,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        worker: [api, realtime, admin_host, paymob_webhook, shared]
+        worker: [api, admin_host, shared]
     steps:
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
@@ -157,7 +157,7 @@ jobs:
 
       - name: Install worker dependencies for dry run
         run: |
-          for pkg in api realtime admin_host paymob_webhook; do
+          for pkg in api admin_host; do
             npm ci --prefix backend/$pkg --include=dev --no-audit --no-fund
           done
 
@@ -168,7 +168,7 @@ jobs:
           # pointing to backend/admin_host/public, a build output not present in
           # source). It is validated via `wrangler pages deploy` in deploy-cloud.yml,
           # not via `wrangler deploy --dry-run`.
-          for pkg in api realtime paymob_webhook; do
+          for pkg in api; do
             for target in '' '--env staging' '--env production'; do
               echo "== $pkg: ${target:-dev} =="
               (cd backend/$pkg && wrangler deploy --dry-run $target 2>&1 | tee /tmp/dry-run.out)
