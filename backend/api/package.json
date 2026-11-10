@@ -16,6 +16,7 @@
   "dependencies": {
     "daftari-backend-shared": "file:../shared",
     "daftari-realtime": "file:../realtime",
+    "daftari-paymob-webhook": "file:../paymob_webhook",
     "hono": "^4.0.0"
   },
   "devDependencies": {

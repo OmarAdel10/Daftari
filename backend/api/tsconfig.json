@@ -15,7 +15,8 @@
     "baseUrl": ".",
     "paths": {
       "daftari-backend-shared/*": ["../shared/src/*"],
-      "daftari-realtime/*": ["../realtime/src/*"]
+      "daftari-realtime/*": ["../realtime/src/*"],
+      "daftari-paymob-webhook/*": ["../paymob_webhook/src/*"]
     }
   },
   "include": ["src/**/*.ts", "test/**/*.ts"],

@@ -8,7 +8,7 @@
  * PAYMOB_HMAC_SECRET, POSTHOG_API_KEY) come from the Worker environment via
  * wrangler secrets.
  */
-import { createTurso } from '../../shared/src/turso';
+import { createTurso } from 'daftari-backend-shared/turso';
 import { TursoWebhookEventRepository } from './infrastructure/repositories/turso-webhook-event-repository';
 import { PostHogAnalyticsService } from './infrastructure/external-services/posthog-analytics-service';
 import { HmacValidationServiceImpl } from './domain/services/hmac-validation-service.impl';
@@ -16,7 +16,7 @@ import { LicenseSigningServiceImpl } from './domain/services/license-signing-ser
 import { ProcessWebhookUseCase } from './application/use-cases/process-webhook-use-case';
 import { IssueLicenseUseCase } from './application/use-cases/issue-license-use-case';
 import { createPaymobApp, type PaymobDeps, type Env } from './index';
-import { signLicenseKey } from '../../shared/src/license';
+import { signLicenseKey } from 'daftari-backend-shared/license';
 
 /**
  * Build a fully-wired `createPaymobApp` from the Worker environment.
