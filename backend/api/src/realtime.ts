@@ -19,5 +19,10 @@ export function notifyRealtime(
     .get(notifier.idFromName(tenantId))
     .notify(tenantId, { tenantId, event, data })
     .then(() => undefined)
-    .catch(() => undefined);
+    .catch((err) => {
+      // Best-effort broadcast: never fail the originating request, but log so
+      // dropped notifications are visible (e.g. DO overloaded/misconfigured).
+      // eslint-disable-next-line no-console
+      console.error('[notifyRealtime] broadcast failed:', err);
+    });
 }

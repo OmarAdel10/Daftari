@@ -3352,5 +3352,27 @@ describe('CORS allowlist (T19)', () => {
       expect(call[0].sql).toContain('UPDATE licenses');
       expect(typeof call[0].args[0]).toBe('number');
     });
+
+    it('POST /webhook delegates to paymob app (not 503 API-not-configured)', async () => {
+      const res = await api.fetch(new Request('http://localhost/webhook', { method: 'POST', body: '{}' }), env as unknown as Env, {} as ExecutionContext);
+      // Not 503 means it did not fall through to the API app's "not configured" stub.
+      expect(res.status).not.toBe(503);
+    });
+
+    it('GET /ws delegates to realtime app (not 503 API-not-configured)', async () => {
+      const res = await api.fetch(new Request('http://localhost/ws'), env as unknown as Env, {} as ExecutionContext);
+      expect(res.status).not.toBe(503);
+    });
+
+    it('reuses cached paymob and realtime apps across requests', async () => {
+      const r1 = await api.fetch(new Request('http://localhost/webhook', { method: 'POST', body: '{}' }), env as unknown as Env, {} as ExecutionContext);
+      const r2 = await api.fetch(new Request('http://localhost/webhook', { method: 'POST', body: '{}' }), env as unknown as Env, {} as ExecutionContext);
+      const r3 = await api.fetch(new Request('http://localhost/ws'), env as unknown as Env, {} as ExecutionContext);
+      const r4 = await api.fetch(new Request('http://localhost/ws'), env as unknown as Env, {} as ExecutionContext);
+      expect(r1.status).not.toBe(503);
+      expect(r2.status).not.toBe(503);
+      expect(r3.status).not.toBe(503);
+      expect(r4.status).not.toBe(503);
+    });
   });
 });

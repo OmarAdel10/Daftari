@@ -109,8 +109,9 @@ export function createPaymobApp(deps: Partial<PaymobDeps> = {}) {
 
   const app = new Hono<{ Bindings: Env }>();
 
-  app.use('*', cors());
-
+  // /webhook is server-to-server (Paymob → api). No browser-origin CORS needed;
+  // the merged api worker's explicit CORS allowlist governs API routes instead.
+  // Wildcard CORS on a state-changing license-issuance endpoint is removed.
   app.post('/webhook', async (c) => {
     const env = c.env;
     // Fail closed. No secrets configured → cannot validate HMAC or sign licenses.

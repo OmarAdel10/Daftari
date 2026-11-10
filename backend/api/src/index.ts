@@ -256,6 +256,9 @@ export default {
 
     // WebSocket upgrade → realtime app
     if (url.pathname === '/ws' && request.method === 'GET') {
+      if (!env.NOTIFIER) {
+        return Response.json({ ok: false, error: 'realtime not configured' }, { status: 503 });
+      }
       const app = realtimeAppFor(env);
       return app.fetch(request, env, ctx);
     }
