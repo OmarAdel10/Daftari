@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "daftari-backend-shared": "file:../shared",
+    "daftari-realtime": "file:../realtime",
     "hono": "^4.0.0"
   },
   "devDependencies": {

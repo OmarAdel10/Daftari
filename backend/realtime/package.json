@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@libsql/client": "^0.15.15",
+    "daftari-backend-shared": "file:../shared",
     "hono": "^4.0.0",
     "reflect-metadata": "^0.2.2",
     "tsyringe": "^4.10.0"

@@ -14,7 +14,8 @@
     "types": ["@cloudflare/workers-types"],
     "baseUrl": ".",
     "paths": {
-      "daftari-backend-shared/*": ["../shared/src/*"]
+      "daftari-backend-shared/*": ["../shared/src/*"],
+      "daftari-realtime/*": ["../realtime/src/*"]
     }
   },
   "include": ["src/**/*.ts", "test/**/*.ts"],
