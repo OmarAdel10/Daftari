@@ -5,15 +5,19 @@ export interface Env {
   TURSO_DATABASE_URL: string;
   TURSO_AUTH_TOKEN: string;
   POSTHOG_API_KEY: string;
-  /** Signs/verifies dashboard session JWTs (shared with realtime worker). */
+  /** Signs/verifies dashboard session JWTs (shared with realtime/paymob). */
   ADMIN_JWT_SECRET: string;
-  /** Shared secret sent to the realtime worker's /internal/notify route. */
-  INTERNAL_NOTIFY_SECRET: string;
-  /** Service binding to daftari-realtime worker. */
-  REALTIME?: {
-    /** Fetcher shape: POST to the realtime worker's /internal/notify. */
-    fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+  /** Durable Object binding for tenant WebSocket hubs (TenantNotifier). */
+  NOTIFIER?: {
+    idFromName: (name: string) => string;
+    get: (id: string) => { notify: (tenantId: string, event: Record<string, unknown>) => Promise<void>; fetch: (req: Request) => Promise<Response> };
   };
+  /** Paymob HMAC secret for webhook signature validation. */
+  PAYMOB_HMAC_SECRET?: string;
+  /** Ed25519 private key for license signing. */
+  ED25519_PRIVATE_KEY?: string;
+  /** Ed25519 public key for license verification. */
+  ED25519_PUBLIC_KEY?: string;
   /** R2 bucket for tenant branding (logos). */
   LOGOS?: {
     put: (

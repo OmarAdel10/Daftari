@@ -77,13 +77,17 @@ const dbState: DbState = {
   deviceRows: [],
 };
 
-const realtimeFetch = vi.fn(
-  (_input: RequestInfo | URL, _init?: RequestInit) =>
-    Promise.resolve(new Response(null, { status: 200 })),
-);
-const INTERNAL_NOTIFY_SECRET = 'test-internal-secret';
+const notifyMock = vi.fn(async (_tenantId: string, _event: Record<string, unknown>) => {});
 const logosPut = vi.fn(() => Promise.resolve());
 const logosGet = vi.fn(() => Promise.resolve(null as unknown));
+
+const notifierMock = {
+  idFromName: vi.fn((name: string) => name),
+  get: vi.fn(() => ({
+    notify: notifyMock,
+    fetch: vi.fn(),
+  })),
+};
 
 const env = {
   ENVIRONMENT: 'development',
@@ -95,17 +99,13 @@ const env = {
   TURSO_AUTH_TOKEN: 'turso-token',
   POSTHOG_API_KEY: 'phc_test',
   ADMIN_JWT_SECRET: 'test-admin-jwt-secret',
-  INTERNAL_NOTIFY_SECRET,
-  REALTIME: { fetch: realtimeFetch },
+  NOTIFIER: notifierMock,
   LOGOS: { put: logosPut, get: logosGet },
 };
 
-/** Decode the JSON body the api sent to the realtime service binding. */
-function realtimeBodies(): Array<Record<string, unknown>> {
-  return realtimeFetch.mock.calls.map((call) => {
-    const init = call[1];
-    return JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
-  });
+/** Capture the notify payloads sent to the tenant Durable Object. */
+function notifyBodies(): Array<Record<string, unknown>> {
+  return notifyMock.mock.calls.map((call) => call[1]);
 }
 
 function makeApp() {
@@ -883,15 +883,13 @@ describe('sales routes', () => {
     expect(res.status).toBe(200);
     const calls = executeMock.mock.calls.filter((c) => (c[0] as { sql: string }).sql.includes('INSERT OR REPLACE INTO sales'));
     expect(calls.length).toBe(2);
-    expect(realtimeFetch).toHaveBeenCalledTimes(1);
-    expect(realtimeFetch).toHaveBeenCalledWith(
-      'https://realtime/internal/notify',
-      expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({ 'X-Internal-Secret': INTERNAL_NOTIFY_SECRET }),
-      }),
-    );
-    expect(realtimeBodies()[0]).toEqual({ tenantId: 'uid-123', event: 'sale', data: { count: 2 } });
+    expect(notifyMock).toHaveBeenCalledTimes(1);
+    expect(notifyMock).toHaveBeenCalledWith('uid-123', {
+      tenantId: 'uid-123',
+      event: 'sale',
+      data: { count: 2 },
+    });
+    expect(notifyBodies()[0]).toEqual({ tenantId: 'uid-123', event: 'sale', data: { count: 2 } });
   });
 
   it('the sale broadcast never contains receipt_json', async () => {
@@ -906,7 +904,7 @@ describe('sales routes', () => {
       }),
     }, env);
     expect(res.status).toBe(200);
-    const body = realtimeBodies()[0] ?? {};
+    const body = notifyBodies()[0] ?? {};
     expect(body).not.toHaveProperty('sales');
     expect(body).toEqual({ tenantId: 'uid-123', event: 'sale', data: { count: 1 } });
     expect(JSON.stringify(body)).not.toContain('receipt_json');
@@ -2101,14 +2099,13 @@ describe('login + revoke routes (admin-dashboard T06)', () => {
       return sql.includes('UPDATE sessions') && sql.includes('ended_at = ?');
     });
     expect(endCalls).toHaveLength(2);
-    expect(realtimeFetch).toHaveBeenCalledWith(
-      'https://realtime/internal/notify',
-      expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({ 'X-Internal-Secret': INTERNAL_NOTIFY_SECRET }),
-      }),
-    );
-    expect(realtimeBodies()[0]).toEqual({
+    expect(notifyMock).toHaveBeenCalledTimes(1);
+    expect(notifyMock).toHaveBeenCalledWith('uid-123', {
+      tenantId: 'uid-123',
+      event: 'session_revoked',
+      data: { username: 'admin', at: expect.any(Number) },
+    });
+    expect(notifyBodies()[0]).toEqual({
       tenantId: 'uid-123',
       event: 'session_revoked',
       data: { username: 'admin', at: expect.any(Number) },
@@ -2241,7 +2238,7 @@ describe('login + revoke routes (admin-dashboard T06)', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { ok: boolean; data: { ended: number } };
     expect(body.data.ended).toBe(0);
-    expect(realtimeFetch).not.toHaveBeenCalled();
+    expect(notifyMock).not.toHaveBeenCalled();
   });
 
   it('POST /sessions/revoke ends only own-tenant sessions (token scoping)', async () => {

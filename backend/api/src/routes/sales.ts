@@ -128,9 +128,9 @@ export function registerSales(
       }
     }
 
-    // Notify the realtime worker (service binding) — fire & forget. Only a
-    // count crosses the wire; receipts stay in the database.
-    if (c.env.REALTIME) {
+    // Notify the tenant's Durable Object — fire & forget. Only a count
+    // crosses the wire; receipts stay in the database.
+    if (c.env.NOTIFIER) {
       const notifyPromise = notifyRealtime(c.env, tenantId, 'sale', { count: sales.length });
       // In Workers, executionCtx.waitUntil extends lifetime. In tests the
       // getter throws, so wrap it.

@@ -284,8 +284,7 @@ export function registerSessions(
       if (endResult.status === 'fulfilled' && endResult.value.ok) ended++;
     }
 
-    const realtime = c.env.REALTIME;
-    if (realtime && ended > 0) {
+    if (c.env.NOTIFIER && ended > 0) {
       const notifyPromise = notifyRealtime(c.env, tenantId, 'session_revoked', {
         username,
         at: now,

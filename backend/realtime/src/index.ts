@@ -45,10 +45,10 @@ export interface Env {
   };
   /** Verifies dashboard session JWTs on the /ws upgrade (same value as api). */
   ADMIN_JWT_SECRET: string;
-  /** Turso (libSQL) database URL. */
-  TURSO_DB_URL: string;
-  /** Turso (libSQL) database authentication token. */
-  TURSO_DB_AUTH_TOKEN: string;
+  /** Turso (libSQL) database URL (same name as api worker). */
+  TURSO_DATABASE_URL: string;
+  /** Turso (libSQL) database authentication token (same name as api worker). */
+  TURSO_AUTH_TOKEN: string;
 }
 
 export interface RealtimeDeps {

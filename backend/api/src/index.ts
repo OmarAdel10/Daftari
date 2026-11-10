@@ -43,6 +43,9 @@ import { UserCreateUseCase } from './application/use-cases/user-create-use-case'
 import { UserUpdateUseCase } from './application/use-cases/user-update-use-case';
 import { UserDeleteUseCase } from './application/use-cases/user-delete-use-case';
 import { DeviceLinkUseCase } from './application/use-cases/device-link-use-case';
+import { createRealtimeApp, TenantNotifier } from 'daftari-realtime/index';
+import { createRealtimeServices, type RealtimeEnv } from 'daftari-realtime/runtime';
+import { createPaymobAppFromEnv } from 'daftari-paymob-webhook/runtime';
 
 export interface ApiDeps {
   verifyToken?: FirebaseTokenVerifier;
@@ -212,6 +215,8 @@ export function createApp(deps: ApiDeps) {
  *  then reuse it (all requests to a deployment share the same env). Secrets
  *  are read at request time via `env`, never via `process.env` at load time. */
 let cachedServices: ApiServices | null = null;
+let cachedRealtimeApp: ReturnType<typeof createRealtimeApp> | null = null;
+let cachedPaymobApp: ReturnType<typeof createPaymobAppFromEnv> | null = null;
 
 function servicesFor(env: Env): ApiServices {
   if (!cachedServices) {
@@ -224,8 +229,38 @@ function servicesFor(env: Env): ApiServices {
   return cachedServices;
 }
 
+function realtimeAppFor(env: Env) {
+  if (!cachedRealtimeApp) {
+    const deps = createRealtimeServices(env as unknown as RealtimeEnv);
+    cachedRealtimeApp = createRealtimeApp(deps);
+  }
+  return cachedRealtimeApp;
+}
+
+function paymobAppFor(env: Env) {
+  if (!cachedPaymobApp) {
+    cachedPaymobApp = createPaymobAppFromEnv(env as unknown as Parameters<typeof createPaymobAppFromEnv>[0]);
+  }
+  return cachedPaymobApp;
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+
+    // PayMob webhook → paymob app
+    if (url.pathname === '/webhook' && request.method === 'POST') {
+      const app = paymobAppFor(env);
+      return app.fetch(request, env, ctx);
+    }
+
+    // WebSocket upgrade → realtime app
+    if (url.pathname === '/ws' && request.method === 'GET') {
+      const app = realtimeAppFor(env);
+      return app.fetch(request, env, ctx);
+    }
+
+    // API → existing createApp
     let services: ApiServices;
     try {
       services = servicesFor(env);
@@ -250,3 +285,5 @@ export default {
     await db.sweepExpiredLicenses(Date.now());
   },
 };
+
+export { TenantNotifier };

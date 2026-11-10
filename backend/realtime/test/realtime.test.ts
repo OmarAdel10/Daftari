@@ -24,8 +24,8 @@ const JWT_SECRET = 'test-rt-secret';
 const env: Env = {
   NOTIFIER: notifierNamespace as unknown as Env['NOTIFIER'],
   ADMIN_JWT_SECRET: JWT_SECRET,
-  TURSO_DB_URL: 'libsql://test.turso.io',
-  TURSO_DB_AUTH_TOKEN: 'test-token',
+  TURSO_DATABASE_URL: 'libsql://test.turso.io',
+  TURSO_AUTH_TOKEN: 'test-token',
 };
 
 const ticketRepo = new InMemoryRealtimeTicketRepository();
