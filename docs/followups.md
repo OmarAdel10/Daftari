@@ -14,7 +14,7 @@
 14: [DOCUMENTED] Program.cs /receipt print_to_file filename divergence vs Windows: Windows writes EXACT PrintFileName path; Linux writes invoice_{timestamp}.pdf in its directory (client consumes returned pdfPath, contract-compatible). Parity not needed as client doesn't use print_to_file today.
 15: [RESOLVED] PrintServer.Linux csproj: dropped System.Runtime.InteropServices 4.3.0 ref; SalesExportService: deleted dead word-wrap code; CS8604 fixed with ! on logoSvgData; padX removed.
 16: (Task 10, post-deploy) backend/admin_host/src/index.ts CSP: verify admin CSP in browser console on `admin-dev.daftariapp.workers.dev` after first deploy; relax `connect-src` if a legitimate origin is blocked (e.g. PostHog, Turso direct) — only observable after first deploy.
-17: backend/api/wrangler.toml: [RESOLVED E5] REALTIME service binding now enabled for dev/staging/production; /internal/notify requires X-Internal-Secret and sales broadcasts only a count
+17: backend/api/wrangler.toml: [RESOLVED E5] REALTIME service binding was enabled for dev/staging/production then REMOVED in worker consolidation (Branch B) — realtime merged into api; NOTIFIER Durable Object binding now on api instead; /internal/notify replaced by direct DO `env.NOTIFIER.get(id).notify()`
 18: backend/realtime/src/index.ts:22/:32: TaftariDurableObjectStub typo for Daftari
 [RESOLVED] 19: cloudflare/wrangler-action@v3 → v4 upgrade (v3 works; v4 is current) — replaced by pinned global wrangler CLI (4.157.0) in deploy-cloud.yml; wrangler-action removed.
 20: backend/api: CORS is open (app.use('*', cors())) vs spec's fixed origins — tighten to pages.dev/workers.dev origins
@@ -25,7 +25,7 @@
 25: lib/core/config/flavor_config.dart: 'landing' flavor is dead config (nothing uses AppFlavor.landing — the real landing page is the Jaspr project) — remove or document
 26: Ed25519 keypair generation script (user-requested feature: script that generates the ED25519 keypair; public key is hard-coded in release.yml dart-define, private key lives in paymob_webhook worker secrets) — separate feature, own branch
 27: PRE-EXISTING (backend refactor 7220601 fallout, out of migration scope): 18 analyzer issues in lib/core/backend/** + 2 SalesWorkspace "March 2026" test failures — fix before merge to development
-28: apps/daftari/lib/core/config/env_config.dart:22,25: doc comments reference pre-rename worker names (daftari-api/daftari-realtime)
+28: [RESOLVED] apps/daftari/lib/core/config/env_config.dart:22,25: doc comments reference pre-rename worker names (daftari-api/daftari-realtime) — updated in Branch B: realtimeWsUrl doc now says "served by the merged api worker"; values point to api-{dev,staging,}.daftariapp.workers.dev/ws
 29: test/core/backend/api_client_test.dart:17: test name 'sham URL' now asserts the real canonical URL — rename when next touched
 30: .github/workflows/opencode.yml: stale sync_specs job comment still mentions push to development
 31: backend/admin_host/src/index.ts:41: responses with status >= 400 bypass withHeaders (no security headers on error paths) — route through if constraint read strictly — superseded by the 2026-10-23/24 registry entry (Plane DAFTARI-147); live code: src/application/use-cases/serve-request-use-case.ts:63-68
