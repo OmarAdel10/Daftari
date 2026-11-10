@@ -19,20 +19,13 @@ const notifierNamespace = {
   get: vi.fn(() => notifier),
 };
 
-const INTERNAL_SECRET = 'test-internal-secret';
 const JWT_SECRET = 'test-rt-secret';
 
 const env: Env = {
   NOTIFIER: notifierNamespace as unknown as Env['NOTIFIER'],
   ADMIN_JWT_SECRET: JWT_SECRET,
-  INTERNAL_NOTIFY_SECRET: INTERNAL_SECRET,
   TURSO_DB_URL: 'libsql://test.turso.io',
   TURSO_DB_AUTH_TOKEN: 'test-token',
-};
-
-const internalHeaders = {
-  'Content-Type': 'application/json',
-  'X-Internal-Secret': INTERNAL_SECRET,
 };
 
 const ticketRepo = new InMemoryRealtimeTicketRepository();
@@ -108,200 +101,15 @@ beforeEach(async () => {
 });
 
 describe('realtime worker routes', () => {
-  // ---- POST /internal/notify ----
+  // POST /internal/notify has been removed — api now calls the DO stub directly.
 
-  it('POST /internal/notify routes to the tenant DO and broadcasts', async () => {
-    const res = await app.request('/internal/notify', {
-      method: 'POST',
-      headers: internalHeaders,
-      body: JSON.stringify({ tenantId: 'uid-123', event: 'sale', data: { n: 1 } }),
-    }, env);
-    expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json).toMatchObject({ ok: true, broadcastId: expect.any(String) });
-    expect(notifierNamespace.idFromName).toHaveBeenCalledWith('uid-123');
-    expect(notifier.notify).toHaveBeenCalledWith(
-      'uid-123',
-      expect.objectContaining({ type: 'sale', tenantId: 'uid-123', data: { n: 1 } }),
-    );
-  });
-
-  it('POST /internal/notify rejects a request without the shared secret → 401', async () => {
+  it('POST /internal/notify is removed → 404', async () => {
     const res = await app.request('/internal/notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tenantId: 'uid-123', event: 'sale', data: { n: 1 } }),
     }, env);
-    expect(res.status).toBe(401);
-    expect(notifier.notify).not.toHaveBeenCalled();
-  });
-
-  it('POST /internal/notify rejects a wrong shared secret → 401', async () => {
-    const res = await app.request('/internal/notify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Internal-Secret': 'nope' },
-      body: JSON.stringify({ tenantId: 'uid-123', event: 'sale' }),
-    }, env);
-    expect(res.status).toBe(401);
-    expect(notifier.notify).not.toHaveBeenCalled();
-  });
-
-  it('POST /internal/notify broadcasts a bare sale count (no receipts)', async () => {
-    const res = await app.request('/internal/notify', {
-      method: 'POST',
-      headers: internalHeaders,
-      body: JSON.stringify({ tenantId: 'uid-123', event: 'sale', data: { count: 3 } }),
-    }, env);
-    expect(res.status).toBe(200);
-    expect(notifier.notify).toHaveBeenCalledWith('uid-123', expect.objectContaining({
-      type: 'sale',
-      tenantId: 'uid-123',
-      data: { count: 3 },
-    }));
-  });
-
-  it('POST /internal/notify rejects missing tenantId → 400 INVALID_TENANT', async () => {
-    const res = await app.request('/internal/notify', {
-      method: 'POST',
-      headers: internalHeaders,
-      body: JSON.stringify({ event: 'sale', data: { n: 1 } }),
-    }, env);
-    expect(res.status).toBe(400);
-    const json = await res.json();
-    expect(json).toEqual({ ok: false, error: 'INVALID_TENANT' });
-    expect(notifier.notify).not.toHaveBeenCalled();
-  });
-
-  it('POST /internal/notify rejects empty tenantId → 400 MISSING_TENANT', async () => {
-    const res = await app.request('/internal/notify', {
-      method: 'POST',
-      headers: internalHeaders,
-      body: JSON.stringify({ tenantId: '', event: 'sale', data: { n: 1 } }),
-    }, env);
-    expect(res.status).toBe(400);
-    const json = await res.json();
-    expect(json).toEqual({ ok: false, error: 'MISSING_TENANT' });
-    expect(notifier.notify).not.toHaveBeenCalled();
-  });
-
-  it('POST /internal/notify rejects invalid-format tenantId → 400 INVALID_TENANT', async () => {
-    const res = await app.request('/internal/notify', {
-      method: 'POST',
-      headers: internalHeaders,
-      body: JSON.stringify({ tenantId: 'Invalid Tenant!', event: 'sale', data: {} }),
-    }, env);
-    expect(res.status).toBe(400);
-    const json = await res.json();
-    expect(json).toEqual({ ok: false, error: 'INVALID_TENANT' });
-    expect(notifier.notify).not.toHaveBeenCalled();
-  });
-
-  it('POST /internal/notify rejects invalid event → 400 INVALID_EVENT', async () => {
-    const res = await app.request('/internal/notify', {
-      method: 'POST',
-      headers: internalHeaders,
-      body: JSON.stringify({ tenantId: 'uid-123', event: 'delete_everything', data: {} }),
-    }, env);
-    expect(res.status).toBe(400);
-    const json = await res.json();
-    expect(json).toEqual({ ok: false, error: 'INVALID_EVENT' });
-    expect(notifier.notify).not.toHaveBeenCalled();
-  });
-
-  it('POST /internal/notify accepts session_revoked event → 200', async () => {
-    const res = await app.request('/internal/notify', {
-      method: 'POST',
-      headers: internalHeaders,
-      body: JSON.stringify({ tenantId: 'uid-123', event: 'session_revoked', data: {} }),
-    }, env);
-    expect(res.status).toBe(200);
-    expect(notifier.notify).toHaveBeenCalled();
-  });
-
-  it('POST /internal/notify rejects oversized body → 413', async () => {
-    const bigData = { payload: 'x'.repeat(300_000) };
-    const res = await app.request('/internal/notify', {
-      method: 'POST',
-      headers: { ...internalHeaders },
-      body: JSON.stringify({ tenantId: 'uid-123', event: 'sale', data: bigData }),
-    }, env);
-    expect(res.status).toBe(413);
-    expect(notifier.notify).not.toHaveBeenCalled();
-  });
-
-  it('POST /internal/notify rate limits excessive requests → 429', async () => {
-    // First request allowed
-    const res1 = await rateLimiterApp.request('/internal/notify', {
-      method: 'POST',
-      headers: internalHeaders,
-      body: JSON.stringify({ tenantId: 'tenant-rl', event: 'sale', data: {} }),
-    }, env);
-    expect(res1.status).toBe(200);
-    // Second request within window → 429
-    const res2 = await rateLimiterApp.request('/internal/notify', {
-      method: 'POST',
-      headers: internalHeaders,
-      body: JSON.stringify({ tenantId: 'tenant-rl', event: 'sale', data: {} }),
-    }, env);
-    expect(res2.status).toBe(429);
-    const json = (await res2.json()) as { ok: boolean; error: string; retryAfterMs?: number };
-    expect(json).toMatchObject({ ok: false, error: 'RATE_LIMITED' });
-    expect(json.retryAfterMs).toBeGreaterThan(0);
-  });
-
-  it('POST /internal/notify rate limit is global (different tenantIds share quota) → 429', async () => {
-    // Exhaust quota with tenant-a
-    await rateLimiterApp.request('/internal/notify', {
-      method: 'POST',
-      headers: internalHeaders,
-      body: JSON.stringify({ tenantId: 'tenant-a', event: 'sale', data: {} }),
-    }, env);
-    // tenant-b gets 429 because quota is global
-    const res = await rateLimiterApp.request('/internal/notify', {
-      method: 'POST',
-      headers: internalHeaders,
-      body: JSON.stringify({ tenantId: 'tenant-b', event: 'sale', data: {} }),
-    }, env);
-    expect(res.status).toBe(429);
-  });
-
-  it('POST /internal/notify sanitizes prototype-pollution keys in data → 200', async () => {
-    const res = await app.request('/internal/notify', {
-      method: 'POST',
-      headers: internalHeaders,
-      body: JSON.stringify({
-        tenantId: 'uid-123',
-        event: 'sale',
-        data: { __proto__: { polluted: true }, count: 1 },
-      }),
-    }, env);
-    expect(res.status).toBe(200);
-    expect(notifier.notify).toHaveBeenCalledTimes(1);
-    const callArgs = notifier.notify.mock.calls[0] as [string, Record<string, unknown>];
-    expect(callArgs[0]).toBe('uid-123');
-    expect(callArgs[1].data).toEqual({ count: 1 });
-    expect(callArgs[1].data).not.toHaveProperty('__proto__');
-  });
-
-  it('POST /internal/notify rejects non-string event → 400 INVALID_EVENT', async () => {
-    const res = await app.request('/internal/notify', {
-      method: 'POST',
-      headers: internalHeaders,
-      body: JSON.stringify({ tenantId: 'uid-123', event: 123, data: {} }),
-    }, env);
-    expect(res.status).toBe(400);
-    const json = await res.json();
-    expect(json).toEqual({ ok: false, error: 'INVALID_EVENT' });
-  });
-
-  it('POST /internal/notify with non-object data → 200 (data coerced to undefined)', async () => {
-    const res = await app.request('/internal/notify', {
-      method: 'POST',
-      headers: internalHeaders,
-      body: JSON.stringify({ tenantId: 'uid-123', event: 'sale', data: 'not-an-object' }),
-    }, env);
-    expect(res.status).toBe(200);
-    expect(notifier.notify).toHaveBeenCalled();
+    expect(res.status).toBe(404);
   });
 
   it('GET /ws rate limits excessive requests → 429', async () => {
@@ -349,61 +157,6 @@ describe('realtime worker routes', () => {
     expect(res2.status).toBe(429);
     const json = await res2.json();
     expect(json).toMatchObject({ ok: false, error: 'RATE_LIMITED' });
-  });
-
-  it('POST /internal/notify fan-out failure → 503 BROADCAST_FANOUT_FAILED', async () => {
-    notifier.notify.mockRejectedValueOnce(new Error('DO down'));
-    const res = await app.request('/internal/notify', {
-      method: 'POST',
-      headers: internalHeaders,
-      body: JSON.stringify({ tenantId: 'uid-123', event: 'sale', data: { n: 1 } }),
-    }, env);
-    expect(res.status).toBe(503);
-    const json = await res.json();
-    expect(json).toEqual({ ok: false, error: 'BROADCAST_FANOUT_FAILED' });
-  });
-
-  it('POST /internal/notify rejects invalid JSON → 400', async () => {
-    const res = await app.request('/internal/notify', {
-      method: 'POST',
-      headers: { ...internalHeaders, 'Content-Type': 'application/json' },
-      body: '{not valid json',
-    }, env);
-    expect(res.status).toBe(400);
-    expect(notifier.notify).not.toHaveBeenCalled();
-  });
-
-  it('POST /internal/notify rejects null body → 400', async () => {
-    const res = await app.request('/internal/notify', {
-      method: 'POST',
-      headers: { ...internalHeaders, 'Content-Type': 'application/json' },
-      body: null,
-    }, env);
-    expect(res.status).toBe(400);
-    const json = await res.json();
-    expect(json).toEqual({ ok: false, error: 'Invalid JSON' });
-  });
-
-  it('POST /internal/notify rejects array body → 400', async () => {
-    const res = await app.request('/internal/notify', {
-      method: 'POST',
-      headers: { ...internalHeaders, 'Content-Type': 'application/json' },
-      body: JSON.stringify([1, 2, 3]),
-    }, env);
-    expect(res.status).toBe(400);
-    const json = await res.json();
-    expect(json).toEqual({ ok: false, error: 'Invalid JSON' });
-  });
-
-  it('POST /internal/notify rejects string body → 400', async () => {
-    const res = await app.request('/internal/notify', {
-      method: 'POST',
-      headers: { ...internalHeaders, 'Content-Type': 'application/json' },
-      body: '"just a string"',
-    }, env);
-    expect(res.status).toBe(400);
-    const json = await res.json();
-    expect(json).toEqual({ ok: false, error: 'Invalid JSON' });
   });
 
   // ---- Ticket-based WebSocket authentication ----

@@ -24,7 +24,6 @@ import { TicketValidationServiceImpl } from './domain/services/ticket-validation
 import { RateLimiter } from './infrastructure/services/rate-limiter';
 import { InMemoryBroadcastRepository } from './infrastructure/repositories/in-memory-broadcast-repository';
 import { InMemoryRealtimeTicketRepository } from './infrastructure/repositories/in-memory-realtime-ticket-repository';
-import { NotifyUseCase } from './application/use-cases/notify-use-case';
 import { WebSocketConnectUseCase } from './application/use-cases/websocket-connect-use-case';
 import type { BroadcastService } from './domain/services/broadcast-service';
 import type { BroadcastRepository } from './domain/repositories/broadcast-repository';
@@ -46,8 +45,6 @@ export interface Env {
   };
   /** Verifies dashboard session JWTs on the /ws upgrade (same value as api). */
   ADMIN_JWT_SECRET: string;
-  /** Shared secret required on /internal/notify (same value as api worker). */
-  INTERNAL_NOTIFY_SECRET: string;
   /** Turso (libSQL) database URL. */
   TURSO_DB_URL: string;
   /** Turso (libSQL) database authentication token. */
@@ -164,94 +161,12 @@ export function createRealtimeApp(deps: RealtimeDeps = {}) {
     deps.ticketValidationService ?? new TicketValidationServiceImpl();
   const ticketRepo = deps.ticketRepo ?? new InMemoryRealtimeTicketRepository();
   const rateLimiter = deps.rateLimiter ?? new RateLimiter(100, 60_000);
-
-  const notifyUseCase = new NotifyUseCase(broadcastService, broadcastRepo);
   const wsConnectUseCase = new WebSocketConnectUseCase(
     ticketValidationService,
     ticketRepo,
   );
 
   const app = new Hono<{ Bindings: Env }>();
-
-  app.post('/internal/notify', async (c) => {
-    // Reject oversized bodies before parsing (DoS guard).
-    const bodyText = await c.req.raw.text();
-    if (new TextEncoder().encode(bodyText).length > 256 * 1024) {
-      return c.json({ ok: false, error: 'PAYLOAD_TOO_LARGE' }, 413);
-    }
-
-    const secret = c.req.header('X-Internal-Secret') ?? '';
-    const expectedSecret = c.env.INTERNAL_NOTIFY_SECRET ?? '';
-    if (
-      !expectedSecret ||
-      !constantTimeEqual(secret, expectedSecret)
-    ) {
-      return c.json({ ok: false, error: 'Unauthorized' }, 401);
-    }
-
-    let body: Record<string, unknown>;
-    try {
-      body = JSON.parse(bodyText);
-    } catch {
-      return c.json({ ok: false, error: 'Invalid JSON' }, 400);
-    }
-    if (body === null || typeof body !== 'object' || Array.isArray(body)) {
-      return c.json({ ok: false, error: 'Invalid JSON' }, 400);
-    }
-
-    const rawTenantId = body['tenantId'];
-    if (!isStringTenantId(rawTenantId)) {
-      return c.json({ ok: false, error: 'INVALID_TENANT' }, 400);
-    }
-    const tenantId = rawTenantId;
-
-    // Validate tenantId presence (empty = missing).
-    if (tenantId.length === 0) {
-      return c.json({ ok: false, error: 'MISSING_TENANT' }, 400);
-    }
-    // Validate tenantId format (IDOR guard: tenantId routes to a Durable Object).
-    if (!validateTenantId(tenantId)) {
-      return c.json({ ok: false, error: 'INVALID_TENANT' }, 400);
-    }
-
-    // Rate limit per caller (global key, DoS guard — not keyed on caller-supplied tenantId).
-    const rateResult = rateLimiter.check('realtime-notify');
-    if (!rateResult.allowed) {
-      return c.json(
-        { ok: false, error: 'RATE_LIMITED', retryAfterMs: rateResult.retryAfterMs },
-        429,
-      );
-    }
-
-    const result = await notifyUseCase.execute({
-      tenantId,
-      event:
-        typeof body['event'] === 'string'
-          ? body['event']
-          : String(body['event'] ?? ''),
-      data:
-        body['data'] && typeof body['data'] === 'object' && !Array.isArray(body['data'])
-          ? (body['data'] as Record<string, unknown>)
-          : undefined,
-    });
-
-    if (!result.ok) {
-      return c.json({ ok: false, error: result.error }, 400);
-    }
-
-    // Fan out to the tenant's WebSocket sessions via the Durable Object.
-    const payload = result.data.payload;
-    // Use validated tenantId (not payload.tenantId) for DO routing — IDOR guard.
-    const stub = c.env.NOTIFIER.get(c.env.NOTIFIER.idFromName(tenantId));
-    try {
-      await stub.notify(tenantId, payload as unknown as Record<string, unknown>);
-    } catch {
-      // Fan-out failure: event persisted but not delivered. Return 503 so
-      // the caller can retry; the broadcast record remains for audit/replay.
-      return c.json({ ok: false, error: 'BROADCAST_FANOUT_FAILED' }, 503);
-    }
-    return c.json({ ok: true, broadcastId: result.data.broadcastId });
-  });
 
   app.get('/ws', async (c) => {
     const url = new URL(c.req.raw.url);
