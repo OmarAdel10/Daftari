@@ -1762,13 +1762,11 @@ JAAS handle `licenses/<tenant_id>/` (R2). Admin dashboard pulls sales via `/api/
 
 ### CI/CD Deployment Method (September 2026)
 
-All backend worker deployments (admin_host, api, realtime, paymob_webhook) use **`npx wrangler deploy`** via plain `run` steps in `.github/workflows/deploy-cloud.yml` — **not** `wrangler-action@v3`.
+All backend worker deployments (admin_host, api, realtime, paymob_webhook) use the **pinned global wrangler CLI (`wrangler@4.157.0`)** via plain `run` steps in `.github/workflows/deploy-cloud.yml` — no repo-pinned local wrangler devDependencies remain, and `wrangler-action@v3` is no longer used anywhere (its bundled wrangler 3.90.0 conflicted with `@cloudflare/workers-types v5`).
 
-**Reason:** `wrangler-action@v3` bundles wrangler **3.90.0** whose `peerOptional` dependency on `@cloudflare/workers-types@"^4.x"` conflicts with the repo's `workers-types v5` (installed in each worker's `node_modules`). This causes `ERESOLVE` failures during the action's internal `npm install`.
+**wrangler version policy:** `wrangler@4.157.0` is installed globally in CI (`npm install -g --prefix "$HOME/.local" wrangler@4.157.0`); developers install the same way locally. No `npx wrangler` anywhere (avoids fetching latest at runtime). Node.js **22** is required — all repo-pinned wrangler versions (≥4.133.0) declare `engines: node >= 22.0.0` and abort at CLI startup on Node 20. The `setup-node` step uses `node-version: '22'`.
 
-Using `npx wrangler` resolves the **repo-pinned local wrangler 4.x** (e.g., api 4.135.0, realtime 4.139.0, admin_host 4.136.1, paymob 4.133.0) from each worker's own `node_modules` — zero downloads, zero installs, no peer resolution, no conflicts.
-
-The landing page deploy (`wrangler pages deploy`) still uses `wrangler-action@v3` because it runs before any `node_modules` exist and has no workers-types dependency.
+**Dry-run gate:** `ci.yml` runs `wrangler deploy --dry-run` per worker × env (dev/staging/production) to validate bundle size (<64 MiB), startup (<1s), and Durable Object exports before any deploy.
 
 **Dependency Installation Order** (in `deploy-cloud.yml`):
 1. `npm ci --prefix backend/shared --include=dev` (always — shared types)
@@ -1777,7 +1775,7 @@ The landing page deploy (`wrangler pages deploy`) still uses `wrangler-action@v3
 4. `npm ci --prefix backend/realtime --include=dev` (when `deploy_realtime=true`)
 5. `npm ci --prefix backend/paymob_webhook --include=dev` (when `deploy_paymob=true`)
 
-Each worker's lockfile pins its own wrangler 4.x version; `npx` picks it up instantly.
+**wrangler dry-run CI job:** `.github/workflows/ci.yml` adds a `wrangler-dry-run` job that installs the pinned global wrangler, asserts `wrangler --version` equals `4.157.0`, then runs `wrangler deploy --dry-run` per worker × env with per-worker `npm ci --include=dev` before each dry-run. `admin_host` (Cloudflare Pages) is excluded from the Worker dry-run loop.
 
 ---
 
