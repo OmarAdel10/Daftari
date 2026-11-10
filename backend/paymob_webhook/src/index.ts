@@ -12,7 +12,6 @@
  * `src/infrastructure/`.
  */
 import { Hono } from 'hono';
-import { cors } from 'hono/cors';
 import { buildPaymobHmacString } from 'daftari-backend-shared/paymob';
 import { createTurso, type TursoDb } from 'daftari-backend-shared/turso';
 import type { LicensePayload } from 'daftari-backend-shared/types';

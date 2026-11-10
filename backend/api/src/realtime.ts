@@ -22,7 +22,8 @@ export function notifyRealtime(
     .catch((err) => {
       // Best-effort broadcast: never fail the originating request, but log so
       // dropped notifications are visible (e.g. DO overloaded/misconfigured).
+      // Sanitize: log tenantId + error type only, drop raw err (Logpush exposure).
       // eslint-disable-next-line no-console
-      console.error('[notifyRealtime] broadcast failed:', err);
+      console.error(`[notifyRealtime] broadcast failed for tenant ${tenantId}: ${err?.constructor?.name ?? 'unknown'}`);
     });
 }

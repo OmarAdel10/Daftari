@@ -230,6 +230,7 @@ function servicesFor(env: Env): ApiServices {
 }
 
 function realtimeAppFor(env: Env) {
+  if (!env.NOTIFIER) throw new Error('realtime not configured: NOTIFIER binding missing');
   if (!cachedRealtimeApp) {
     const deps = createRealtimeServices(env as unknown as RealtimeEnv);
     cachedRealtimeApp = createRealtimeApp(deps);
@@ -238,6 +239,11 @@ function realtimeAppFor(env: Env) {
 }
 
 function paymobAppFor(env: Env) {
+  if (
+    !env.PAYMOB_HMAC_SECRET ||
+    !env.ED25519_PRIVATE_KEY ||
+    !env.ED25519_PUBLIC_KEY
+  ) throw new Error('paymob not configured: Paymob secrets missing');
   if (!cachedPaymobApp) {
     cachedPaymobApp = createPaymobAppFromEnv(env as unknown as Parameters<typeof createPaymobAppFromEnv>[0]);
   }
@@ -250,8 +256,12 @@ export default {
 
     // PayMob webhook → paymob app
     if (url.pathname === '/webhook' && request.method === 'POST') {
-      const app = paymobAppFor(env);
-      return app.fetch(request, env, ctx);
+      try {
+        const app = paymobAppFor(env);
+        return app.fetch(request, env, ctx);
+      } catch {
+        return Response.json({ ok: false, error: 'paymob not configured' }, { status: 503 });
+      }
     }
 
     // WebSocket upgrade → realtime app
@@ -259,8 +269,12 @@ export default {
       if (!env.NOTIFIER) {
         return Response.json({ ok: false, error: 'realtime not configured' }, { status: 503 });
       }
-      const app = realtimeAppFor(env);
-      return app.fetch(request, env, ctx);
+      try {
+        const app = realtimeAppFor(env);
+        return app.fetch(request, env, ctx);
+      } catch {
+        return Response.json({ ok: false, error: 'realtime not configured' }, { status: 503 });
+      }
     }
 
     // API → existing createApp

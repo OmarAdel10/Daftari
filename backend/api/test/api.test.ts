@@ -3357,11 +3357,22 @@ describe('CORS allowlist (T19)', () => {
       const res = await api.fetch(new Request('http://localhost/webhook', { method: 'POST', body: '{}' }), env as unknown as Env, {} as ExecutionContext);
       // Not 503 means it did not fall through to the API app's "not configured" stub.
       expect(res.status).not.toBe(503);
+      // Body '{}' is not valid Paymob webhook JSON → paymob app returns 400, proving delegation.
+      expect(res.status).toBe(400);
     });
 
     it('GET /ws delegates to realtime app (not 503 API-not-configured)', async () => {
       const res = await api.fetch(new Request('http://localhost/ws'), env as unknown as Env, {} as ExecutionContext);
       expect(res.status).not.toBe(503);
+    });
+
+    it('GET /ws with NOTIFIER unset → 503 realtime not configured (index.ts:260)', async () => {
+      const noNotifier = { ...env } as Env;
+      delete noNotifier.NOTIFIER;
+      const res = await api.fetch(new Request('http://localhost/ws'), noNotifier, {} as ExecutionContext);
+      expect(res.status).toBe(503);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toBe('realtime not configured');
     });
 
     it('reuses cached paymob and realtime apps across requests', async () => {
@@ -3370,9 +3381,30 @@ describe('CORS allowlist (T19)', () => {
       const r3 = await api.fetch(new Request('http://localhost/ws'), env as unknown as Env, {} as ExecutionContext);
       const r4 = await api.fetch(new Request('http://localhost/ws'), env as unknown as Env, {} as ExecutionContext);
       expect(r1.status).not.toBe(503);
-      expect(r2.status).not.toBe(503);
+      expect(r2.status).toBe(r1.status); // same cached paymobApp → same result
       expect(r3.status).not.toBe(503);
-      expect(r4.status).not.toBe(503);
+      expect(r4.status).toBe(r3.status); // same cached realtimeApp → same result
+    });
+
+    it('notifyRealtime broadcast failure → request still succeeds (realtime.ts:26)', async () => {
+      dbState.deviceRows = [];
+      notifyMock.mockReset();
+      notifyMock.mockRejectedValue(new Error('DO overloaded'));
+      try {
+        const app = makeApp();
+        const res = await app.request('/sales/sync', {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({
+            device_hwid: 'hw1',
+            sales: [{ id: 'r1', receipt_json: '{}', total_piastres: 500, created_at: Date.now() }],
+          }),
+        }, env);
+        expect(res.status).toBe(200); // originating request never fails
+      } finally {
+        notifyMock.mockReset();
+        notifyMock.mockImplementation(async (_tenantId: string, _event: Record<string, unknown>) => {});
+      }
     });
   });
 });
