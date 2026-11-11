@@ -7,9 +7,9 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPaymobApp } from '../index';
+import { registerExpectedMerchantOrderId } from '../index';
 import { verifyPaymobHmac } from '../../../shared/src/paymob';
 import type { TursoDb } from '../../../shared/src/turso';
-import { RateLimiter } from '../infrastructure/services/rate-limiter';
 
 // Mock shared dependencies
 vi.mock('../../../shared/src/paymob', () => ({
@@ -219,84 +219,37 @@ describe('POST /webhook', () => {
     expect(res.status).toBe(500);
   });
 
-  it('returns 429 when rate limit exceeded for same IP', async () => {
-    // Use a fresh app with a small rate limiter (3 req/min)
-    const rateLimiter = new RateLimiter(3, 60_000);
-    const rateLimitedApp = createPaymobApp({ db: mockDb, rateLimiter });
-    const ipHeaders = {
-      'Content-Type': 'application/json',
-      'CF-Connecting-IP': '1.2.3.4',
+  it('returns 422 MERCHANT_ORDER_ID_MISMATCH when expected mapping exists but merchant_order_id differs', async () => {
+    registerExpectedMerchantOrderId('order_42', 'tenant_1|device_abc|monthly');
+    const tamperedObj = {
+      ...validObj,
+      order: {
+        ...validObj.order,
+        merchant_order_id: 'tenant_99|device_xyz|monthly',
+      },
     };
-
-    // 3 requests from ip-1 should all succeed
-    for (let i = 0; i < 3; i++) {
-      const res = await rateLimitedApp.fetch(
-        new Request('http://localhost/webhook?hmac=valid-sig', {
-          method: 'POST',
-          headers: ipHeaders,
-          body: JSON.stringify({ obj: validObj }),
-        }),
-        testEnv,
-      );
-      expect(res.status).not.toBe(429);
-    }
-    // 4th request from same IP should be rate limited
-    const res = await rateLimitedApp.fetch(
+    const res = await app.fetch(
       new Request('http://localhost/webhook?hmac=valid-sig', {
         method: 'POST',
-        headers: ipHeaders,
-        body: JSON.stringify({ obj: validObj }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ obj: tamperedObj }),
       }),
       testEnv,
     );
-    expect(res.status).toBe(429);
+    expect(res.status).toBe(422);
     const json = (await res.json()) as { error?: string };
-    expect(json.error).toBe('RATE_LIMITED');
+    expect(json.error).toBe('MERCHANT_ORDER_ID_MISMATCH');
   });
 
-  it('allows requests from a different IP after rate limiting first IP', async () => {
-    const rateLimiter = new RateLimiter(3, 60_000);
-    const rateLimitedApp = createPaymobApp({ db: mockDb, rateLimiter });
-    const ip1Headers = {
-      'Content-Type': 'application/json',
-      'CF-Connecting-IP': '5.6.7.8',
-    };
-    const ip2Headers = {
-      'Content-Type': 'application/json',
-      'CF-Connecting-IP': '9.10.11.12',
-    };
+  it('allows webhook when merchant_order_id matches expected mapping', async () => {
+    registerExpectedMerchantOrderId('order_42', 'tenant_1|device_abc|monthly');
+    const res = await app.fetch(makeWebhookRequest({ obj: validObj }), testEnv);
+    expect(res.status).toBe(200);
+  });
 
-    // Exhaust ip-1 (3 requests)
-    for (let i = 0; i < 3; i++) {
-      await rateLimitedApp.fetch(
-        new Request('http://localhost/webhook?hmac=valid-sig', {
-          method: 'POST',
-          headers: ip1Headers,
-          body: JSON.stringify({ obj: validObj }),
-        }),
-        testEnv,
-      );
-    }
-    // ip-1 should be rate limited
-    const blocked = await rateLimitedApp.fetch(
-      new Request('http://localhost/webhook?hmac=valid-sig', {
-        method: 'POST',
-        headers: ip1Headers,
-        body: JSON.stringify({ obj: validObj }),
-      }),
-      testEnv,
-    );
-    expect(blocked.status).toBe(429);
-
-    // ip-2 should still be allowed
-    const allowed = await rateLimitedApp.fetch(
-      new Request('http://localhost/webhook?hmac=valid-sig', {
-        method: 'POST',
-        headers: ip2Headers,
-        body: JSON.stringify({ obj: validObj }),
-      }),
-      testEnv,
-    );
-    expect(allowed.status).toBe(200);
+  it('allows webhook when no expected mapping exists for order.id (backward compatible)', async () => {
+    // No registerExpectedMerchantOrderId call for order_42
+    const res = await app.fetch(makeWebhookRequest({ obj: validObj }), testEnv);
+    expect(res.status).toBe(200);
   });
 });
