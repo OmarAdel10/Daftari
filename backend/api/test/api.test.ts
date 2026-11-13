@@ -99,8 +99,8 @@ const env = {
   TURSO_AUTH_TOKEN: 'turso-token',
   POSTHOG_API_KEY: 'phc_test',
   ADMIN_JWT_SECRET: 'test-admin-jwt-secret',
-  NOTIFIER: notifierMock,
-  LOGOS: { put: logosPut, get: logosGet },
+  INTERNAL_NOTIFY_SECRET: 'test-internal-secret',
+    LOGOS: { put: logosPut, get: logosGet },
 };
 
 /** Capture the notify payloads sent to the tenant Durable Object. */
@@ -3368,7 +3368,6 @@ describe('CORS allowlist (T19)', () => {
 
     it('GET /ws with NOTIFIER unset → 503 realtime not configured (index.ts:269-270)', async () => {
       const noNotifier = { ...env } as Env;
-      delete noNotifier.NOTIFIER;
       const res = await api.fetch(new Request('http://localhost/ws'), noNotifier, {} as ExecutionContext);
       expect(res.status).toBe(503);
       const body = (await res.json()) as { error: string };
