@@ -7,10 +7,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SaleRecordUseCase } from '../sale-record-use-case';
 import type { SaleRecordDto } from '../../dtos/sale-record.dto';
-import type { SaleRepository } from 'daftari-backend-shared/domain/repositories/sale-repository';
-import type { DeviceRepository } from 'daftari-backend-shared/domain/repositories/device-repository';
-import type { LicenseRepository } from 'daftari-backend-shared/domain/repositories/license-repository';
-import type { UserRepository } from 'daftari-backend-shared/domain/repositories/user-repository';
+import type { SaleRepository } from '../../../../../shared/src/domain/repositories/sale-repository';
+import type { DeviceRepository } from '../../../../../shared/src/domain/repositories/device-repository';
+import type { LicenseRepository } from '../../../../../shared/src/domain/repositories/license-repository';
+import type { UserRepository } from '../../../../../shared/src/domain/repositories/user-repository';
 
 const FIXED_NOW = 1_700_000_000_000;
 

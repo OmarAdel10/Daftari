@@ -6,7 +6,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SaleStatsUseCase } from '../sale-stats-use-case';
 import type { SaleStatsDto } from '../../dtos/sale-stats.dto';
-import type { SaleRepository } from 'daftari-backend-shared/domain/repositories/sale-repository';
+import type { SaleRepository } from '../../../../../shared/src/domain/repositories/sale-repository';
 
 const FIXED_NOW = 1_700_000_000_000;
 

@@ -9,7 +9,7 @@ import { cors } from 'hono/cors';
 import type { Env, Vars } from './env';
 import { getDb } from './db';
 import type { VerifyTokenFn } from './middleware/auth';
-import { verifyFirebaseToken } from 'daftari-backend-shared/jwt';
+import { verifyFirebaseToken } from '../../shared/src/jwt';
 import { registerSales } from './routes/sales';
 import { registerAdmin } from './routes/admin';
 import { registerUsers } from './routes/users';
@@ -43,9 +43,6 @@ import { UserCreateUseCase } from './application/use-cases/user-create-use-case'
 import { UserUpdateUseCase } from './application/use-cases/user-update-use-case';
 import { UserDeleteUseCase } from './application/use-cases/user-delete-use-case';
 import { DeviceLinkUseCase } from './application/use-cases/device-link-use-case';
-import { createRealtimeApp, TenantNotifier } from 'daftari-realtime/index';
-import { createRealtimeServices, type RealtimeEnv } from 'daftari-realtime/runtime';
-import { createPaymobAppFromEnv } from 'daftari-paymob-webhook/runtime';
 
 export interface ApiDeps {
   verifyToken?: FirebaseTokenVerifier;
@@ -215,8 +212,6 @@ export function createApp(deps: ApiDeps) {
  *  then reuse it (all requests to a deployment share the same env). Secrets
  *  are read at request time via `env`, never via `process.env` at load time. */
 let cachedServices: ApiServices | null = null;
-let cachedRealtimeApp: ReturnType<typeof createRealtimeApp> | null = null;
-let cachedPaymobApp: ReturnType<typeof createPaymobAppFromEnv> | null = null;
 
 function servicesFor(env: Env): ApiServices {
   if (!cachedServices) {
@@ -229,55 +224,8 @@ function servicesFor(env: Env): ApiServices {
   return cachedServices;
 }
 
-function realtimeAppFor(env: Env) {
-  if (!env.NOTIFIER) throw new Error('realtime not configured: NOTIFIER binding missing');
-  if (!cachedRealtimeApp) {
-    const deps = createRealtimeServices(env as unknown as RealtimeEnv);
-    cachedRealtimeApp = createRealtimeApp(deps);
-  }
-  return cachedRealtimeApp;
-}
-
-function paymobAppFor(env: Env) {
-  if (
-    !env.PAYMOB_HMAC_SECRET ||
-    !env.ED25519_PRIVATE_KEY ||
-    !env.ED25519_PUBLIC_KEY
-  ) throw new Error('paymob not configured: Paymob secrets missing');
-  if (!cachedPaymobApp) {
-    cachedPaymobApp = createPaymobAppFromEnv(env as unknown as Parameters<typeof createPaymobAppFromEnv>[0]);
-  }
-  return cachedPaymobApp;
-}
-
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const url = new URL(request.url);
-
-    // PayMob webhook → paymob app
-    if (url.pathname === '/webhook' && request.method === 'POST') {
-      try {
-        const app = paymobAppFor(env);
-        return app.fetch(request, env, ctx);
-      } catch {
-        return Response.json({ ok: false, error: 'paymob not configured' }, { status: 503 });
-      }
-    }
-
-    // WebSocket upgrade → realtime app
-    if (url.pathname === '/ws' && request.method === 'GET') {
-      if (!env.NOTIFIER) {
-        return Response.json({ ok: false, error: 'realtime not configured' }, { status: 503 });
-      }
-      try {
-        const app = realtimeAppFor(env);
-        return app.fetch(request, env, ctx);
-      } catch {
-        return Response.json({ ok: false, error: 'realtime not configured' }, { status: 503 });
-      }
-    }
-
-    // API → existing createApp
     let services: ApiServices;
     try {
       services = servicesFor(env);
@@ -302,5 +250,3 @@ export default {
     await db.sweepExpiredLicenses(Date.now());
   },
 };
-
-export { TenantNotifier };

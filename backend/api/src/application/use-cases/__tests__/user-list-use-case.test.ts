@@ -6,7 +6,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { UserListUseCase } from '../user-list-use-case';
 import type { UserListDto } from '../../dtos/user-list.dto';
-import type { AuthUserRepository } from 'daftari-backend-shared/domain/repositories/auth-user-repository';
+import type { AuthUserRepository } from '../../../../../shared/src/domain/repositories/auth-user-repository';
 
 const FIXED_NOW = 1_700_000_000_000;
 

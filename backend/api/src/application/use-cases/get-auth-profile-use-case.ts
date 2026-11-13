@@ -10,8 +10,8 @@
  * from request body/query/header values (base precedent: cross-tenant tests,
  * backend/api/test/api.test.ts:1115-1134).
  */
-import type { LicenseRepository } from 'daftari-backend-shared/domain/repositories/license-repository';
-import type { UserRepository } from 'daftari-backend-shared/domain/repositories/user-repository';
+import type { LicenseRepository } from '../../../../shared/src/domain/repositories/license-repository';
+import type { UserRepository } from '../../../../shared/src/domain/repositories/user-repository';
 import type { MeDto, MeResponse } from '../dtos/me.dto';
 
 export class GetAuthProfileUseCase {

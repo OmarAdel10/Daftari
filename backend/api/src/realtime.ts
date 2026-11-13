@@ -1,10 +1,12 @@
 /**
- * Best-effort push to a tenant's Durable Object via the NOTIFIER binding.
+ * Best-effort push to the realtime worker via the REALTIME service binding.
  *
  * The binding is absent in local/tests, stays inside Cloudflare, and a failed
  * broadcast must never fail the originating request — so this never rejects.
  */
 import type { Env } from './env';
+
+export const REALTIME_NOTIFY_URL = 'https://realtime/internal/notify';
 
 export function notifyRealtime(
   env: Env,
@@ -12,18 +14,18 @@ export function notifyRealtime(
   event: string,
   data: Record<string, unknown>,
 ): Promise<void> {
-  const notifier = env.NOTIFIER;
-  if (!notifier) return Promise.resolve();
+  const realtime = env.REALTIME;
+  if (!realtime) return Promise.resolve();
 
-  return notifier
-    .get(notifier.idFromName(tenantId))
-    .notify(tenantId, { tenantId, event, data })
+  return realtime
+    .fetch(REALTIME_NOTIFY_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Internal-Secret': env.INTERNAL_NOTIFY_SECRET,
+      },
+      body: JSON.stringify({ tenantId, event, data }),
+    })
     .then(() => undefined)
-    .catch((err) => {
-      // Best-effort broadcast: never fail the originating request, but log so
-      // dropped notifications are visible (e.g. DO overloaded/misconfigured).
-      // Sanitize: log tenantId + error type only, drop raw err (Logpush exposure).
-      // eslint-disable-next-line no-console
-      console.error(`[notifyRealtime] broadcast failed for tenant ${tenantId}: ${err?.constructor?.name ?? 'unknown'}`);
-    });
+    .catch(() => undefined);
 }
