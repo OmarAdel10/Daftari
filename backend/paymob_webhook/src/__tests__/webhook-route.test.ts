@@ -7,6 +7,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPaymobApp } from '../index';
+import { registerExpectedMerchantOrderId } from '../index';
 import { verifyPaymobHmac } from '../../../shared/src/paymob';
 import type { TursoDb } from '../../../shared/src/turso';
 
@@ -216,5 +217,39 @@ describe('POST /webhook', () => {
     } as any);
     const res = await customApp.fetch(makeWebhookRequest({ obj: validObj }), testEnv);
     expect(res.status).toBe(500);
+  });
+
+  it('returns 422 MERCHANT_ORDER_ID_MISMATCH when expected mapping exists but merchant_order_id differs', async () => {
+    registerExpectedMerchantOrderId('order_42', 'tenant_1|device_abc|monthly');
+    const tamperedObj = {
+      ...validObj,
+      order: {
+        ...validObj.order,
+        merchant_order_id: 'tenant_99|device_xyz|monthly',
+      },
+    };
+    const res = await app.fetch(
+      new Request('http://localhost/webhook?hmac=valid-sig', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ obj: tamperedObj }),
+      }),
+      testEnv,
+    );
+    expect(res.status).toBe(422);
+    const json = (await res.json()) as { error?: string };
+    expect(json.error).toBe('MERCHANT_ORDER_ID_MISMATCH');
+  });
+
+  it('allows webhook when merchant_order_id matches expected mapping', async () => {
+    registerExpectedMerchantOrderId('order_42', 'tenant_1|device_abc|monthly');
+    const res = await app.fetch(makeWebhookRequest({ obj: validObj }), testEnv);
+    expect(res.status).toBe(200);
+  });
+
+  it('allows webhook when no expected mapping exists for order.id (backward compatible)', async () => {
+    // No registerExpectedMerchantOrderId call for order_42
+    const res = await app.fetch(makeWebhookRequest({ obj: validObj }), testEnv);
+    expect(res.status).toBe(200);
   });
 });

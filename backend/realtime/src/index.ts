@@ -238,9 +238,13 @@ export function createRealtimeApp(deps: RealtimeDeps = {}) {
 
     const id = c.env.NOTIFIER.idFromName(tenantId);
     const stub = c.env.NOTIFIER.get(id);
-    // TODO(Phase 5/6): DO-level re-authorization — validate caller identity/tenant
-    // binding inside TenantNotifier.fetch() to prevent cross-tenant WS access.
-    return stub.fetch(c.req.raw);
+    // DO-level re-authorization: TenantNotifier.fetch() validates X-Tenant-Id
+    // matches the DO's tenant before accepting the WebSocket upgrade.
+    const wsReq = new Request(c.req.raw.url, {
+      method: c.req.raw.method,
+      headers: { ...Object.fromEntries(c.req.raw.headers.entries()), 'x-tenant-id': tenantId },
+    });
+    return stub.fetch(wsReq);
   });
 
   return app;
