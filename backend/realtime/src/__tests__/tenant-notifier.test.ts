@@ -50,6 +50,7 @@ class MockDurableObjectState {
   webSockets: MockWebSocket[] = [];
   autoResponse: MockWebSocketRequestResponsePair | null = null;
   acceptedSocket: MockWebSocket | null = null;
+  private _store: Map<string, unknown> = new Map();
 
   getWebSockets() {
     return this.webSockets;
@@ -61,6 +62,13 @@ class MockDurableObjectState {
 
   acceptWebSocket(ws: MockWebSocket) {
     this.acceptedSocket = ws;
+  }
+
+  get storage() {
+    return {
+      get: (key: string) => this._store.get(key),
+      put: (key: string, value: unknown) => this._store.set(key, value),
+    };
   }
 }
 
@@ -87,11 +95,45 @@ describe('TenantNotifier — Durable Object', () => {
   describe('fetch — WebSocket upgrade hand-off', () => {
     it('returns 101 with client socket and accepts server socket', async () => {
       const res = await notifier.fetch(
-        new Request('https://example.com/ws'),
+        new Request('https://example.com/ws', {
+          headers: { upgrade: 'websocket', 'x-tenant-id': 'tenant-1' },
+        }),
       );
       expect(res.status).toBe(101);
       expect(state.acceptedSocket).toBeInstanceOf(MockWebSocket);
       // [1] = server socket accepted, [0] = client returned in Response
+    });
+
+    it('rejects WebSocket upgrade without X-Tenant-Id header → 403', async () => {
+      const res = await notifier.fetch(
+        new Request('https://example.com/ws', { headers: { upgrade: 'websocket' } }),
+      );
+      expect(res.status).toBe(403);
+    });
+
+    it('accepts WebSocket upgrade with matching X-Tenant-Id on first access', async () => {
+      const req = new Request('https://example.com/ws', {
+        headers: { upgrade: 'websocket', 'x-tenant-id': 'tenant-1' },
+      });
+      const res = await notifier.fetch(req);
+      expect(res.status).toBe(101);
+      expect(await state.storage.get('tenantId')).toBe('tenant-1');
+    });
+
+    it('rejects WebSocket upgrade with mismatched X-Tenant-Id → 403', async () => {
+      // First access claims the DO for tenant-1
+      await notifier.fetch(
+        new Request('https://example.com/ws', {
+          headers: { upgrade: 'websocket', 'x-tenant-id': 'tenant-1' },
+        }),
+      );
+      // Second access with a different tenant is rejected
+      const res = await notifier.fetch(
+        new Request('https://example.com/ws', {
+          headers: { upgrade: 'websocket', 'x-tenant-id': 'tenant-2' },
+        }),
+      );
+      expect(res.status).toBe(403);
     });
   });
 
@@ -107,6 +149,25 @@ describe('TenantNotifier — Durable Object', () => {
       const payload = JSON.stringify(event);
       expect(ws1.send).toHaveBeenCalledWith(payload);
       expect(ws2.send).toHaveBeenCalledWith(payload);
+    });
+
+    it('rejects notify with empty tenantId → throws', async () => {
+      await expect(
+        notifier.notify('', { type: 'sale' }),
+      ).rejects.toThrow(/tenantId/);
+    });
+
+    it('rejects notify with invalid tenantId format → throws', async () => {
+      await expect(
+        notifier.notify('../evil', { type: 'sale' }),
+      ).rejects.toThrow(/tenantId/);
+    });
+
+    it('rejects notify with tenantId exceeding max length → throws', async () => {
+      const longId = 'a'.repeat(129);
+      await expect(
+        notifier.notify(longId, { type: 'sale' }),
+      ).rejects.toThrow(/tenantId/);
     });
 
     it('ignores dead sockets without throwing', async () => {

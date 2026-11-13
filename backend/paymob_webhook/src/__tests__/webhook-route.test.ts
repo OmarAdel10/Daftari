@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPaymobApp } from '../index';
 import { verifyPaymobHmac } from '../../../shared/src/paymob';
 import type { TursoDb } from '../../../shared/src/turso';
+import { RateLimiter } from '../infrastructure/services/rate-limiter';
 
 // Mock shared dependencies
 vi.mock('../../../shared/src/paymob', () => ({
@@ -216,5 +217,86 @@ describe('POST /webhook', () => {
     } as any);
     const res = await customApp.fetch(makeWebhookRequest({ obj: validObj }), testEnv);
     expect(res.status).toBe(500);
+  });
+
+  it('returns 429 when rate limit exceeded for same IP', async () => {
+    // Use a fresh app with a small rate limiter (3 req/min)
+    const rateLimiter = new RateLimiter(3, 60_000);
+    const rateLimitedApp = createPaymobApp({ db: mockDb, rateLimiter });
+    const ipHeaders = {
+      'Content-Type': 'application/json',
+      'CF-Connecting-IP': '1.2.3.4',
+    };
+
+    // 3 requests from ip-1 should all succeed
+    for (let i = 0; i < 3; i++) {
+      const res = await rateLimitedApp.fetch(
+        new Request('http://localhost/webhook?hmac=valid-sig', {
+          method: 'POST',
+          headers: ipHeaders,
+          body: JSON.stringify({ obj: validObj }),
+        }),
+        testEnv,
+      );
+      expect(res.status).not.toBe(429);
+    }
+    // 4th request from same IP should be rate limited
+    const res = await rateLimitedApp.fetch(
+      new Request('http://localhost/webhook?hmac=valid-sig', {
+        method: 'POST',
+        headers: ipHeaders,
+        body: JSON.stringify({ obj: validObj }),
+      }),
+      testEnv,
+    );
+    expect(res.status).toBe(429);
+    const json = (await res.json()) as { error?: string };
+    expect(json.error).toBe('RATE_LIMITED');
+  });
+
+  it('allows requests from a different IP after rate limiting first IP', async () => {
+    const rateLimiter = new RateLimiter(3, 60_000);
+    const rateLimitedApp = createPaymobApp({ db: mockDb, rateLimiter });
+    const ip1Headers = {
+      'Content-Type': 'application/json',
+      'CF-Connecting-IP': '5.6.7.8',
+    };
+    const ip2Headers = {
+      'Content-Type': 'application/json',
+      'CF-Connecting-IP': '9.10.11.12',
+    };
+
+    // Exhaust ip-1 (3 requests)
+    for (let i = 0; i < 3; i++) {
+      await rateLimitedApp.fetch(
+        new Request('http://localhost/webhook?hmac=valid-sig', {
+          method: 'POST',
+          headers: ip1Headers,
+          body: JSON.stringify({ obj: validObj }),
+        }),
+        testEnv,
+      );
+    }
+    // ip-1 should be rate limited
+    const blocked = await rateLimitedApp.fetch(
+      new Request('http://localhost/webhook?hmac=valid-sig', {
+        method: 'POST',
+        headers: ip1Headers,
+        body: JSON.stringify({ obj: validObj }),
+      }),
+      testEnv,
+    );
+    expect(blocked.status).toBe(429);
+
+    // ip-2 should still be allowed
+    const allowed = await rateLimitedApp.fetch(
+      new Request('http://localhost/webhook?hmac=valid-sig', {
+        method: 'POST',
+        headers: ip2Headers,
+        body: JSON.stringify({ obj: validObj }),
+      }),
+      testEnv,
+    );
+    expect(allowed.status).toBe(200);
   });
 });
