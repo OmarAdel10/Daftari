@@ -99,7 +99,7 @@ const env = {
   TURSO_AUTH_TOKEN: 'turso-token',
   POSTHOG_API_KEY: 'phc_test',
   ADMIN_JWT_SECRET: 'test-admin-jwt-secret',
-  INTERNAL_NOTIFY_SECRET: 'test-internal-secret',
+  NOTIFIER: notifierMock,
     LOGOS: { put: logosPut, get: logosGet },
 };
 

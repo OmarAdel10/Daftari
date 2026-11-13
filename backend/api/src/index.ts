@@ -9,7 +9,7 @@ import { cors } from 'hono/cors';
 import type { Env, Vars } from './env';
 import { getDb } from './db';
 import type { VerifyTokenFn } from './middleware/auth';
-import { verifyFirebaseToken } from 'daftari-backend-shared/jwt';
+import { verifyFirebaseToken } from '../../shared/src/jwt';
 import { registerSales } from './routes/sales';
 import { registerAdmin } from './routes/admin';
 import { registerUsers } from './routes/users';

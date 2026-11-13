@@ -203,7 +203,7 @@ export function registerAuth(
   app.post('/auth/sync-user', async (c) => {
     const result = await syncFirebaseUser.execute({
       tenantId: c.get('authUid'),
-      email: c.get('authEmail'),
+      email: c.get('authUsername'),
     });
 
     if (!result.ok) return c.json({ ok: false, error: 'USER_NOT_FOUND' }, 401);
