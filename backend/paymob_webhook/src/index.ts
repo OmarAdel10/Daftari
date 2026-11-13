@@ -27,8 +27,39 @@ import type { HmacValidationService } from './domain/services/hmac-validation-se
 import type { LicenseSigningService } from './domain/services/license-signing-service';
 import type { PostHogAnalyticsService } from './infrastructure/external-services/posthog-analytics-service';
 
+/**
+ * In-memory store for order.id → expected merchant_order_id mapping.
+ *
+ * Populated when a payment intent is created server-side (via
+ * registerExpectedMerchantOrderId). Used to detect tampering of
+ * merchant_order_id in webhooks — merchant_order_id is NOT in Paymob's
+ * 20 HMAC fields (only order.id is), so a MITM attacker between Paymob
+ * and this worker could alter merchant_order_id without invalidating
+ * the HMAC, causing a license to be issued to the wrong tenant/device.
+ *
+ * Known limitation: in-memory store is per-Worker-instance. Cross-instance
+ * enforcement requires server-side payment intent storage (Phase 5/6).
+ */
+const expectedMerchantOrderIds = new Map<string, string>();
+
+/**
+ * Registers the expected merchant_order_id for a Paymob order.id.
+ * Call this when creating a payment intent server-side so the webhook
+ * can verify merchant_order_id hasn't been tampered with.
+ */
+export function registerExpectedMerchantOrderId(orderId: string, merchantOrderId: string): void {
+  expectedMerchantOrderIds.set(orderId, merchantOrderId);
+}
+
 export interface Env {
   PAYMOB_HMAC_SECRET: string;
+  /** Ed25519 private key for license signing — ISOLATED to paymob_webhook
+   *  worker. MUST NOT be exposed to the api worker or any other worker.
+   *  When consolidating workers (Branch B), keep license signing isolated:
+   *  either keep paymob as a separate worker, or scope Ed25519 signing to a
+   *  dedicated sub-request with limited secret visibility.
+   *  See Plane DAFTARI-181.
+   */
   ED25519_PRIVATE_KEY: string;
   ED25519_PUBLIC_KEY: string;
   FIREBASE_PROJECT_ID: string;
@@ -161,8 +192,32 @@ export function createPaymobApp(deps: Partial<PaymobDeps> = {}) {
       return c.json({ error: 'INVALID_HMAC' }, 401);
     }
 
-    // tenant|hwid|cycle ride in merchant_order_id.
+    // merchant_order_id is NOT in Paymob's HMAC fields (only order.id is).
+    // If we have an expected mapping for this order.id, verify it matches
+    // to detect tampering (see registerExpectedMerchantOrderId).
     const orderRaw = obj['order'];
+    let orderIdForCheck: string | null = null;
+    if (
+      orderRaw &&
+      typeof orderRaw === 'object' &&
+      !Array.isArray(orderRaw)
+    ) {
+      const idValue = (orderRaw as Record<string, unknown>).id;
+      orderIdForCheck = typeof idValue === 'string' ? idValue : null;
+    }
+    if (orderIdForCheck && expectedMerchantOrderIds.has(orderIdForCheck)) {
+      const expected = expectedMerchantOrderIds.get(orderIdForCheck)!;
+      const actualMerchantOrderId =
+        typeof (orderRaw as Record<string, unknown>).merchant_order_id === 'string'
+          ? (orderRaw as Record<string, unknown>).merchant_order_id
+          : null;
+      if (actualMerchantOrderId !== expected) {
+        return c.json(
+          { error: 'MERCHANT_ORDER_ID_MISMATCH' },
+          422,
+        );
+      }
+    }
     let parsed;
     if (
       orderRaw &&
