@@ -13,9 +13,6 @@
     "noEmit": true,
     "skipLibCheck": true,
     "experimentalDecorators": true,
-    "types": [
-      "@cloudflare/workers-types"
-    ],
     "baseUrl": ".",
     "paths": {
       "daftari-backend-shared/*": [
