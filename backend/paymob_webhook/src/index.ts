@@ -54,6 +54,13 @@ export function registerExpectedMerchantOrderId(orderId: string, merchantOrderId
 
 export interface Env {
   PAYMOB_HMAC_SECRET: string;
+  /** Ed25519 private key for license signing — ISOLATED to paymob_webhook
+   *  worker. MUST NOT be exposed to the api worker or any other worker.
+   *  When consolidating workers (Branch B), keep license signing isolated:
+   *  either keep paymob as a separate worker, or scope Ed25519 signing to a
+   *  dedicated sub-request with limited secret visibility.
+   *  See Plane DAFTARI-181.
+   */
   ED25519_PRIVATE_KEY: string;
   ED25519_PUBLIC_KEY: string;
   FIREBASE_PROJECT_ID: string;
