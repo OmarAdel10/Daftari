@@ -27,9 +27,9 @@ import type { SessionHeartbeatUseCase } from '../src/application/use-cases/sessi
 import type { SessionEndUseCase } from '../src/application/use-cases/session-end-use-case';
 import type { SessionListActiveUseCase } from '../src/application/use-cases/session-list-active-use-case';
 import { mintSessionJwt, verifySessionJwt } from '../../shared/src/session_jwt';
-import type { SessionRepository } from 'daftari-backend-shared/domain/repositories/session-repository';
-import type { AuthUserRepository } from 'daftari-backend-shared/domain/repositories/auth-user-repository';
-import type { UserRepository } from 'daftari-backend-shared/domain/repositories/user-repository';
+import type { SessionRepository } from '../../shared/src/domain/repositories/session-repository';
+import type { AuthUserRepository } from '../../shared/src/domain/repositories/auth-user-repository';
+import type { UserRepository } from '../../shared/src/domain/repositories/user-repository';
 import { hashTagged, verifyTagged } from '../../shared/src/password_kdf';
 import { requireOwner, type VerifyTokenFn } from '../src/middleware/auth';
 import { bytesToB64url } from '../../shared/src/base64';
