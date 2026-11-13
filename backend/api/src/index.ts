@@ -20,54 +20,22 @@ import { registerSessions } from './routes/sessions';
 import { createApiRuntime } from './runtime';
 import type { ApiRuntimeEnv, ApiServices } from './application/ports';
 import type { ExecutionContext } from '@cloudflare/workers-types';
-import type { FirebaseTokenVerifier } from './application/ports';
-import type { FetchFn } from '../../shared/src/types';
+import { createPaymobAppFromEnv } from '../../paymob-webhook/src/runtime';
+import { createRealtimeApp, TenantNotifier } from '../../realtime/src/index';
+import { createRealtimeServices, type RealtimeEnv } from '../../realtime/src/runtime';
+import { RateLimiter } from '../../shared/src/infrastructure/services/rate-limiter';
 import { verifyTagged } from '../../shared/src/password_kdf';
-import { DashboardLoginUseCase } from './application/use-cases/dashboard-login-use-case';
-import { DashboardLogoutUseCase } from './application/use-cases/dashboard-logout-use-case';
-import { OwnerRefreshUseCase } from './application/use-cases/owner-refresh-use-case';
-import { AuthSessionResumeUseCase } from './application/use-cases/auth-session-resume-use-case';
-import { GetAuthProfileUseCase } from './application/use-cases/get-auth-profile-use-case';
-import { SyncFirebaseUserUseCase } from './application/use-cases/sync-firebase-user-use-case';
-import { IssueRealtimeTicketUseCase } from './application/use-cases/issue-realtime-ticket-use-case';
-import { ValidateRealtimeTicketUseCase } from './application/use-cases/validate-realtime-ticket-use-case';
-import { SessionStartUseCase } from './application/use-cases/session-start-use-case';
-import { SessionHeartbeatUseCase } from './application/use-cases/session-heartbeat-use-case';
-import { SessionEndUseCase } from './application/use-cases/session-end-use-case';
-import { SessionListActiveUseCase } from './application/use-cases/session-list-active-use-case';
-import { SaleRecordUseCase } from './application/use-cases/sale-record-use-case';
-import { SaleListUseCase } from './application/use-cases/sale-list-use-case';
-import { AdminSettingsUseCase } from './application/use-cases/admin-settings-use-case';
-import { UserListUseCase } from './application/use-cases/user-list-use-case';
-import { UserCreateUseCase } from './application/use-cases/user-create-use-case';
-import { UserUpdateUseCase } from './application/use-cases/user-update-use-case';
-import { UserDeleteUseCase } from './application/use-cases/user-delete-use-case';
-import { DeviceLinkUseCase } from './application/use-cases/device-link-use-case';
+import type { RealtimeTicketRepository } from '../../shared/src/domain/repositories/realtime-ticket-repository';
 
 export interface ApiDeps {
   verifyToken?: FirebaseTokenVerifier;
   getDb?: typeof getDb;
   postHogFetch?: FetchFn;
-  /** Injectable KDF verifier (T16): lets a test assert the derivation runs
-   *  even for an unknown username. Defaults to the real verifyTagged. */
   verify?: typeof verifyTagged;
-  /** Injectable login rate limiter (T17): default is the real sliding window. */
   rateLimit?: (tenantId: string, username: string, ip: string, at: number) => Promise<{ allowed: boolean; retryAfterMs?: number }>;
-  /** Shared admin JWT secret used for signing session JWTs. Required — no fallback. */
   adminJwtSecret: string;
-  /** Service container built from the real Worker bindings (`env`), not module
-   *  scope. Passed in by the fetch handler so secrets are read at request time,
-   *  never via `process.env` at load time. */
   services: ApiServices;
 }
-
-/** Dashboard origin served by the paired admin_host worker in each
- *  environment (admin_host/wrangler.toml: admin-dev / admin-staging / admin). */
-const ADMIN_ORIGINS: Record<string, string> = {
-  development: 'https://admin-dev.daftariapp.workers.dev',
-  staging: 'https://admin-staging.daftariapp.workers.dev',
-  production: 'https://admin.daftariapp.workers.dev',
-};
 
 /** The single browser origin allowed to call the api for a given
  *  ENVIRONMENT. Unknown environments get no origin (deny by default). */
@@ -147,8 +115,7 @@ export function createApp(deps: ApiDeps) {
     sessionRepository: deps.services.auth.sessionRepository,
     authUserRepository: deps.services.auth.authUserRepository,
     userRepository: deps.services.auth.userRepository,
-    verifyToken: deps.verifyToken ?? verifyFirebaseToken,
-    verify: deps.verify ?? verifyTagged,
+    verifyToken: deps.verifyToken,
     rateLimit: deps.rateLimit,
   });
   registerSessions(app, {
@@ -165,31 +132,17 @@ export function createApp(deps: ApiDeps) {
   registerSales(app, {
     verifyToken: deps.verifyToken,
     sessionRepository: deps.services.auth.sessionRepository,
-    authUserRepository: deps.services.auth.authUserRepository,
-    userRepository: deps.services.auth.userRepository,
     saleRecord: useCases.saleRecord,
     saleList: useCases.saleList,
     rateLimit: deps.rateLimit,
   });
   registerAdmin(app, {
     verifyToken: deps.verifyToken,
-    getDb: get,
     sessionRepository: deps.services.auth.sessionRepository,
     authUserRepository: deps.services.auth.authUserRepository,
     userRepository: deps.services.auth.userRepository,
     adminSettings: useCases.adminSettings,
     deviceLink: useCases.deviceLink,
-  });
-  // After registerAdmin: the /admin/* requireAuth middleware covers these.
-  registerUsers(app, {
-    verifyToken: deps.verifyToken,
-    sessionRepository: deps.services.auth.sessionRepository,
-    authUserRepository: deps.services.auth.authUserRepository,
-    userRepository: deps.services.auth.userRepository,
-    userList: useCases.userList,
-    userCreate: useCases.userCreate,
-    userUpdate: useCases.userUpdate,
-    userDelete: useCases.userDelete,
   });
   registerAnalytics(app, {
     verifyToken: deps.verifyToken,
@@ -226,6 +179,32 @@ function servicesFor(env: Env): ApiServices {
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+
+    // PayMob webhook → paymob app
+    if (url.pathname === '/webhook' && request.method === 'POST') {
+      try {
+        const app = paymobAppFor(env);
+        return app.fetch(request, env, ctx);
+      } catch {
+        return Response.json({ ok: false, error: 'paymob not configured' }, { status: 503 });
+      }
+    }
+
+    // WebSocket upgrade → realtime app
+    if (url.pathname === '/ws' && request.method === 'GET') {
+      if (!env.NOTIFIER) {
+        return Response.json({ ok: false, error: 'realtime not configured' }, { status: 503 });
+      }
+      try {
+        const app = realtimeAppFor(env);
+        return app.fetch(request, env, ctx);
+      } catch {
+        return Response.json({ ok: false, error: 'realtime not configured' }, { status: 503 });
+      }
+    }
+
+    // API → existing createApp
     let services: ApiServices;
     try {
       services = servicesFor(env);
@@ -242,11 +221,28 @@ export default {
     });
     return app.fetch(request, env, ctx);
   },
-  /** Daily cron: mark expired licenses (grace_end in the past). */
-  async scheduled(_event: unknown, env: Env, ctx: ExecutionContext): Promise<void> {
-    void _event;
-    void ctx;
-    const db = getDb(env);
-    await db.sweepExpiredLicenses(Date.now());
-  },
 };
+
+function realtimeAppFor(env: Env) {
+  if (!env.NOTIFIER) throw new Error('realtime not configured: NOTIFIER binding missing');
+  if (!cachedRealtimeApp) {
+    const deps = createRealtimeServices(env as unknown as RealtimeEnv);
+    cachedRealtimeApp = createRealtimeApp(deps);
+  }
+  return cachedRealtimeApp;
+}
+
+function paymobAppFor(env: Env) {
+  if (
+    !env.PAYMOB_HMAC_SECRET ||
+    !env.ED25519_PRIVATE_KEY ||
+    !env.ED25519_PUBLIC_KEY
+  ) throw new Error('paymob not configured: Paymob secrets missing');
+  if (!cachedPaymobApp) {
+    cachedPaymobApp = createPaymobAppFromEnv(env as unknown as Parameters<typeof createPaymobAppFromEnv>[0]);
+  }
+  return cachedPaymobApp;
+}
+
+let cachedRealtimeApp: ReturnType<typeof createRealtimeApp> | null = null;
+let cachedPaymobApp: ReturnType<typeof createPaymobAppFromEnv> | null = null;
