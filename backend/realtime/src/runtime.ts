@@ -9,8 +9,8 @@
  * The Durable Object binding (NOTIFIER) and Turso DB credentials come from
  * wrangler.toml environment variables/secrets.
  */
-import { createTurso } from 'daftari-backend-shared/turso';
-import { TursoRealtimeTicketRepository } from 'daftari-backend-shared/infrastructure/repositories/turso-realtime-ticket-repository';
+import { createTurso } from '../../shared/src/turso';
+import { TursoRealtimeTicketRepository } from '../../shared/src/infrastructure/repositories/turso-realtime-ticket-repository';
 import { BroadcastServiceImpl } from './domain/services/broadcast-service.impl';
 import { TicketValidationServiceImpl } from './domain/services/ticket-validation-service.impl';
 import { RateLimiter } from './infrastructure/services/rate-limiter';

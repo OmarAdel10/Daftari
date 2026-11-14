@@ -28,7 +28,7 @@ import { WebSocketConnectUseCase } from './application/use-cases/websocket-conne
 import type { BroadcastService } from './domain/services/broadcast-service';
 import type { BroadcastRepository } from './domain/repositories/broadcast-repository';
 import type { TicketValidationService } from './domain/services/ticket-validation-service';
-import type { RealtimeTicketRepository } from 'daftari-backend-shared/domain/repositories/realtime-ticket-repository';
+import type { RealtimeTicketRepository } from '../../shared/src/domain/repositories/realtime-ticket-repository';
 
 /** Pojo that matches the DO stub's public API. */
 export interface DaftariDurableObjectStub {

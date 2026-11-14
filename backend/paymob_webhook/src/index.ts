@@ -12,10 +12,10 @@
  * `src/infrastructure/`.
  */
 import { Hono } from 'hono';
-import { buildPaymobHmacString } from 'daftari-backend-shared/paymob';
-import { createTurso, type TursoDb } from 'daftari-backend-shared/turso';
-import type { LicensePayload } from 'daftari-backend-shared/types';
-import { signLicenseKey as staticSignLicenseKey } from 'daftari-backend-shared/license';
+import { buildPaymobHmacString } from '../../shared/src/paymob';
+import { createTurso, type TursoDb } from '../../shared/src/turso';
+import type { LicensePayload } from '../../shared/src/types';
+import { signLicenseKey as staticSignLicenseKey } from '../../shared/src/license';
 import { HmacValidationServiceImpl } from './domain/services/hmac-validation-service.impl';
 import { LicenseSigningServiceImpl } from './domain/services/license-signing-service.impl';
 import { InMemoryWebhookEventRepository } from './infrastructure/repositories/in-memory-webhook-event-repository';
