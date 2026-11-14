@@ -2,6 +2,8 @@
  * daftari-api — the single authenticated HTTP surface for Daftari POS.
  *
  * Routes: /auth/*, /sessions/*, /sales/*, /admin/*, /events, /branding/*
+ *         POST /webhook → paymob webhook app
+ *         GET /ws → realtime WebSocket app
  * Cron: daily license-expiry sweep (03:00 UTC).
  */
 import { Hono } from 'hono';
@@ -43,6 +45,11 @@ import { UserCreateUseCase } from './application/use-cases/user-create-use-case'
 import { UserUpdateUseCase } from './application/use-cases/user-update-use-case';
 import { UserDeleteUseCase } from './application/use-cases/user-delete-use-case';
 import { DeviceLinkUseCase } from './application/use-cases/device-link-use-case';
+import { createPaymobAppFromEnv } from '../../paymob_webhook/src/runtime';
+import { createRealtimeApp, TenantNotifier } from '../../realtime/src/index';
+import { createRealtimeServices, type RealtimeEnv } from '../../realtime/src/runtime';
+import { RateLimiter } from '../../shared/src/domain/services/rate-limiter';
+import type { RealtimeTicketRepository } from '../../shared/src/domain/repositories/realtime-ticket-repository';
 
 export interface ApiDeps {
   verifyToken?: FirebaseTokenVerifier;
@@ -224,8 +231,58 @@ function servicesFor(env: Env): ApiServices {
   return cachedServices;
 }
 
+let cachedRealtimeApp: ReturnType<typeof createRealtimeApp> | null = null;
+let cachedPaymobApp: ReturnType<typeof createPaymobAppFromEnv> | null = null;
+
+function realtimeAppFor(env: Env) {
+  if (!env.NOTIFIER) throw new Error('realtime not configured: NOTIFIER binding missing');
+  if (!cachedRealtimeApp) {
+    const deps = createRealtimeServices(env as unknown as RealtimeEnv);
+    cachedRealtimeApp = createRealtimeApp(deps);
+  }
+  return cachedRealtimeApp;
+}
+
+function paymobAppFor(env: Env) {
+  if (
+    !env.PAYMOB_HMAC_SECRET ||
+    !env.ED25519_PRIVATE_KEY ||
+    !env.ED25519_PUBLIC_KEY
+  ) throw new Error('paymob not configured: Paymob secrets missing');
+  if (!cachedPaymobApp) {
+    cachedPaymobApp = createPaymobAppFromEnv(env as unknown as Parameters<typeof createPaymobAppFromEnv>[0]);
+  }
+  return cachedPaymobApp;
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+
+    // PayMob webhook → paymob app
+    if (url.pathname === '/webhook' && request.method === 'POST') {
+      try {
+        const app = paymobAppFor(env);
+        return app.fetch(request, env, ctx);
+      } catch {
+        return Response.json({ ok: false, error: 'paymob not configured' }, { status: 503 });
+      }
+    }
+
+    // WebSocket upgrade → realtime app
+    if (url.pathname === '/ws' && request.method === 'GET') {
+      if (!env.NOTIFIER) {
+        return Response.json({ ok: false, error: 'realtime not configured' }, { status: 503 });
+      }
+      try {
+        const app = realtimeAppFor(env);
+        return app.fetch(request, env, ctx);
+      } catch {
+        return Response.json({ ok: false, error: 'realtime not configured' }, { status: 503 });
+      }
+    }
+
+    // API → existing createApp
     let services: ApiServices;
     try {
       services = servicesFor(env);
@@ -250,3 +307,4 @@ export default {
     await db.sweepExpiredLicenses(Date.now());
   },
 };
+

@@ -3368,6 +3368,7 @@ describe('CORS allowlist (T19)', () => {
 
     it('GET /ws with NOTIFIER unset → 503 realtime not configured (index.ts:269-270)', async () => {
       const noNotifier = { ...env } as Env;
+      delete noNotifier.NOTIFIER;
       const res = await api.fetch(new Request('http://localhost/ws'), noNotifier, {} as ExecutionContext);
       expect(res.status).toBe(503);
       const body = (await res.json()) as { error: string };
