@@ -68,22 +68,16 @@ export interface ApiDeps {
   services: ApiServices;
 }
 
-/** Dashboard origin served by the paired admin_host worker in each
- *  environment (admin_host/wrangler.toml: admin-dev / admin-staging / admin). */
 const ADMIN_ORIGINS: Record<string, string> = {
   development: 'https://admin-dev.daftariapp.workers.dev',
   staging: 'https://admin-staging.daftariapp.workers.dev',
   production: 'https://admin.daftariapp.workers.dev',
 };
 
-/** The single browser origin allowed to call the api for a given
- *  ENVIRONMENT. Unknown environments get no origin (deny by default). */
 export function adminOriginFor(environment: string | undefined): string | null {
   return (environment && ADMIN_ORIGINS[environment]) || null;
 }
 
-/** Resolves the CORS allowlist for a request origin: the environment's admin
- *  origin, plus localhost ONLY in development (T19). */
 export function allowedCorsOrigin(
   origin: string,
   environment: string | undefined,
@@ -109,9 +103,6 @@ export function createApp(deps: ApiDeps) {
   const get = deps.getDb ?? getDb;
   const app = new Hono<{ Bindings: Env; Variables: Vars }>();
 
-  // Explicit allowlist (T19) — never a wide-open wildcard. The origin is
-  // resolved per request from ENVIRONMENT so dev/staging/production each only
-  // echo their own admin_host origin.
   app.use(
     '*',
     cors({
@@ -120,8 +111,6 @@ export function createApp(deps: ApiDeps) {
     }),
   );
 
-  // Global error handler: maps SyntaxError (malformed JSON) → 400 INVALID_JSON,
-  // everything else → 500 INTERNAL (no stack in body).
   app.onError((err, c) => {
     if (err instanceof SyntaxError) {
       return c.json({ ok: false, error: 'INVALID_JSON' }, 400);
@@ -145,9 +134,6 @@ export function createApp(deps: ApiDeps) {
     }, schemaOk ? 200 : 503);
   });
 
-  // Services are built from the real Worker bindings (`env`) by the fetch
-  // handler (servicesFor) and passed in via deps.services. No module-scope
-  // dummy env, no process.env reads — secrets are read at request time.
   const useCases = deps.services.auth;
   registerAuth(app, {
     useCases,
@@ -187,7 +173,6 @@ export function createApp(deps: ApiDeps) {
     adminSettings: useCases.adminSettings,
     deviceLink: useCases.deviceLink,
   });
-  // After registerAdmin: the /admin/* requireAuth middleware covers these.
   registerUsers(app, {
     verifyToken: deps.verifyToken,
     sessionRepository: deps.services.auth.sessionRepository,
@@ -215,9 +200,6 @@ export function createApp(deps: ApiDeps) {
   return app;
 }
 
-/** Lazily build the service container once from the real Worker bindings,
- *  then reuse it (all requests to a deployment share the same env). Secrets
- *  are read at request time via `env`, never via `process.env` at load time. */
 let cachedServices: ApiServices | null = null;
 
 function servicesFor(env: Env): ApiServices {
@@ -259,7 +241,6 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
-    // PayMob webhook → paymob app
     if (url.pathname === '/webhook' && request.method === 'POST') {
       try {
         const app = paymobAppFor(env);
@@ -269,7 +250,6 @@ export default {
       }
     }
 
-    // WebSocket upgrade → realtime app
     if (url.pathname === '/ws' && request.method === 'GET') {
       if (!env.NOTIFIER) {
         return Response.json({ ok: false, error: 'realtime not configured' }, { status: 503 });
@@ -282,7 +262,6 @@ export default {
       }
     }
 
-    // API → existing createApp
     let services: ApiServices;
     try {
       services = servicesFor(env);
@@ -299,7 +278,6 @@ export default {
     });
     return app.fetch(request, env, ctx);
   },
-  /** Daily cron: mark expired licenses (grace_end in the past). */
   async scheduled(_event: unknown, env: Env, ctx: ExecutionContext): Promise<void> {
     void _event;
     void ctx;
