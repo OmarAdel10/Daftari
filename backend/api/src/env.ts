@@ -8,7 +8,7 @@ export interface Env {
   /** Signs/verifies dashboard session JWTs (shared with realtime worker). */
   ADMIN_JWT_SECRET: string;
   /** Durable Object binding for tenant WebSocket hubs (TenantNotifier). */
-  NOTIFIER: {
+  NOTIFIER?: {
     idFromName: (name: string) => string;
     get: (id: string) => { fetch: (req: Request) => Promise<Response>; notify: (tenantId: string, event: Record<string, unknown>) => Promise<void>; };
   };
