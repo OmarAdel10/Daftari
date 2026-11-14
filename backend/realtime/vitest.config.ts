@@ -14,6 +14,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@libsql/client': path.resolve(__dirname, './node_modules/@libsql/client/lib-esm/node.js'),
+      'daftari-backend-shared': path.resolve(__dirname, '../shared/src'),
     },
   },
 });

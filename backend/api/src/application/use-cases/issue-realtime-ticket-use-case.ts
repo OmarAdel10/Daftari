@@ -10,7 +10,7 @@
  * from request body/query/header values (base precedent: cross-tenant tests,
  * backend/api/test/api.test.ts:1115-1134).
  */
-import type { UserRepository } from 'daftari-backend-shared/domain/repositories/user-repository';
+import type { UserRepository } from '../../../../shared/src/domain/repositories/user-repository';
 import type { RealtimeTicketRepository } from '../../domain/repositories/realtime-ticket-repository';
 import type { TicketIssueDto, TicketIssueResponse } from '../dtos/ticket-issue.dto';
 

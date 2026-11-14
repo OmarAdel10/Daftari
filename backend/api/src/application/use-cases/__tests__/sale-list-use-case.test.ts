@@ -7,8 +7,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SaleListUseCase } from '../sale-list-use-case';
 import type { SaleListDto } from '../../dtos/sale-list.dto';
-import type { SaleRepository } from 'daftari-backend-shared/domain/repositories/sale-repository';
-import type { Sale } from 'daftari-backend-shared/domain/entities/sale';
+import type { SaleRepository } from '../../../../../shared/src/domain/repositories/sale-repository';
+import type { Sale } from '../../../../../shared/src/domain/entities/sale';
 
 const FIXED_NOW = 1_700_000_000_000;
 

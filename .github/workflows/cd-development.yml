@@ -37,8 +37,6 @@ jobs:
       landing: ${{ steps.filter.outputs.landing }}
       admin: ${{ steps.filter.outputs.admin }}
       api: ${{ steps.filter.outputs.api }}
-      realtime: ${{ steps.filter.outputs.realtime }}
-      paymob: ${{ steps.filter.outputs.paymob }}
       any: ${{ steps.filter.outputs.any }}
     steps:
       - name: Checkout repository
@@ -59,11 +57,6 @@ jobs:
             api:
               - 'backend/api/**'
               - 'backend/shared/**'
-            realtime:
-              - 'backend/realtime/**'
-              - 'backend/shared/**'
-            paymob:
-              - 'backend/paymob_webhook/**'
             any:
               - 'landing_page/**'
               - 'apps/daftari/lib/**'
@@ -110,7 +103,7 @@ jobs:
           # Shared source is imported by api/realtime — install it (with dev deps) first,
           # mirroring the backend-tests job in ci.yml.
           npm ci --prefix backend/shared --include=dev --no-audit --no-fund
-          for d in api realtime admin_host paymob_webhook shared; do
+          for d in api admin_host shared; do
             echo "::group::backend/$d"
             ( cd "backend/$d" && npm ci --include=dev --no-audit --no-fund && npm test -- --passWithNoTests && npm run typecheck )
             echo "::endgroup::"
@@ -132,6 +125,4 @@ jobs:
       deploy_landing: ${{ inputs.deploy_all == true || needs.changes.outputs.landing == 'true' }}
       deploy_admin: ${{ inputs.deploy_all == true || needs.changes.outputs.admin == 'true' }}
       deploy_api: ${{ inputs.deploy_all == true || needs.changes.outputs.api == 'true' }}
-      deploy_realtime: ${{ inputs.deploy_all == true || needs.changes.outputs.realtime == 'true' }}
-      deploy_paymob: ${{ inputs.deploy_all == true || needs.changes.outputs.paymob == 'true' }}
     secrets: inherit

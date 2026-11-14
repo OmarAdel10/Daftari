@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AnalyticsClient } from '../analytics-client';
-import type { PostHogEvent } from 'daftari-backend-shared/analytics';
+import type { PostHogEvent } from '../../../../shared/src/analytics';
 
 const FIXED_NOW = 1_700_000_000_000;
 

@@ -63,7 +63,7 @@ lib/
 * **Barcode Layout Engine:** `barcode_widget` package using native vector rendering mechanics.
 * **Barcode Export:** `RenderRepaintBoundary.toImage()` for PNG capture; `file_picker` for directory selection.
 * **UUID Generation:** `uuid` package for entity IDs (shift entities, receipts).
-* **Cloudflare Workers Backend:** `http` package for REST API calls to daftari-api; WebSocket for daftari-realtime (admin flavor only). Auth via Bearer Firebase ID tokens.
+* **Cloudflare Workers Backend:** `http` package for REST API calls to daftari-api; WebSocket for daftari-api (admin flavor only). Auth via Bearer Firebase ID tokens.
 * **Build Flavors:** Four flavors via `--dart-define=FLAVOR=<local|cloud|landing|admin>` — local (desktop only), cloud (desktop+web, Turso sync), landing (web/Jaspr, marketing), admin (web/WASM, dashboard).
 * **Environment Config:** Three environments via `--dart-define=ENV=<development|staging|production>` — each with dedicated Cloudflare Worker URLs and Turso DB.
 * **HWID Provider:** Platform-specific hardware identification (Windows WMI, Linux system files, Web fingerprinting) for license binding and device tracking.
@@ -1582,7 +1582,7 @@ class EnvConfig {
   static late final String firebaseFunctionsUrl;  // deprecated
   static late final String cloudflareWorkerUrl;   // deprecated
   static late final String apiBaseUrl;            // daftari-api worker
-  static late final String realtimeWsUrl;         // daftari-realtime WS
+  static late final String realtimeWsUrl;         // daftari-api WS
   static late final String tursoDbUrl;
   static late final String firebaseProjectId;
   static late final bool enableLogging;
@@ -1729,13 +1729,11 @@ The system has migrated its server-side logic from Firebase Functions to Cloudfl
 
 | Worker | Folder | Purpose |
 |--------|--------|---------|
-| `api` (api-dev / api-staging per env) | `backend/api/` | Auth sync, sessions/device limits, sales sync, analytics (PostHog), branding/R2 |
-| `realtime` (realtime-dev / realtime-staging per env) | `backend/realtime/` | Durable Object WebSocket hub (admin dashboard only) |
-| `paymob-webhook` (paymob-webhook-dev / -staging per env) | `backend/paymob_webhook/` | Paymob payments → Ed25519 license issuance |
+| `api` (api-dev / api-staging per env) | `backend/api/` | Auth sync, sessions/device limits, sales sync, analytics (PostHog), branding/R2, realtime WebSocket hub + per-tenant Durable Object (TenantNotifier), Paymob webhook → Ed25519 license issuance |
 | `daftari-admin` | `backend/admin_host/` | Static hosting of the WASM admin build |
 | `shared` | `backend/shared/` | TypeScript modules + tests (40 tests) |
 
-JAAS handle `licenses/<tenant_id>/` (R2). Admin dashboard pulls sales via `/api/sales?since=` and pushes realtime over `/ws`.
+JAAS handle `licenses/<tenant_id>/` (R2). Admin dashboard pulls sales via `/api/sales?since=` and connects WebSocket via `/ws` on the api worker.
 
 ### Schema (Turso)
 
@@ -1762,7 +1760,7 @@ JAAS handle `licenses/<tenant_id>/` (R2). Admin dashboard pulls sales via `/api/
 
 ### CI/CD Deployment Method (September 2026)
 
-All backend worker deployments (admin_host, api, realtime, paymob_webhook) use the **pinned global wrangler CLI (`wrangler@4.157.0`)** via plain `run` steps in `.github/workflows/deploy-cloud.yml` — no repo-pinned local wrangler devDependencies remain, and `wrangler-action@v3` is no longer used anywhere (its bundled wrangler 3.90.0 conflicted with `@cloudflare/workers-types v5`).
+All backend worker deployments (admin_host, api) use the **pinned global wrangler CLI (`wrangler@4.157.0`)** via plain `run` steps in `.github/workflows/deploy-cloud.yml` — no repo-pinned local wrangler devDependencies remain, and `wrangler-action@v3` is no longer used anywhere (its bundled wrangler 3.90.0 conflicted with `@cloudflare/workers-types v5`).
 
 **wrangler version policy:** `wrangler@4.157.0` is installed globally in CI (`npm install -g --prefix "$HOME/.local" wrangler@4.157.0`); developers install the same way locally. No `npx wrangler` anywhere (avoids fetching latest at runtime). Node.js **22** is required — all repo-pinned wrangler versions (≥4.133.0) declare `engines: node >= 22.0.0` and abort at CLI startup on Node 20. The `setup-node` step uses `node-version: '22'`.
 
@@ -1772,8 +1770,6 @@ All backend worker deployments (admin_host, api, realtime, paymob_webhook) use t
 1. `npm ci --prefix backend/shared --include=dev` (always — shared types)
 2. `npm ci --prefix backend/admin_host --include=dev` (when `deploy_admin=true`)
 3. `npm ci --prefix backend/api --include=dev` (when `deploy_api=true`)
-4. `npm ci --prefix backend/realtime --include=dev` (when `deploy_realtime=true`)
-5. `npm ci --prefix backend/paymob_webhook --include=dev` (when `deploy_paymob=true`)
 
 **wrangler dry-run CI job:** `.github/workflows/ci.yml` adds a `wrangler-dry-run` job that installs the pinned global wrangler, asserts `wrangler --version` equals `4.157.0`, then runs `wrangler deploy --dry-run` per worker × env with per-worker `npm ci --include=dev` before each dry-run. `admin_host` (Cloudflare Pages) is excluded from the Worker dry-run loop.
 

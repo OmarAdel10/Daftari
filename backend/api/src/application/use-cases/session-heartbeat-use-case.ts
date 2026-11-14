@@ -10,7 +10,7 @@
  * from request body/query/header. Application layer trusts DTO input by
  * design; authz is a Phases 7-12 concern.
  */
-import type { SessionRepository } from 'daftari-backend-shared/domain/repositories/session-repository';
+import type { SessionRepository } from '../../../../shared/src/domain/repositories/session-repository';
 import type { SessionHeartbeatDto, SessionHeartbeatResponse } from '../dtos/session-heartbeat.dto';
 
 export class SessionHeartbeatUseCase {

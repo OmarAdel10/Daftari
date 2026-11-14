@@ -591,18 +591,16 @@ Settings surface adapts per business type: read-only business-type card, favorit
 
 #### R1: Migration from Firebase Functions
 * **Previous Architecture:** Firebase Functions (paid Blaze plan) hosted all backend logic — auth sync, sales sync, analytics, license verification, webhook handling.
-* **New Architecture:** Cloudflare Workers (free 100k req/day tier) with four specialized workers:
-  * **daftari-api** (Hono): Auth sync (Option A + B), session/device tracking with per-tier device limits, sales sync, PostHog analytics batching, logo upload via R2, license-expiry cron.
-  * **daftari-realtime**: Per-tenant Durable Object + WebSocket finder pattern; notification surface internal to Cloudflare via service binding from daftari-api.
-  * **daftari-paymob**: Paymob webhook handler with corrected HMAC-SHA512 signature verification (URL query param, 20 fields) + real Ed25519 license signing (base64url(sig || payload)) for offline Flutter verification.
+* **New Architecture:** Cloudflare Workers (free 100k req/day tier) with two specialized workers:
+  * **daftari-api** (Hono): Auth sync (Option A + B), session/device tracking with per-tier device limits, sales sync, PostHog analytics batching, logo upload via R2, license-expiry cron, realtime WebSocket hub with per-tenant Durable Object (TenantNotifier), and Paymob webhook handler with Ed25519 license signing.
   * **daftari-admin**: Worker hosting the Flutter web WASM build (worker static assets).
 * **Firebase Role:** Isolated to **Auth only** (Google Sign-In + magic link); every other call/site talks to Cloudflare Workers.
 
 #### R2: Environment Configuration (`lib/core/config/env_config.dart`)
 * **Three Environments:** `development`, `staging`, `production` — set via `--dart-define=ENV=<name>`.
 * **Configuration per Environment:**
-  * `apiBaseUrl` — daftari-api worker URL (e.g., `https://api-dev.daftariapp.workers.dev`)
-  * `realtimeWsUrl` — daftari-realtime WebSocket endpoint (e.g., `wss://realtime-dev.daftariapp.workers.dev/ws`)
+  * `apiBaseUrl` — api worker URL (e.g., `https://api-dev.daftariapp.workers.dev`)
+  * `realtimeWsUrl` — WebSocket endpoint served by the api worker (e.g., `wss://api-dev.daftariapp.workers.dev/ws`)
   * `firebaseFunctionsUrl` (deprecated) — legacy Firebase Functions URL
   * `cloudflareWorkerUrl` (deprecated) — legacy single worker URL
   * `tursoDbUrl` — Turso libSQL database URL

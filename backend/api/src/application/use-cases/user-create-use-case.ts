@@ -15,8 +15,8 @@
  * The route hashes the password via hashTagged() (KDF is infrastructure) and
  * passes the resulting scheme-tagged hash as passwordHash.
  */
-import type { AuthUserRepository } from 'daftari-backend-shared/domain/repositories/auth-user-repository';
-import type { UserRepository } from 'daftari-backend-shared/domain/repositories/user-repository';
+import type { AuthUserRepository } from '../../../../shared/src/domain/repositories/auth-user-repository';
+import type { UserRepository } from '../../../../shared/src/domain/repositories/user-repository';
 import type { UserCreateDto, UserCreateResponse } from '../dtos/user-create.dto';
 import {
   validateTenantId,

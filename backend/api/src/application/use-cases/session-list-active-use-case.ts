@@ -10,8 +10,8 @@
  * body/query/header. Application layer trusts DTO input by design; authz is a
  * Phases 7-12 concern.
  */
-import type { SessionRepository } from 'daftari-backend-shared/domain/repositories/session-repository';
-import type { Session } from 'daftari-backend-shared/domain/entities/session';
+import type { SessionRepository } from '../../../../shared/src/domain/repositories/session-repository';
+import type { Session } from '../../../../shared/src/domain/entities/session';
 import type {
   SessionListActiveDto,
   SessionListActiveResponse,

@@ -10,8 +10,8 @@
  * body/query/header. Application layer trusts DTO input by design; authz is a
  * Phases 7-12 concern.
  */
-import type { SaleRepository } from 'daftari-backend-shared/domain/repositories/sale-repository';
-import type { Sale } from 'daftari-backend-shared/domain/entities/sale';
+import type { SaleRepository } from '../../../../shared/src/domain/repositories/sale-repository';
+import type { Sale } from '../../../../shared/src/domain/entities/sale';
 import type {
   SaleListDto,
   SaleListResponse,

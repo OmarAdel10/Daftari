@@ -81,8 +81,8 @@ Every micro-incremental state change must be committed using the standard struct
 * **OTA Patching:** Standard pushes to `master` trigger instant Shorebird OTA patch without requiring user reinstall.
 
 #### 4e. Cloudflare Workers CI/CD (New)
-* **Workers:** `backend/api/`, `backend/realtime/`, `backend/paymob_webhook/`, `backend/admin_host/`, `backend/shared/`
-* **Deploy:** `wrangler deploy` per worker with environment-specific vars (dev/staging/prod) using the pinned global wrangler CLI (4.157.0); no repo-pinned local wrangler devDependencies remain.
+* **Workers:** `backend/api/`, `backend/admin_host/`, `backend/shared/`
+* **Deploy:** `wrangler deploy` per worker with environment-specific vars (dev/staging/prod) using the pinned global wrangler CLI (4.157.0); no repo-pinned local wrangler devDependencies remain. `api` is the merged Worker (API + Paymob webhook + WS/Durable Object); `admin_host` is Cloudflare Pages.
 * **Dry-run gate:** `ci.yml` runs `wrangler deploy --dry-run` per worker × env (dev/staging/production) to validate bundle size (<64 MiB), startup (<1s), and Durable Object exports before any deploy.
 * **Shared Tests:** `backend/shared/` — 40 unit tests (TypeScript/Vitest)
 * **API Tests:** `backend/api/test/` — integration tests against deployed worker
@@ -103,12 +103,12 @@ Three environment-specific deployment pipelines triggered on pushes to protected
 * **Runs on:** `ubuntu-latest`
 * **Concurrency:** `cd-dev-${{ github.ref }}` (no cancel-in-progress)
 * **Jobs:**
-  1. **changes** — Path filter detection for: `landing_page/**`, `lib/**`, `backend/admin_host/**`, `backend/api/**`, `backend/shared/**`, `backend/realtime/**`, `backend/paymob_webhook/**`, `pubspec.yaml`, `pubspec.lock`
+  1. **changes** — Path filter detection for: `landing_page/**`, `lib/**`, `backend/admin_host/**`, `backend/api/**`, `backend/shared/**`, `pubspec.yaml`, `pubspec.lock`
   2. **verify** (Dev Gate) — Flutter fmt/analyze/test + backend workers tests:
      - `dart format --set-exit-if-changed lib test`
      - `flutter analyze`
      - `flutter test`
-     - Backend workers: install `backend/shared` deps first (with `--include=dev`), then per-worker `npm ci --include=dev`, `npm test -- --passWithNoTests`, `npm run typecheck` for `api`, `realtime`, `admin_host`, `paymob_webhook`, `shared`
+     - Backend workers: install `backend/shared` deps first (with `--include=dev`), then per-worker `npm ci --include=dev`, `npm test -- --passWithNoTests`, `npm run typecheck` for `api`, `admin_host`, `shared`
   3. **deploy** — Calls `deploy-cloud.yml` with `pages_project: daftari-dev`, `flutter_env: development`, deploys only changed components
 
 ##### 4g.2. Staging CD (`cd-staging.yml`)
@@ -130,11 +130,11 @@ Three environment-specific deployment pipelines triggered on pushes to protected
 ##### 4g.4. Reusable Cloud Deploy Workflow (`deploy-cloud.yml`)
 * **File:** `.github/workflows/deploy-cloud.yml`
 * **Type:** Reusable workflow (`workflow_call`)
-* **Inputs:** `pages_project`, `wrangler_env_flag`, `flutter_env`, `deploy_landing`, `deploy_admin`, `deploy_api`, `deploy_realtime`, `deploy_paymob`
+* **Inputs:** `pages_project`, `wrangler_env_flag`, `flutter_env`, `deploy_landing`, `deploy_admin`, `deploy_api`
 * **Deploys:**
   - **Landing page (Jaspr):** `jaspr build` → Cloudflare Pages (`wrangler pages deploy`) via the pinned global wrangler CLI (4.157.0).
   - **Admin dashboard (Flutter Web WASM):** `flutter build web --wasm --dart-define=FLAVOR=admin --dart-define=ENV=<env>` → copy to `backend/admin_host/public` via `build.sh` → `wrangler deploy` worker.
-  - **Backend workers:** `wrangler deploy` per worker (`admin_host`, `api`, `realtime`, `paymob_webhook`) with env flag — single pinned global CLI replaces both repo-pinned local wrangler devDependencies and `wrangler-action@v3`.
+  - **Backend workers:** `wrangler deploy` per worker (`admin_host`, `api`) with env flag — single pinned global CLI replaces both repo-pinned local wrangler devDependencies and `wrangler-action@v3`.
 * **Node.js Runtime:** Node.js **22** is required — all repo-pinned wrangler versions (≥4.133.0) declare `engines: node >=22.0.0` and abort at CLI startup on Node 20. The `setup-node` step uses `node-version: '22'`.
 * **wrangler version policy:** `wrangler@4.157.0` is installed globally in CI (`npm install -g --prefix "$HOME/.local" wrangler@4.157.0`); developers install the same way locally. No `npx wrangler` anywhere (avoids fetching latest at runtime).
 * **Dependency Installation:** `npm ci --include=dev` runs for `backend/shared` (always) and each deploying worker directory before deploy; `admin_host` is included when `deploy_admin=true`

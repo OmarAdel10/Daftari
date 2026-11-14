@@ -27,9 +27,9 @@ import type { SessionHeartbeatUseCase } from '../src/application/use-cases/sessi
 import type { SessionEndUseCase } from '../src/application/use-cases/session-end-use-case';
 import type { SessionListActiveUseCase } from '../src/application/use-cases/session-list-active-use-case';
 import { mintSessionJwt, verifySessionJwt } from '../../shared/src/session_jwt';
-import type { SessionRepository } from 'daftari-backend-shared/domain/repositories/session-repository';
-import type { AuthUserRepository } from 'daftari-backend-shared/domain/repositories/auth-user-repository';
-import type { UserRepository } from 'daftari-backend-shared/domain/repositories/user-repository';
+import type { SessionRepository } from '../../shared/src/domain/repositories/session-repository';
+import type { AuthUserRepository } from '../../shared/src/domain/repositories/auth-user-repository';
+import type { UserRepository } from '../../shared/src/domain/repositories/user-repository';
 import { hashTagged, verifyTagged } from '../../shared/src/password_kdf';
 import { requireOwner, type VerifyTokenFn } from '../src/middleware/auth';
 import { bytesToB64url } from '../../shared/src/base64';
@@ -77,13 +77,17 @@ const dbState: DbState = {
   deviceRows: [],
 };
 
-const realtimeFetch = vi.fn(
-  (_input: RequestInfo | URL, _init?: RequestInit) =>
-    Promise.resolve(new Response(null, { status: 200 })),
-);
-const INTERNAL_NOTIFY_SECRET = 'test-internal-secret';
+const notifyMock = vi.fn(async (_tenantId: string, _event: Record<string, unknown>) => {});
 const logosPut = vi.fn(() => Promise.resolve());
 const logosGet = vi.fn(() => Promise.resolve(null as unknown));
+
+const notifierMock = {
+  idFromName: vi.fn((name: string) => name),
+  get: vi.fn(() => ({
+    notify: notifyMock,
+    fetch: vi.fn(),
+  })),
+};
 
 const env = {
   ENVIRONMENT: 'development',
@@ -95,17 +99,13 @@ const env = {
   TURSO_AUTH_TOKEN: 'turso-token',
   POSTHOG_API_KEY: 'phc_test',
   ADMIN_JWT_SECRET: 'test-admin-jwt-secret',
-  INTERNAL_NOTIFY_SECRET,
-  REALTIME: { fetch: realtimeFetch },
-  LOGOS: { put: logosPut, get: logosGet },
+  NOTIFIER: notifierMock,
+    LOGOS: { put: logosPut, get: logosGet },
 };
 
-/** Decode the JSON body the api sent to the realtime service binding. */
-function realtimeBodies(): Array<Record<string, unknown>> {
-  return realtimeFetch.mock.calls.map((call) => {
-    const init = call[1];
-    return JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
-  });
+/** Capture the notify payloads sent to the tenant Durable Object. */
+function notifyBodies(): Array<Record<string, unknown>> {
+  return notifyMock.mock.calls.map((call) => call[1]);
 }
 
 function makeApp() {
@@ -883,15 +883,13 @@ describe('sales routes', () => {
     expect(res.status).toBe(200);
     const calls = executeMock.mock.calls.filter((c) => (c[0] as { sql: string }).sql.includes('INSERT OR REPLACE INTO sales'));
     expect(calls.length).toBe(2);
-    expect(realtimeFetch).toHaveBeenCalledTimes(1);
-    expect(realtimeFetch).toHaveBeenCalledWith(
-      'https://realtime/internal/notify',
-      expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({ 'X-Internal-Secret': INTERNAL_NOTIFY_SECRET }),
-      }),
-    );
-    expect(realtimeBodies()[0]).toEqual({ tenantId: 'uid-123', event: 'sale', data: { count: 2 } });
+    expect(notifyMock).toHaveBeenCalledTimes(1);
+    expect(notifyMock).toHaveBeenCalledWith('uid-123', {
+      tenantId: 'uid-123',
+      event: 'sale',
+      data: { count: 2 },
+    });
+    expect(notifyBodies()[0]).toEqual({ tenantId: 'uid-123', event: 'sale', data: { count: 2 } });
   });
 
   it('the sale broadcast never contains receipt_json', async () => {
@@ -906,7 +904,7 @@ describe('sales routes', () => {
       }),
     }, env);
     expect(res.status).toBe(200);
-    const body = realtimeBodies()[0] ?? {};
+    const body = notifyBodies()[0] ?? {};
     expect(body).not.toHaveProperty('sales');
     expect(body).toEqual({ tenantId: 'uid-123', event: 'sale', data: { count: 1 } });
     expect(JSON.stringify(body)).not.toContain('receipt_json');
@@ -2101,14 +2099,13 @@ describe('login + revoke routes (admin-dashboard T06)', () => {
       return sql.includes('UPDATE sessions') && sql.includes('ended_at = ?');
     });
     expect(endCalls).toHaveLength(2);
-    expect(realtimeFetch).toHaveBeenCalledWith(
-      'https://realtime/internal/notify',
-      expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({ 'X-Internal-Secret': INTERNAL_NOTIFY_SECRET }),
-      }),
-    );
-    expect(realtimeBodies()[0]).toEqual({
+    expect(notifyMock).toHaveBeenCalledTimes(1);
+    expect(notifyMock).toHaveBeenCalledWith('uid-123', {
+      tenantId: 'uid-123',
+      event: 'session_revoked',
+      data: { username: 'admin', at: expect.any(Number) },
+    });
+    expect(notifyBodies()[0]).toEqual({
       tenantId: 'uid-123',
       event: 'session_revoked',
       data: { username: 'admin', at: expect.any(Number) },
@@ -2241,7 +2238,7 @@ describe('login + revoke routes (admin-dashboard T06)', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { ok: boolean; data: { ended: number } };
     expect(body.data.ended).toBe(0);
-    expect(realtimeFetch).not.toHaveBeenCalled();
+    expect(notifyMock).not.toHaveBeenCalled();
   });
 
   it('POST /sessions/revoke ends only own-tenant sessions (token scoping)', async () => {
@@ -3354,6 +3351,60 @@ describe('CORS allowlist (T19)', () => {
       const call = executeMock.mock.calls[0]!;
       expect(call[0].sql).toContain('UPDATE licenses');
       expect(typeof call[0].args[0]).toBe('number');
+    });
+
+    it('POST /webhook delegates to paymob app (not 503 API-not-configured)', async () => {
+      const res = await api.fetch(new Request('http://localhost/webhook', { method: 'POST', body: '{}' }), env as unknown as Env, {} as ExecutionContext);
+      // Not 503 means it did not fall through to the API app's "not configured" stub.
+      expect(res.status).not.toBe(503);
+      // Body '{}' is not valid Paymob webhook JSON → paymob app returns 400, proving delegation.
+      expect(res.status).toBe(400);
+    });
+
+    it('GET /ws delegates to realtime app (not 503 API-not-configured)', async () => {
+      const res = await api.fetch(new Request('http://localhost/ws'), env as unknown as Env, {} as ExecutionContext);
+      expect(res.status).not.toBe(503);
+    });
+
+    it('GET /ws with NOTIFIER unset → 503 realtime not configured (index.ts:269-270)', async () => {
+      const noNotifier = { ...env } as Env;
+      delete noNotifier.NOTIFIER;
+      const res = await api.fetch(new Request('http://localhost/ws'), noNotifier, {} as ExecutionContext);
+      expect(res.status).toBe(503);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toBe('realtime not configured');
+    });
+
+    it('reuses cached paymob and realtime apps across requests', async () => {
+      const r1 = await api.fetch(new Request('http://localhost/webhook', { method: 'POST', body: '{}' }), env as unknown as Env, {} as ExecutionContext);
+      const r2 = await api.fetch(new Request('http://localhost/webhook', { method: 'POST', body: '{}' }), env as unknown as Env, {} as ExecutionContext);
+      const r3 = await api.fetch(new Request('http://localhost/ws'), env as unknown as Env, {} as ExecutionContext);
+      const r4 = await api.fetch(new Request('http://localhost/ws'), env as unknown as Env, {} as ExecutionContext);
+      expect(r1.status).not.toBe(503);
+      expect(r2.status).toBe(r1.status); // same cached paymobApp → same result
+      expect(r3.status).not.toBe(503);
+      expect(r4.status).toBe(r3.status); // same cached realtimeApp → same result
+    });
+
+    it('notifyRealtime broadcast failure → request still succeeds (realtime.ts:26)', async () => {
+      dbState.deviceRows = [];
+      notifyMock.mockReset();
+      notifyMock.mockRejectedValue(new Error('DO overloaded'));
+      try {
+        const app = makeApp();
+        const res = await app.request('/sales/sync', {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({
+            device_hwid: 'hw1',
+            sales: [{ id: 'r1', receipt_json: '{}', total_piastres: 500, created_at: Date.now() }],
+          }),
+        }, env);
+        expect(res.status).toBe(200); // originating request never fails
+      } finally {
+        notifyMock.mockReset();
+        notifyMock.mockImplementation(async (_tenantId: string, _event: Record<string, unknown>) => {});
+      }
     });
   });
 });

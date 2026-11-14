@@ -11,8 +11,8 @@
  * body/query/header. Application layer trusts DTO input by design; authz is a
  * Phases 7-12 concern.
  */
-import type { AuthUserRepository } from 'daftari-backend-shared/domain/repositories/auth-user-repository';
-import type { AuthUser } from 'daftari-backend-shared/domain/entities/auth-user';
+import type { AuthUserRepository } from '../../../../shared/src/domain/repositories/auth-user-repository';
+import type { AuthUser } from '../../../../shared/src/domain/entities/auth-user';
 import type {
   UserListDto,
   UserListResponse,
