@@ -11,8 +11,8 @@
  * body/query/header. Application layer trusts DTO input by design; authz is a
  * Phases 7-12 concern.
  */
-import type { DeviceRepository } from 'daftari-backend-shared/domain/repositories/device-repository';
-import type { Device } from 'daftari-backend-shared/domain/entities/device';
+import type { DeviceRepository } from '../../../../shared/src/domain/repositories/device-repository';
+import type { Device } from '../../../../shared/src/domain/entities/device';
 import type { DeviceLinkDto, DeviceLinkResponse } from '../dtos/device-link.dto';
 import { validateTenantId, validateDeviceHwid } from '../validation';
 

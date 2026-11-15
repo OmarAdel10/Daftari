@@ -26,7 +26,7 @@
  * from request body/query/header values (base precedent: cross-tenant tests,
  * backend/api/test/api.test.ts:1115-1134).
  */
-import type { UserRepository } from 'daftari-backend-shared/domain/repositories/user-repository';
+import type { UserRepository } from '../../../../shared/src/domain/repositories/user-repository';
 import type { OwnerRefreshDto, OwnerRefreshResponse } from '../dtos/owner-refresh.dto';
 
 export class OwnerRefreshUseCase {

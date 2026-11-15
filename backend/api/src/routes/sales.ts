@@ -18,10 +18,10 @@ import { SaleRecordUseCase } from '../application/use-cases/sale-record-use-case
 import { SaleListUseCase } from '../application/use-cases/sale-list-use-case';
 import type { SaleRecordDto } from '../application/dtos/sale-record.dto';
 import type { SaleListDto } from '../application/dtos/sale-list.dto';
-import type { Sale } from 'daftari-backend-shared/domain/entities/sale';
-import type { SessionRepository } from 'daftari-backend-shared/domain/repositories/session-repository';
-import type { AuthUserRepository } from 'daftari-backend-shared/domain/repositories/auth-user-repository';
-import type { UserRepository } from 'daftari-backend-shared/domain/repositories/user-repository';
+import type { Sale } from '../../../shared/src/domain/entities/sale';
+import type { SessionRepository } from '../../../shared/src/domain/repositories/session-repository';
+import type { AuthUserRepository } from '../../../shared/src/domain/repositories/auth-user-repository';
+import type { UserRepository } from '../../../shared/src/domain/repositories/user-repository';
 
 /** HTTP wire contract: snake_case; shared TypeScript records: camelCase. */
 function toWireSale(sale: Sale) {
@@ -130,7 +130,7 @@ export function registerSales(
 
     // Notify the realtime worker (service binding) — fire & forget. Only a
     // count crosses the wire; receipts stay in the database.
-    if (c.env.REALTIME) {
+    if (c.env.NOTIFIER) {
       const notifyPromise = notifyRealtime(c.env, tenantId, 'sale', { count: sales.length });
       // In Workers, executionCtx.waitUntil extends lifetime. In tests the
       // getter throws, so wrap it.

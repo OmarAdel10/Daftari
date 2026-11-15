@@ -1,5 +1,5 @@
-import { verifyFirebaseToken } from 'daftari-backend-shared/jwt';
-import type { FirebaseTokenResult } from 'daftari-backend-shared/jwt';
+import { verifyFirebaseToken } from '../../../shared/src/jwt';
+import type { FirebaseTokenResult } from '../../../shared/src/jwt';
 
 /**
  * Auth client wrapping Firebase ID token verification.

@@ -14,9 +14,9 @@ import type { Context } from 'hono';
 import type { Env, Vars } from '../env';
 import { verifySessionJwt } from '../../../shared/src/session_jwt';
 import { requireAuth, requireOwner, type VerifyTokenFn } from '../middleware/auth';
-import type { SessionRepository } from 'daftari-backend-shared/domain/repositories/session-repository';
-import type { AuthUserRepository } from 'daftari-backend-shared/domain/repositories/auth-user-repository';
-import type { UserRepository } from 'daftari-backend-shared/domain/repositories/user-repository';
+import type { SessionRepository } from '../../../shared/src/domain/repositories/session-repository';
+import type { AuthUserRepository } from '../../../shared/src/domain/repositories/auth-user-repository';
+import type { UserRepository } from '../../../shared/src/domain/repositories/user-repository';
 import {
   DashboardLoginUseCase,
 } from '../application/use-cases/dashboard-login-use-case';
@@ -203,7 +203,7 @@ export function registerAuth(
   app.post('/auth/sync-user', async (c) => {
     const result = await syncFirebaseUser.execute({
       tenantId: c.get('authUid'),
-      email: c.get('authEmail'),
+      email: c.get('authUsername'),
     });
 
     if (!result.ok) return c.json({ ok: false, error: 'USER_NOT_FOUND' }, 401);

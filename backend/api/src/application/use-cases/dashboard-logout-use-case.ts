@@ -16,7 +16,7 @@
  * from request body/query/header values (base precedent: cross-tenant tests,
  * backend/api/test/api.test.ts:1115-1134).
  */
-import type { SessionRepository } from 'daftari-backend-shared/domain/repositories/session-repository';
+import type { SessionRepository } from '../../../../shared/src/domain/repositories/session-repository';
 import type { LogoutDto, LogoutResponse } from '../dtos/logout.dto';
 
 export class DashboardLogoutUseCase {

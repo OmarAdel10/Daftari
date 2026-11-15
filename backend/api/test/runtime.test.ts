@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { TursoDb } from 'daftari-backend-shared/turso';
+import type { TursoDb } from '../../shared/src/turso';
 import { createApiRuntime } from '../src/runtime';
 
 const env = {

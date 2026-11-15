@@ -17,9 +17,9 @@ import { requireAdmin, requireOwner, requireAuth } from '../middleware/auth';
 import { AdminSettingsUseCase } from '../application/use-cases/admin-settings-use-case';
 import { DeviceLinkUseCase } from '../application/use-cases/device-link-use-case';
 import { registerDevices } from './devices';
-import type { SessionRepository } from 'daftari-backend-shared/domain/repositories/session-repository';
-import type { AuthUserRepository } from 'daftari-backend-shared/domain/repositories/auth-user-repository';
-import type { UserRepository } from 'daftari-backend-shared/domain/repositories/user-repository';
+import type { SessionRepository } from '../../../shared/src/domain/repositories/session-repository';
+import type { AuthUserRepository } from '../../../shared/src/domain/repositories/auth-user-repository';
+import type { UserRepository } from '../../../shared/src/domain/repositories/user-repository';
 
 export function registerAdmin(
   app: Hono<{ Bindings: Env; Variables: Vars }>,

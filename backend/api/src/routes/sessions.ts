@@ -13,9 +13,9 @@
 import type { Hono } from 'hono';
 import type { Env, Vars } from '../env';
 import { requireAuth, type VerifyTokenFn } from '../middleware/auth';
-import type { SessionRepository } from 'daftari-backend-shared/domain/repositories/session-repository';
-import type { AuthUserRepository } from 'daftari-backend-shared/domain/repositories/auth-user-repository';
-import type { UserRepository } from 'daftari-backend-shared/domain/repositories/user-repository';
+import type { SessionRepository } from '../../../shared/src/domain/repositories/session-repository';
+import type { AuthUserRepository } from '../../../shared/src/domain/repositories/auth-user-repository';
+import type { UserRepository } from '../../../shared/src/domain/repositories/user-repository';
 import { notifyRealtime } from '../realtime';
 import {
   SessionStartUseCase,
@@ -284,7 +284,7 @@ export function registerSessions(
       if (endResult.status === 'fulfilled' && endResult.value.ok) ended++;
     }
 
-    const realtime = c.env.REALTIME;
+    const realtime = c.env.NOTIFIER;
     if (realtime && ended > 0) {
       const notifyPromise = notifyRealtime(c.env, tenantId, 'session_revoked', {
         username,

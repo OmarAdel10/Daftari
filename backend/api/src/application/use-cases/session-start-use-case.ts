@@ -18,12 +18,12 @@
  * SessionRepository.getActiveForUsername; rate limiting is intentionally
  * omitted (no matching error arm in the contract).
  */
-import type { SessionRepository } from 'daftari-backend-shared/domain/repositories/session-repository';
-import type { DeviceRepository } from 'daftari-backend-shared/domain/repositories/device-repository';
-import type { LicenseRepository } from 'daftari-backend-shared/domain/repositories/license-repository';
-import type { AuthUserRepository } from 'daftari-backend-shared/domain/repositories/auth-user-repository';
-import type { UserRepository } from 'daftari-backend-shared/domain/repositories/user-repository';
-import type { SessionTokenService } from 'daftari-backend-shared/application/services/session-token-service';
+import type { SessionRepository } from '../../../../shared/src/domain/repositories/session-repository';
+import type { DeviceRepository } from '../../../../shared/src/domain/repositories/device-repository';
+import type { LicenseRepository } from '../../../../shared/src/domain/repositories/license-repository';
+import type { AuthUserRepository } from '../../../../shared/src/domain/repositories/auth-user-repository';
+import type { UserRepository } from '../../../../shared/src/domain/repositories/user-repository';
+import type { SessionTokenService } from '../../../../shared/src/application/services/session-token-service';
 import type {
   SessionStartDto,
   SessionStartResponse,

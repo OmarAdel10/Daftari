@@ -22,7 +22,8 @@ class EnvConfig {
   /// API worker base URL (api-dev (dev), api-staging (staging), api (prod)).
   static late final String apiBaseUrl;
 
-  /// Realtime worker URL (realtime-dev (dev), realtime-staging (staging), realtime (prod)).
+  /// Realtime/WebSocket URL, now served by the merged api worker
+  /// (api-dev (dev), api-staging (staging), api (prod)).
   static late final String realtimeWsUrl;
 
   /// Turso database URL.
@@ -88,7 +89,7 @@ class EnvConfig {
             'https://us-central1-daftari-dev.cloudfunctions.net',
         cloudflareWorkerUrl: 'https://api-dev.daftariapp.workers.dev',
         apiBaseUrl: 'https://api-dev.daftariapp.workers.dev',
-        realtimeWsUrl: 'wss://realtime-dev.daftariapp.workers.dev/ws',
+        realtimeWsUrl: 'wss://api-dev.daftariapp.workers.dev/ws',
         tursoDbUrl: 'libsql://daftari-dev-xyz.turso.io',
         firebaseProjectId: 'daftari-pos',
         adminOrigin: 'https://admin-dev.daftariapp.workers.dev',
@@ -102,7 +103,7 @@ class EnvConfig {
             'https://us-central1-daftari-staging.cloudfunctions.net',
         cloudflareWorkerUrl: 'https://api-staging.daftariapp.workers.dev',
         apiBaseUrl: 'https://api-staging.daftariapp.workers.dev',
-        realtimeWsUrl: 'wss://realtime-staging.daftariapp.workers.dev/ws',
+        realtimeWsUrl: 'wss://api-staging.daftariapp.workers.dev/ws',
         tursoDbUrl: 'libsql://daftari-staging-xyz.turso.io',
         firebaseProjectId: 'daftari-pos',
         adminOrigin: 'https://admin-staging.daftariapp.workers.dev',
@@ -116,7 +117,7 @@ class EnvConfig {
             'https://us-central1-daftari-prod.cloudfunctions.net',
         cloudflareWorkerUrl: 'https://api.daftariapp.workers.dev',
         apiBaseUrl: 'https://api.daftariapp.workers.dev',
-        realtimeWsUrl: 'wss://realtime.daftariapp.workers.dev/ws',
+        realtimeWsUrl: 'wss://api.daftariapp.workers.dev/ws',
         tursoDbUrl: 'libsql://daftari-prod-xyz.turso.io',
         firebaseProjectId: 'daftari-pos',
         adminOrigin: 'https://admin.daftariapp.workers.dev',

@@ -6,8 +6,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AnalyticsSummaryUseCase } from '../analytics-summary-use-case';
 import type { AnalyticsSummaryDto } from '../../dtos/analytics-summary.dto';
-import type { SaleRepository } from 'daftari-backend-shared/domain/repositories/sale-repository';
-import type { LicenseRepository } from 'daftari-backend-shared/domain/repositories/license-repository';
+import type { SaleRepository } from '../../../../../shared/src/domain/repositories/sale-repository';
+import type { LicenseRepository } from '../../../../../shared/src/domain/repositories/license-repository';
 
 const FIXED_NOW = 1_700_000_000_000;
 

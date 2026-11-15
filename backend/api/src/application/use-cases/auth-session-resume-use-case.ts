@@ -12,8 +12,8 @@
  * middleware context (never request input) and keep the route's own
  * `!authSessionId → 401` guard.
  */
-import type { SessionTokenService } from 'daftari-backend-shared/application/services/session-token-service';
-import type { UserRepository } from 'daftari-backend-shared/domain/repositories/user-repository';
+import type { SessionTokenService } from '../../../../shared/src/application/services/session-token-service';
+import type { UserRepository } from '../../../../shared/src/domain/repositories/user-repository';
 import type { SessionResumeDto, SessionResumeResponse } from '../dtos/session-resume.dto';
 
 /** Dashboard session JWT lifetime (seconds — JWT convention). */

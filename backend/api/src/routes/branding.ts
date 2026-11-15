@@ -9,9 +9,9 @@ import type { Hono } from 'hono';
 import type { Env, Vars } from '../env';
 import { requireAuth } from '../middleware/auth';
 import type { VerifyTokenFn } from '../middleware/auth';
-import type { SessionRepository } from 'daftari-backend-shared/domain/repositories/session-repository';
-import type { AuthUserRepository } from 'daftari-backend-shared/domain/repositories/auth-user-repository';
-import type { UserRepository } from 'daftari-backend-shared/domain/repositories/user-repository';
+import type { SessionRepository } from '../../../shared/src/domain/repositories/session-repository';
+import type { AuthUserRepository } from '../../../shared/src/domain/repositories/auth-user-repository';
+import type { UserRepository } from '../../../shared/src/domain/repositories/user-repository';
 
 const MAX_SVG_BYTES = 256 * 1024;
 

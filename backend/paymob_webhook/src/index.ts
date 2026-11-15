@@ -12,7 +12,6 @@
  * `src/infrastructure/`.
  */
 import { Hono } from 'hono';
-import { cors } from 'hono/cors';
 import { buildPaymobHmacString } from '../../shared/src/paymob';
 import { createTurso, type TursoDb } from '../../shared/src/turso';
 import type { LicensePayload } from '../../shared/src/types';
@@ -144,8 +143,9 @@ export function createPaymobApp(deps: Partial<PaymobDeps> = {}) {
 
   const app = new Hono<{ Bindings: Env }>();
 
-  app.use('*', cors());
-
+  // /webhook is server-to-server (Paymob → api). No browser-origin CORS needed;
+  // the merged api worker's explicit CORS allowlist governs API routes instead.
+  // Wildcard CORS on a state-changing license-issuance endpoint is removed.
   app.post('/webhook', async (c) => {
     // Pre-auth rate limit: keyed by CF-Connecting-IP (Cloudflare-trusted).
     // Rejects before any body parsing or HMAC computation to protect CPU

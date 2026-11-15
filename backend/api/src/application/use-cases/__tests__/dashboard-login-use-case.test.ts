@@ -7,14 +7,14 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DashboardLoginUseCase } from '../dashboard-login-use-case';
-import type { AuthUserRepository } from 'daftari-backend-shared/domain/repositories/auth-user-repository';
-import type { SessionRepository } from 'daftari-backend-shared/domain/repositories/session-repository';
-import type { LicenseRepository } from 'daftari-backend-shared/domain/repositories/license-repository';
-import type { UserRepository } from 'daftari-backend-shared/domain/repositories/user-repository';
-import type { AuthService } from 'daftari-backend-shared/domain/services/auth-service';
-import type { RateLimiter } from 'daftari-backend-shared/domain/services/rate-limiter';
-import type { SessionTokenService } from 'daftari-backend-shared/application/services/session-token-service';
-import { DUMMY_HASH } from 'daftari-backend-shared/password_kdf';
+import type { AuthUserRepository } from '../../../../../shared/src/domain/repositories/auth-user-repository';
+import type { SessionRepository } from '../../../../../shared/src/domain/repositories/session-repository';
+import type { LicenseRepository } from '../../../../../shared/src/domain/repositories/license-repository';
+import type { UserRepository } from '../../../../../shared/src/domain/repositories/user-repository';
+import type { AuthService } from '../../../../../shared/src/domain/services/auth-service';
+import type { RateLimiter } from '../../../../../shared/src/domain/services/rate-limiter';
+import type { SessionTokenService } from '../../../../../shared/src/application/services/session-token-service';
+import { DUMMY_HASH } from '../../../../../shared/src/password_kdf';
 
 const JWT_SECRET = 'test-jwt-secret';
 const FIXED_NOW = 1_700_000_000_000;

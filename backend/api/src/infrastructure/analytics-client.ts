@@ -1,5 +1,5 @@
-import { postHogBatch } from 'daftari-backend-shared/analytics';
-import type { BatchResult, PostHogEvent } from 'daftari-backend-shared/analytics';
+import { postHogBatch } from '../../../shared/src/analytics';
+import type { BatchResult, PostHogEvent } from '../../../shared/src/analytics';
 
 /**
  * Analytics client wrapping PostHog batching.

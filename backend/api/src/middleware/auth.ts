@@ -18,10 +18,10 @@
 import type { Context, Next } from 'hono';
 import { verifyFirebaseToken } from '../../../shared/src/jwt';
 import { verifySessionJwt } from '../../../shared/src/session_jwt';
-import type { SessionRepository } from 'daftari-backend-shared/domain/repositories/session-repository';
-import type { AuthUserRepository } from 'daftari-backend-shared/domain/repositories/auth-user-repository';
-import type { UserRepository } from 'daftari-backend-shared/domain/repositories/user-repository';
-import type { User } from 'daftari-backend-shared/domain/entities/user';
+import type { SessionRepository } from '../../../shared/src/domain/repositories/session-repository';
+import type { AuthUserRepository } from '../../../shared/src/domain/repositories/auth-user-repository';
+import type { UserRepository } from '../../../shared/src/domain/repositories/user-repository';
+import type { User } from '../../../shared/src/domain/entities/user';
 
 /**
  * Firebase sign-in methods allowed by the api (auth-licensing spec §2.1).

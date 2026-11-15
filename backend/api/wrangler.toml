@@ -13,11 +13,15 @@ crons = ["0 3 * * *"]
 binding = "LOGOS"
 bucket_name = "daftari-branding"
 
-# Service binding to the realtime worker. Each env binds its own worker:
-# realtime-dev (dev), realtime-staging (staging), realtime (production).
-[[services]]
-binding = "REALTIME"
-service = "realtime-dev"
+# Durable Object binding — TenantNotifier lives in backend/realtime/src/tenant_notifier.ts
+# and is exported by this worker's entrypoint (src/index.ts).
+[[durable_objects.bindings]]
+name = "NOTIFIER"
+class_name = "TenantNotifier"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TenantNotifier"]
 
 [env.staging]
 name = "api-staging"
@@ -31,10 +35,10 @@ FIREBASE_PROJECT_ID = "daftari-pos"
 binding = "LOGOS"
 bucket_name = "daftari-branding"
 
-# Service bindings are not inherited by environments (wrangler) — redefined per env.
-[[env.staging.services]]
-binding = "REALTIME"
-service = "realtime-staging"
+# Durable Objects are not inherited by environments (wrangler) — redefined per env.
+[[env.staging.durable_objects.bindings]]
+name = "NOTIFIER"
+class_name = "TenantNotifier"
 
 [env.production]
 name = "api"
@@ -48,14 +52,13 @@ FIREBASE_PROJECT_ID = "daftari-pos"
 binding = "LOGOS"
 bucket_name = "daftari-branding"
 
-# Service bindings are not inherited by environments (wrangler) — redefined per env.
-[[env.production.services]]
-binding = "REALTIME"
-service = "realtime"
+# Durable Objects are not inherited by environments (wrangler) — redefined per env.
+[[env.production.durable_objects.bindings]]
+name = "NOTIFIER"
+class_name = "TenantNotifier"
 
-# Secrets (set via `npx wrangler secret put` per env):
+# Secrets (set via `wrangler secret put` per env):
 # TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, POSTHOG_API_KEY, ADMIN_JWT_SECRET,
-# INTERNAL_NOTIFY_SECRET (MUST match the realtime worker's value within the
-#  same env; see backend/realtime/src/index.ts /internal/notify)
-# (ADMIN_JWT_SECRET signs dashboard session JWTs — MUST match the realtime
+# PAYMOB_HMAC_SECRET, ED25519_PRIVATE_KEY, ED25519_PUBLIC_KEY
+# ADMIN_JWT_SECRET signs dashboard session JWTs — MUST match the realtime
 #  worker's value within the same env; see shared/src/session_jwt.ts.)

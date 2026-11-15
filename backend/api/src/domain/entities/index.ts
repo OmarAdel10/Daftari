@@ -3,5 +3,5 @@
  *
  * Re-exports shared entities and defines API-specific entities.
  */
-export * from 'daftari-backend-shared/types';
+export * from '../../../../shared/src/types';
 export * from './realtime-ticket';

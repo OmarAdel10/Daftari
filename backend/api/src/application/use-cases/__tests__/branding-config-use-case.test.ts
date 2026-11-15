@@ -6,8 +6,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BrandingConfigUseCase } from '../branding-config-use-case';
 import type { BrandingConfigDto } from '../../dtos/branding-config.dto';
-import type { LicenseRepository } from 'daftari-backend-shared/domain/repositories/license-repository';
-import type { UserRepository } from 'daftari-backend-shared/domain/repositories/user-repository';
+import type { LicenseRepository } from '../../../../../shared/src/domain/repositories/license-repository';
+import type { UserRepository } from '../../../../../shared/src/domain/repositories/user-repository';
 
 const baseDto: BrandingConfigDto = {
   tenantId: 'tenant-1',

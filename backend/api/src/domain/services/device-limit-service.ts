@@ -5,7 +5,7 @@
  * tenant pricing tier. Used by the session start use case to determine
  * how many concurrent POS sessions a tenant can have.
  */
-import { TIER_DEVICE_LIMITS } from 'daftari-backend-shared/types';
+import { TIER_DEVICE_LIMITS } from '../../../../shared/src/types';
 
 /**
  * Determines the device limit for a given tier.

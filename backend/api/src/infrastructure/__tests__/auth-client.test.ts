@@ -6,10 +6,10 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AuthClient } from '../auth-client';
-import { verifyFirebaseToken } from 'daftari-backend-shared/jwt';
-import type { FirebaseTokenResult } from 'daftari-backend-shared/jwt';
+import { verifyFirebaseToken } from '../../../../shared/src/jwt';
+import type { FirebaseTokenResult } from '../../../../shared/src/jwt';
 
-vi.mock('daftari-backend-shared/jwt', () => ({
+vi.mock('../../../../shared/src/jwt', () => ({
   verifyFirebaseToken: vi.fn(),
 }));
 

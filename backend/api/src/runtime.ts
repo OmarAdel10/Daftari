@@ -1,18 +1,18 @@
-import { verifyFirebaseToken } from 'daftari-backend-shared/jwt';
+import { verifyFirebaseToken } from '../../shared/src/jwt';
 import {
   createSharedContainer,
   SHARED_TYPES,
-} from 'daftari-backend-shared/infrastructure/container';
-import type { AuthUserRepository } from 'daftari-backend-shared/domain/repositories/auth-user-repository';
-import type { DeviceRepository } from 'daftari-backend-shared/domain/repositories/device-repository';
-import type { LicenseRepository } from 'daftari-backend-shared/domain/repositories/license-repository';
-import type { RateLimiter } from 'daftari-backend-shared/domain/services/rate-limiter';
-import type { SaleRepository } from 'daftari-backend-shared/domain/repositories/sale-repository';
-import type { RealtimeTicketRepository } from 'daftari-backend-shared/domain/repositories/realtime-ticket-repository';
-import type { SessionRepository } from 'daftari-backend-shared/domain/repositories/session-repository';
-import type { UserRepository } from 'daftari-backend-shared/domain/repositories/user-repository';
-import type { SessionTokenService } from 'daftari-backend-shared/application/services/session-token-service';
-import type { AuthService } from 'daftari-backend-shared/domain/services/auth-service';
+} from '../../shared/src/infrastructure/container';
+import type { AuthUserRepository } from '../../shared/src/domain/repositories/auth-user-repository';
+import type { DeviceRepository } from '../../shared/src/domain/repositories/device-repository';
+import type { LicenseRepository } from '../../shared/src/domain/repositories/license-repository';
+import type { RateLimiter } from '../../shared/src/domain/services/rate-limiter';
+import type { SaleRepository } from '../../shared/src/domain/repositories/sale-repository';
+import type { RealtimeTicketRepository } from '../../shared/src/domain/repositories/realtime-ticket-repository';
+import type { SessionRepository } from '../../shared/src/domain/repositories/session-repository';
+import type { UserRepository } from '../../shared/src/domain/repositories/user-repository';
+import type { SessionTokenService } from '../../shared/src/application/services/session-token-service';
+import type { AuthService } from '../../shared/src/domain/services/auth-service';
 import { AnalyticsClient } from './infrastructure/analytics-client';
 import { AuthClient } from './infrastructure/auth-client';
 import type { getDb } from './db';

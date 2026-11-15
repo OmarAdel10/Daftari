@@ -5,7 +5,7 @@
  * This includes web session conflicts (single session per username) and
  * POS session conflicts (device limit enforcement).
  */
-import { SessionRecord } from 'daftari-backend-shared/types';
+import { SessionRecord } from '../../../../shared/src/types';
 
 /**
  * Result of a session conflict check.

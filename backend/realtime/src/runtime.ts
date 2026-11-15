@@ -15,53 +15,51 @@ import { BroadcastServiceImpl } from './domain/services/broadcast-service.impl';
 import { TicketValidationServiceImpl } from './domain/services/ticket-validation-service.impl';
 import { RateLimiter } from './infrastructure/services/rate-limiter';
 import { InMemoryBroadcastRepository } from './infrastructure/repositories/in-memory-broadcast-repository';
-import { NotifyUseCase } from './application/use-cases/notify-use-case';
-import { WebSocketConnectUseCase } from './application/use-cases/websocket-connect-use-case';
-import { createRealtimeApp, type RealtimeDeps, type Env } from './index';
+import type { RealtimeDeps } from './index';
+
+export interface RealtimeEnv {
+  TURSO_DATABASE_URL: string;
+  TURSO_AUTH_TOKEN: string;
+  ADMIN_JWT_SECRET: string;
+}
 
 /**
- * Build a fully-wired createRealtimeApp from the Worker environment.
+ * Build the realtime services container from the Worker environment.
  *
  * Resolves the shared TursoRealtimeTicketRepository (atomic ticket validation:
- * expiry + single-use + tenant lookup) and constructs all realtime use cases
- * with injected dependencies.
+ * expiry + single-use + tenant lookup) and constructs all realtime services
+ * with injected dependencies. Fail-closed: required env vars must be present
+ * before constructing the container.
  *
  * @param env - Cloudflare Worker environment bindings (NOTIFIER DO,
- *   ADMIN_JWT_SECRET, INTERNAL_NOTIFY_SECRET, TURSO_DB_URL,
- *   TURSO_DB_AUTH_TOKEN)
- * @returns A Hono app with all routes wired to use cases
+ *   ADMIN_JWT_SECRET, TURSO_DATABASE_URL, TURSO_AUTH_TOKEN)
+ * @returns The service dependency object (RealtimeDeps)
  */
-export function createRealtimeAppFromEnv(env: Env) {
-  // Fail closed: required env vars must be present before constructing the app.
-  if (!env.TURSO_DB_URL || !env.TURSO_DB_AUTH_TOKEN) {
+export function createRealtimeServices(env: RealtimeEnv): RealtimeDeps {
+  // Fail closed: required env vars must be present before constructing services.
+  if (!env.TURSO_DATABASE_URL || !env.TURSO_AUTH_TOKEN) {
     throw new Error(
-      'Missing required env vars: TURSO_DB_URL and TURSO_DB_AUTH_TOKEN',
+      'Missing required env vars: TURSO_DATABASE_URL and TURSO_AUTH_TOKEN',
     );
   }
   if (!env.ADMIN_JWT_SECRET) {
     throw new Error('Missing required env var: ADMIN_JWT_SECRET');
   }
-  if (!env.INTERNAL_NOTIFY_SECRET) {
-    throw new Error('Missing required env var: INTERNAL_NOTIFY_SECRET');
-  }
 
-  const db = createTurso(env.TURSO_DB_URL, env.TURSO_DB_AUTH_TOKEN);
+  const db = createTurso(env.TURSO_DATABASE_URL, env.TURSO_AUTH_TOKEN);
   const ticketRepo = new TursoRealtimeTicketRepository(db);
   const broadcastRepo = new InMemoryBroadcastRepository();
   const ticketValidationService = new TicketValidationServiceImpl();
   const broadcastService = new BroadcastServiceImpl();
   const rateLimiter = new RateLimiter(100, 60_000);
 
-  const deps: RealtimeDeps = {
+  return {
     broadcastService,
     broadcastRepo,
     ticketValidationService,
     ticketRepo,
     rateLimiter,
   };
-
-  return createRealtimeApp(deps);
 }
 
 export { TenantNotifier } from './tenant_notifier';
-export default createRealtimeAppFromEnv;

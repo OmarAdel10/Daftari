@@ -7,7 +7,7 @@
  *
  * One DO per tenant (id = tenant uid). Holds hibernating WebSocket
  * connections for the admin dashboard and broadcasts sale/session events
- * pushed by daftari-api via service binding (env.REALTIME).
+ * pushed by daftari-api via the NOTIFIER Durable Object binding.
  *
  * WebSocket hibernation: state.acceptWebSocket allows the DO to sleep
  * while connections remain open — zero duration billing when idle.
