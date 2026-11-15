@@ -22,6 +22,7 @@ import type { Sale } from '../../../shared/src/domain/entities/sale';
 import type { SessionRepository } from '../../../shared/src/domain/repositories/session-repository';
 import type { AuthUserRepository } from '../../../shared/src/domain/repositories/auth-user-repository';
 import type { UserRepository } from '../../../shared/src/domain/repositories/user-repository';
+import { createIpRateLimiter } from '../application/services/ip-rate-limiter';
 
 /** HTTP wire contract: snake_case; shared TypeScript records: camelCase. */
 function toWireSale(sale: Sale) {
@@ -59,21 +60,13 @@ export function registerSales(
     userRepository: deps.userRepository,
   }));
 
-  // Fallback limiter for /sales/sync: 30 writes/min/IP. State is bound to
-  // this app instance (fresh per isolate/createApp).
-  const SALES_SYNC_WINDOW_MS = 60_000;
-  const SALES_SYNC_MAX_PER_WINDOW = 30;
-  const salesSyncHits = new Map<string, number[]>();
-  const ipRateLimit = (ip: string, now: number): { allowed: boolean; retryAfterMs: number } => {
-    const hits = (salesSyncHits.get(ip) ?? []).filter((t: number) => now - t < SALES_SYNC_WINDOW_MS);
-    if (hits.length >= SALES_SYNC_MAX_PER_WINDOW) {
-      const oldest = hits[0] ?? now;
-      return { allowed: false, retryAfterMs: Math.max(0, oldest + SALES_SYNC_WINDOW_MS - now) };
-    }
-    hits.push(now);
-    salesSyncHits.set(ip, hits);
-    return { allowed: true, retryAfterMs: 0 };
-  };
+  // Fallback limiter for /sales/sync: 30 writes/min/IP. Shared via
+  // createIpRateLimiter; state is bound to this app instance (fresh per
+  // isolate/createApp).
+  const ipRateLimit = createIpRateLimiter({
+    windowMs: 60_000,
+    maxPerWindow: 30,
+  });
 
   app.post('/sales/sync', async (c) => {
     const tenantId = c.get('authUid');
