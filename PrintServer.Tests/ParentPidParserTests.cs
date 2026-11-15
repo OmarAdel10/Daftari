@@ -48,4 +48,13 @@ public sealed class ParentPidParserTests
         Assert.Equal(0, ParentPidParser.Parse(new[] { "--parent-pid", "abc" }));
         Assert.Equal(0, ParentPidParser.Parse(new[] { "--parent-pid=abc" }));
     }
+
+    [Fact]
+    public void Parse_NegativeValue_IsParsedAndIgnoredByCallers()
+    {
+        // The parser returns the value verbatim; both hosts guard with
+        // `if (parentPid > 0)`, so a negative pid disables the watcher.
+        Assert.Equal(-5, ParentPidParser.Parse(new[] { "--parent-pid", "-5" }));
+        Assert.Equal(-5, ParentPidParser.Parse(new[] { "--parent-pid=-5" }));
+    }
 }
