@@ -49,9 +49,6 @@ class EnvConfig {
   /// Enable Crashlytics.
   static late final bool enableCrashlytics;
 
-  /// Shorebird app ID.
-  static late final String shorebirdAppId;
-
   static const _firebaseWebApiKey = 'AIzaSyBGjEpwrZEuLtFTJC27ZXCELrwShoKj8Qk';
   static const _firebaseWebAuthDomain = 'daftari-pos.firebaseapp.com';
   static const _firebaseWebMessagingSenderId = '905067437740';
@@ -70,7 +67,6 @@ class EnvConfig {
     EnvConfig.firebaseProjectId = config.firebaseProjectId;
     EnvConfig.enableLogging = config.enableLogging;
     EnvConfig.enableCrashlytics = config.enableCrashlytics;
-    EnvConfig.shorebirdAppId = config.shorebirdAppId;
     EnvConfig.firebaseWebApiKey = _firebaseWebApiKey;
     EnvConfig.firebaseWebAuthDomain = _firebaseWebAuthDomain;
     EnvConfig.firebaseWebMessagingSenderId = _firebaseWebMessagingSenderId;
@@ -95,7 +91,6 @@ class EnvConfig {
         adminOrigin: 'https://admin-dev.daftariapp.workers.dev',
         enableLogging: true,
         enableCrashlytics: false,
-        shorebirdAppId: '',
       ),
       'staging' => _EnvConfigData._(
         env: AppEnv.staging,
@@ -109,7 +104,6 @@ class EnvConfig {
         adminOrigin: 'https://admin-staging.daftariapp.workers.dev',
         enableLogging: true,
         enableCrashlytics: true,
-        shorebirdAppId: '',
       ),
       'production' => _EnvConfigData._(
         env: AppEnv.production,
@@ -123,7 +117,6 @@ class EnvConfig {
         adminOrigin: 'https://admin.daftariapp.workers.dev',
         enableLogging: false,
         enableCrashlytics: true,
-        shorebirdAppId: 'prod-app-id',
       ),
       _ => throw Exception('Unknown env: $envName'),
     };
@@ -143,7 +136,6 @@ class _EnvConfigData {
   final String adminOrigin;
   final bool enableLogging;
   final bool enableCrashlytics;
-  final String shorebirdAppId;
 
   const _EnvConfigData._({
     required this.env,
@@ -156,6 +148,5 @@ class _EnvConfigData {
     required this.adminOrigin,
     required this.enableLogging,
     required this.enableCrashlytics,
-    required this.shorebirdAppId,
   });
 }
