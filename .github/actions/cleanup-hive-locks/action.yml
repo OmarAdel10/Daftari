@@ -1,0 +1,30 @@
+name: Clean stale Hive locks
+description: >-
+  Remove leftover Hive lock files from the Flutter app's test fixture
+  directories. Shared by CI jobs so the cleanup logic has a single source of
+  truth.
+
+runs:
+  using: composite
+  steps:
+    - name: Remove stale Hive lock files
+      shell: bash
+      env:
+        # Directory (relative to the repo root) that holds the Hive test fixtures.
+        HIVE_TEST_ROOT: ${{ inputs.directory }}
+      run: |
+        cd "$HIVE_TEST_ROOT"
+        for dir in test/_hive_test*; do
+          [ -d "$dir" ] || continue
+          for lock in "$dir"/*.lock; do
+            [ -e "$lock" ] || continue
+            echo "Removing stale lock: $lock"
+            rm -f "$lock"
+          done
+        done
+
+inputs:
+  directory:
+    description: Repository-relative directory containing the Hive test fixtures.
+    required: false
+    default: apps/daftari

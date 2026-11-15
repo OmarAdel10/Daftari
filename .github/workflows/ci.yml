@@ -74,17 +74,7 @@ jobs:
           jaspr build
 
       - name: Clean stale Hive locks (FUSE safety)
-        working-directory: apps/daftari
-        shell: bash
-        run: |
-          for dir in test/_hive_test*; do
-            [ -d "$dir" ] || continue
-            for lock in "$dir"/*.lock; do
-              [ -e "$lock" ] || continue
-              echo "Removing stale lock: $lock"
-              rm -f "$lock"
-            done
-          done
+        uses: ./.github/actions/cleanup-hive-locks
 
   # TypeScript workers: api, admin_host, shared.
   backend-tests:
@@ -303,17 +293,7 @@ jobs:
             --dart-define=ENV=${{ matrix.env }}
 
       - name: Clean stale Hive locks
-        working-directory: apps/daftari
-        shell: bash
-        run: |
-          for dir in test/_hive_test*; do
-            [ -d "$dir" ] || continue
-            for lock in "$dir"/*.lock; do
-              [ -e "$lock" ] || continue
-              echo "Removing stale lock: $lock"
-              rm -f "$lock"
-            done
-          done
+        uses: ./.github/actions/cleanup-hive-locks
 
   # C# print servers.
   printserver-build:
