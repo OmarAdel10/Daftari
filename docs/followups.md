@@ -22,7 +22,7 @@
 22: backend/admin_host/build.sh: hardcoded local fallback path /mnt/ALL/Daftari/build/web — harmless in CI, tidy up
 23: cd-development/cd-staging verify gates duplicate ci.yml's run on the same push — replace with workflow_run gating ("CI Checks" completes successfully on that branch) if minutes become tight
 24: release.yml: release-windows + release-linux both upsert the same GitHub Release on a tag — concurrent upsert may clobber generate_release_notes; consider a single release job
-25: lib/core/config/flavor_config.dart: 'landing' flavor is dead config (nothing uses AppFlavor.landing — the real landing page is the Jaspr project) — remove or document
+25: [REJECTED] lib/core/config/flavor_config.dart: NO 'landing' flavor exists — AppFlavor is {local, cloud, admin} only; Jaspr is the real landing page (separate package). Nothing to remove. Corrected during codebase-cleanup audit.
 26: Ed25519 keypair generation script (user-requested feature: script that generates the ED25519 keypair; public key is hard-coded in release.yml dart-define, private key lives in paymob_webhook worker secrets) — separate feature, own branch
 27: PRE-EXISTING (backend refactor 7220601 fallout, out of migration scope): 18 analyzer issues in lib/core/backend/** + 2 SalesWorkspace "March 2026" test failures — fix before merge to development
 28: [RESOLVED] apps/daftari/lib/core/config/env_config.dart:22,25: doc comments reference pre-rename worker names (daftari-api/daftari-realtime) — updated in Branch B: realtimeWsUrl doc now says "served by the merged api worker"; values point to api-{dev,staging,}.daftariapp.workers.dev/ws
