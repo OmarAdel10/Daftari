@@ -645,17 +645,14 @@ Settings surface adapts per business type: read-only business-type card, favorit
 
 ### Module S: Hardware ID (HWID) Provider System
 
-#### S1: Architecture (`lib/core/hwid/`)
-* **Interface:** `HwidProvider` (abstract) — defines `getHwid()`, `getHardwareInfo()`, `isAvailable`, `providerName`.
-* **Platform Implementations** (conditional imports):
-  * **Windows** (`hwid_provider_windows.dart`): WMI queries — Machine GUID (Win32_ComputerSystemProduct), CPU ID (Win32_Processor), Motherboard Serial (Win32_BaseBoard), BIOS Serial (Win32_BIOS), Disk Serial (Win32_DiskDrive), Computer Name. Returns `win_<sha256_hash>`.
-  * **Linux (Experimental / Development Only)** (`hwid_provider_linux.dart`): `/etc/machine-id`, `/var/lib/dbus/machine-id`, `/proc/cpuinfo`, `dmidecode` (motherboard, requires root), `lsblk`/`nvme` (disk serial). Returns `lin_<sha256_hash>`. Linux HWID support is experimental and not recommended for production license binding.
-  * **Web** (`hwid_provider_web.dart`): Browser fingerprinting stub (`CS-WEB-<timestamp>`).
-  * **Desktop Fallback** (`hwid_provider_desktop.dart`): Windows registry (MachineGuid) + Linux `/etc/machine-id`.
-  * **Stub** (`hwid_provider_stub.dart`): Unsupported platforms (`CS-STUB-<timestamp>`).
-* **Conditional Export:** `hwid_provider.dart` uses `if (dart.library.io)` / `if (dart.library.html)` for platform selection.
-* **Exception:** `HwidException` with provider name, original error, stack trace.
-* **Usage:** LicenseEngine uses HWID for machine-bound Ed25519 license verification; SessionSyncService sends HWID for device tracking.
+#### S1: Architecture (`lib/core/licensing/infrastructure/hwid/`)
+* **Interface:** `HwidProvider` (abstract) — defines `Future<String?> getHardwareId()`.
+* **Platform Implementations** (selected at runtime by `LicenseEngine._defaultHwidProvider()`):
+  * **Windows** (`windows_hwid_provider.dart`): reads `HKLM\SOFTWARE\Microsoft\Cryptography\MachineGuid` via `reg query`. Last 8 hex characters formatted as `CS-XXXX-XXXX`.
+  * **Linux (Experimental / Development Only)** (`linux_hwid_provider.dart`): reads `/etc/machine-id`, then `/var/lib/dbus/machine-id`. Last 8 hex characters formatted as `CS-XXXX-XXXX`. Linux HWID support is experimental and not recommended for production license binding.
+* **Selection:** `LicenseEngine` picks `LinuxHwidProvider` when `Platform.isLinux`, otherwise `WindowsHwidProvider`. A provider may be injected explicitly (tests).
+* **Fallback:** devices that yield no ID resolve to the `UNKNOWN-MACHINE` sentinel, which cannot be activated.
+* **Usage:** `LicenseEngine.getDeviceId()` caches the resolved device ID for machine-bound Ed25519 license verification; `ActivationCubit` consumes it.
 
 ---
 

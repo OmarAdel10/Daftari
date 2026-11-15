@@ -1867,33 +1867,29 @@ Retention: 90-day rolling
 ### 21. HWID Provider Flow
 
 ```
-[ LicenseEngine.verifyLicense() or SessionSyncService.startSession() ]
+[ LicenseEngine.getDeviceId() ]
               │
               ▼
-[ HwidProvider.getHwid() ]
+[ HwidProvider.getHardwareId() ]
               │
          ┌────┴────┐
          ▼         ▼
    [ Windows ]   [ Linux (Experimental) ]
        │             │
        ▼             ▼
- [ WMI queries: ] [ System files: ]
-   MachineGuid       /etc/machine-id
-   CPU ID            /var/lib/dbus/machine-id
-   Motherboard       /proc/cpuinfo
-   BIOS Serial       dmidecode (root)
-   Disk Serial       lsblk/nvme
+ [ reg query        [ /etc/machine-id
+  MachineGuid ]     /var/lib/dbus/machine-id ]
        │             │
        └──────┬──────┘
               ▼
-     [ Combine components → SHA-256 ]
+ [ Last 8 hex chars → CS-XXXX-XXXX ]
               │
               ▼
-     [ Return: win_<hash32> | lin_<hash32> ]
+ [ Return ID, or null → UNKNOWN-MACHINE ]
 ```
 
-* **Fallback:** Stub provider returns `CS-STUB-<timestamp>` / `CS-WEB-<timestamp>` for unsupported platforms.
-* **Exception:** `HwidException` with provider name, original error, stack trace.
+* **Selection:** `LicenseEngine._defaultHwidProvider()` returns `LinuxHwidProvider` on Linux, `WindowsHwidProvider` otherwise.
+* **Fallback:** devices yielding no ID resolve to the `UNKNOWN-MACHINE` sentinel, which cannot be activated.
 * **Note:** Linux HWID support is experimental/development only and not recommended for production license binding.
 
 ---

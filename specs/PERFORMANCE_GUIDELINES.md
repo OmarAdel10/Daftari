@@ -229,7 +229,7 @@ The behaviors below are **current code reality** and are documented here as ackn
 
 ### 9. Updated Known Deviations (Hot Paths)
 
-12. **HWID Provider not cached in SessionSyncService**: `SessionSyncService.startSession()` calls `HwidProvider.getHwid()` directly each time. Should cache HWID at app startup and reuse.
+12. **HWID Provider caching (resolved)**: `LicenseEngine.getDeviceId()` caches the resolved device ID (`_cachedDeviceId`) and reuses it, so the provider is queried at most once per engine instance. `SessionSyncService` does not call the HWID provider — it receives `deviceHwid` as a constructor argument.
 13. **Analytics queue flush on every event**: `AnalyticsService.track()` flushes immediately (no debounce). Consider batching with 5s debounce for high-frequency events.
 14. **PrintServiceFactory.create() called per print operation**: Consumers call `create()` instead of using singleton `instance`. Each call does platform detection (cheap but unnecessary).
 15. **ThemeManager style lists recreated on each access**: `getReceiptStyles()`/`getInvoiceStyles()`/`getExportStyles()` allocate new lists. Cache with `late` initializers if accessed frequently.

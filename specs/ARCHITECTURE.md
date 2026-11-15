@@ -1372,7 +1372,7 @@ ActivationLoading
 - Strips dashes, takes last 8 hex characters
 - Formats as `CS-XXXX-XXXX`
 - Zero admin required — reads standard registry key
-- `HwidProvider` interface is abstract; only Windows is implemented
+- `HwidProvider` interface is abstract; Windows and Linux are both implemented (`WindowsHwidProvider`, `LinuxHwidProvider`)
 
 #### Cryptographic Verification
 
@@ -1636,17 +1636,15 @@ class FlavorConfig {
 
 * **Usage:** Feature flags gate backend services (e.g., `SessionSyncService` only for cloud/admin), UI elements, and licensing behavior.
 
-#### 5k.3 HWID Provider (`lib/core/backend/hwid/`)
+#### 5k.3 HWID Provider (`lib/core/licensing/infrastructure/hwid/`)
 
-* **Interface:** `HwidProvider` — `getHwid()`, `getHardwareInfo()`, `isAvailable`, `providerName`.
-* **Platform Implementations** (conditional exports via `hwid_provider.dart`):
-  * **Windows** (`hwid_provider_windows.dart`): WMI queries — Machine GUID (Win32_ComputerSystemProduct), CPU ID (Win32_Processor), Motherboard Serial (Win32_BaseBoard), BIOS Serial (Win32_BIOS), Disk Serial (Win32_DiskDrive), Computer Name. Returns `win_<sha256_hash>`.
-  * **Linux** (`hwid_provider_linux.dart`): `/etc/machine-id`, `/var/lib/dbus/machine-id`, `/proc/cpuinfo`, `dmidecode` (motherboard), `lsblk`/`nvme` (disk serial). Returns `lin_<sha256_hash>`.
-  * **Web** (`hwid_provider_web.dart`): Browser fingerprinting stub (`CS-WEB-<timestamp>`).
-  * **Desktop Fallback** (`hwid_provider_desktop.dart`): Windows registry + Linux `/etc/machine-id`.
-  * **Stub** (`hwid_provider_stub.dart`): Unsupported platforms (`CS-STUB-<timestamp>`).
-* **Exception:** `HwidException` with provider name, original error, stack trace.
-* **Consumers:** `LicenseEngine` (machine-bound Ed25519 verification), `SessionSyncService` (device tracking).
+* **Interface:** `HwidProvider` — `Future<String?> getHardwareId()`.
+* **Platform Implementations** (selected at runtime by `LicenseEngine._defaultHwidProvider()`):
+  * **Windows** (`windows_hwid_provider.dart`): reads `HKLM\SOFTWARE\Microsoft\Cryptography\MachineGuid` via `reg query`. Last 8 hex characters formatted as `CS-XXXX-XXXX`.
+  * **Linux** (`linux_hwid_provider.dart`): reads `/etc/machine-id`, then `/var/lib/dbus/machine-id`. Last 8 hex characters formatted as `CS-XXXX-XXXX`.
+* **Selection:** `LinuxHwidProvider` when `Platform.isLinux`, otherwise `WindowsHwidProvider`; a provider may be injected explicitly.
+* **Fallback:** no ID resolves to the `UNKNOWN-MACHINE` sentinel, which cannot be activated.
+* **Consumers:** `LicenseEngine` (machine-bound Ed25519 verification) via `getDeviceId()`.
 
 #### 5k.4 Cloudflare Workers API Client & Services (`lib/core/backend/workers/`)
 
