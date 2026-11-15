@@ -118,6 +118,15 @@ jobs:
       - name: Install worker dependencies
         run: npm ci --prefix backend/${{ matrix.worker }} --include=dev --no-audit --no-fund
 
+      # The api worker imports source from paymob_webhook and realtime
+      # (../../paymob_webhook/src/*, ../../realtime/src/*). TypeScript follows
+      # those imports and needs their node_modules (esp. hono) to type-check.
+      - name: Install deps for packages imported by api
+        if: matrix.worker == 'api'
+        run: |
+          npm ci --prefix backend/paymob_webhook --include=dev --no-audit --no-fund
+          npm ci --prefix backend/realtime --include=dev --no-audit --no-fund
+
       - name: Unit tests
         run: cd backend/${{ matrix.worker }} && npm test -- --passWithNoTests
 
@@ -160,6 +169,10 @@ jobs:
           for pkg in api admin_host; do
             npm ci --prefix backend/$pkg --include=dev --no-audit --no-fund
           done
+          # The api worker imports source from paymob_webhook and realtime.
+          # Wrangler's bundler follows those imports and needs their node_modules.
+          npm ci --prefix backend/paymob_webhook --include=dev --no-audit --no-fund
+          npm ci --prefix backend/realtime --include=dev --no-audit --no-fund
 
       - name: Dry run every Worker package in every environment
         run: |
