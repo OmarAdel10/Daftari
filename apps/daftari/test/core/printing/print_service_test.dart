@@ -3,18 +3,19 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:daftari/core/printing/print_service_factory.dart';
 import 'package:daftari/core/printing/print_service_interface.dart';
+import 'package:daftari/core/printing/print_service_stub.dart';
 
 void main() {
   group('PrintServiceFactory', () {
-    test('returns StubPrintService by default', () {
+    test('returns PrintServiceStub by default', () {
       PrintServiceFactory.reset();
       final service = PrintServiceFactory.instance;
-      expect(service, isA<StubPrintService>());
+      expect(service, isA<PrintServiceStub>());
     });
 
-    test('create returns new StubPrintService', () {
+    test('create returns new PrintServiceStub', () {
       final service = PrintServiceFactory.create();
-      expect(service, isA<StubPrintService>());
+      expect(service, isA<PrintServiceStub>());
     });
 
     test('can override for testing', () {
@@ -22,6 +23,20 @@ void main() {
       PrintServiceFactory.overrideForTesting(mockService);
       expect(PrintServiceFactory.instance, same(mockService));
       PrintServiceFactory.reset();
+    });
+
+    test('stub print operations complete without throwing', () async {
+      final service = PrintServiceFactory.create();
+
+      await expectLater(service.printReceipt(const {}), completes);
+      await expectLater(service.printBarcode(const {}), completes);
+      await expectLater(service.printTicket(const {}), completes);
+      expect(await service.saveReceiptPng(const {}), isEmpty);
+      expect(await service.saveReceiptPdf(const {}), isEmpty);
+      expect(await service.saveSalesPdf(const {}), isEmpty);
+      expect(await service.validateSvg('data'), isEmpty);
+      expect(await service.getLocalPrinters(), isEmpty);
+      expect(await service.healthCheck(), isFalse);
     });
   });
 }

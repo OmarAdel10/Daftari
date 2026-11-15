@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 
 import 'dart:convert';
 
+import 'print_server_config.dart';
 import 'print_service_interface.dart';
 
 /// Web print service - delegates to PrintServer via HTTP.
@@ -14,7 +15,7 @@ class WebPrintService implements PrintService {
   @override
   final String baseUrl;
 
-  WebPrintService({this.baseUrl = 'http://localhost:5001'});
+  WebPrintService({this.baseUrl = kPrintServerBaseUrl});
 
   @override
   Future<bool> healthCheck() async {

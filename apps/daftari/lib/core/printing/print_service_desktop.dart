@@ -4,16 +4,17 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-import 'print_service_stub.dart';
+import 'print_server_config.dart';
+import 'print_service_interface.dart';
 
 /// Desktop Print Service implementation using C# PrintServer sidecar.
 class PrintServiceDesktop implements PrintService {
-  static const String _defaultBaseUrl = 'http://127.0.0.1:5000';
+  @override
   final String baseUrl;
   final http.Client _client;
 
   PrintServiceDesktop({String? baseUrl, http.Client? client})
-    : baseUrl = baseUrl ?? _defaultBaseUrl,
+    : baseUrl = baseUrl ?? kPrintServerBaseUrl,
       _client = client ?? http.Client();
 
   @override
@@ -97,6 +98,16 @@ class PrintServiceDesktop implements PrintService {
     } catch (_) {
       return false;
     }
+  }
+
+  @override
+  Future<List<String>> getLocalPrinters() async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/api/printing/local-printers'),
+    );
+    _handleResponse(response);
+    final data = jsonDecode(response.body) as List<dynamic>;
+    return data.cast<String>();
   }
 
   @override
