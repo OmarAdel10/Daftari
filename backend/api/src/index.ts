@@ -46,7 +46,8 @@ import { UserUpdateUseCase } from './application/use-cases/user-update-use-case'
 import { UserDeleteUseCase } from './application/use-cases/user-delete-use-case';
 import { DeviceLinkUseCase } from './application/use-cases/device-link-use-case';
 import { createPaymobAppFromEnv } from '../../paymob_webhook/src/runtime';
-import { createRealtimeApp, TenantNotifier } from '../../realtime/src/index';
+import { createRealtimeApp } from '../../realtime/src/index';
+export { TenantNotifier } from '../../realtime/src/index';
 import { createRealtimeServices, type RealtimeEnv } from '../../realtime/src/runtime';
 import { RateLimiter } from '../../shared/src/domain/services/rate-limiter';
 import type { RealtimeTicketRepository } from '../../shared/src/domain/repositories/realtime-ticket-repository';
