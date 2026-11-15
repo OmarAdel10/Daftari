@@ -102,12 +102,36 @@ class PrintServiceDesktop implements PrintService {
 
   @override
   Future<List<String>> getLocalPrinters() async {
-    final response = await _client.get(
-      Uri.parse('$baseUrl/api/printing/local-printers'),
-    );
-    _handleResponse(response);
-    final data = jsonDecode(response.body) as List<dynamic>;
-    return data.cast<String>();
+    try {
+      final response = await _client
+          .get(
+            Uri.parse('$baseUrl/api/printing/local-printers'),
+            headers: {'Accept': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.cast<String>();
+      }
+      throw PrintException(
+        'Failed to fetch printers: ${response.statusCode}',
+        endpoint: '/api/printing/local-printers',
+        statusCode: response.statusCode,
+      );
+    } on http.ClientException catch (e) {
+      throw PrintException(
+        'Network error getting printers: $e',
+        endpoint: '/api/printing/local-printers',
+        originalError: e,
+      );
+    } catch (e) {
+      throw PrintException(
+        'Failed to get local printers: $e',
+        endpoint: '/api/printing/local-printers',
+        originalError: e,
+      );
+    }
   }
 
   @override
