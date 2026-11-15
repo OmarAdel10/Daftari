@@ -62,10 +62,13 @@ export function registerSales(
 
   // Fallback limiter for /sales/sync: 30 writes/min/IP. Shared via
   // createIpRateLimiter; state is bound to this app instance (fresh per
-  // isolate/createApp).
+  // isolate/createApp). The map caps mirror /sessions/start so a single
+  // isolate cannot retain an entry for every IP it has ever seen.
   const ipRateLimit = createIpRateLimiter({
     windowMs: 60_000,
     maxPerWindow: 30,
+    softCap: 10_000,
+    hardCap: 5_000,
   });
 
   app.post('/sales/sync', async (c) => {

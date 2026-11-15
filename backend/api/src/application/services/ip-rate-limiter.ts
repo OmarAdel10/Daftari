@@ -9,6 +9,7 @@
  * @param windowMs - Sliding window length in milliseconds.
  * @param maxPerWindow - Max hits allowed per window per IP.
  * @param softCap - Begin evicting expired IPs once the map exceeds this size.
+ *   Omit it only when the caller accepts an unbounded per-IP map.
  * @param hardCap - Stop evicting once the map reaches this size.
  * @returns An `ipRateLimit(ip, now)` predicate returning `{ allowed, retryAfterMs }`.
  */
