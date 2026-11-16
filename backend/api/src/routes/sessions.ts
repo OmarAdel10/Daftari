@@ -68,7 +68,7 @@ export function registerSessions(
     windowMs: 60_000,
     maxPerWindow: 30,
     softCap: 10_000,
-    hardCap: 5_000,
+    maxEntries: 10_000,
   });
 
   // Middleware gate for all session routes.

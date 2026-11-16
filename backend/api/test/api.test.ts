@@ -1090,6 +1090,41 @@ describe('sales route error-arm mapping (stubbed use cases)', () => {
     expect(rateLimit).toHaveBeenCalledTimes(1);
   });
 
+  it('/sales/sync uses the in-memory IP window when no limiter is injected: 31st sync in a minute → 429', async () => {
+    const stubRecord = { execute: vi.fn(async () => ({ ok: true, data: { saleId: 's1' } })) };
+    const stubList = { execute: vi.fn(async () => ({ ok: true, data: { sales: [] } })) };
+    const app = await errorArmApp(stubRecord, stubList);
+    const syncBody = JSON.stringify({
+      device_hwid: 'hw1',
+      sales: [{ id: 'r1', receipt_json: '{}', total_piastres: 500, created_at: Date.now() }],
+    });
+    let last = 0;
+    for (let i = 0; i < 31; i++) {
+      const res = await app.request('/sales/sync', {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json', 'CF-Connecting-IP': '203.0.113.60' },
+        body: syncBody,
+      }, env);
+      last = res.status;
+      const body = (await res.json()) as { error: string; retry_after_ms: number };
+      if (i >= 30) {
+        expect(body.error).toBe('RATE_LIMITED');
+        expect(body.retry_after_ms).toBeGreaterThan(0);
+      }
+    }
+    expect(last).toBe(429);
+    // The first 30 writes reached the use case; the 31st never did.
+    expect(stubRecord.execute).toHaveBeenCalledTimes(30);
+    // A different IP is unaffected.
+    const other = await app.request('/sales/sync', {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json', 'CF-Connecting-IP': '203.0.113.61' },
+      body: syncBody,
+    }, env);
+    expect(other.status).not.toBe(429);
+    expect(stubRecord.execute).toHaveBeenCalledTimes(31);
+  });
+
   it('GET /sales?since=100 returns mapped sales with receipt_json', async () => {
     dbState.saleRows = [{ id: 'r1', tenant_id: 'uid-123', receipt_json: '{"items":2}', total_piastres: 500, created_at: 150 }];
     const app = makeApp();
