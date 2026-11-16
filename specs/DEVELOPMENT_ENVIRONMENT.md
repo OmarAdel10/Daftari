@@ -165,9 +165,9 @@ Three environment-specific deployment pipelines triggered on pushes to protected
 
 #### 5b. Environment & Flavor Configuration (New)
 * **Environment** (`--dart-define=ENV=<development|staging|production>`):
-  * Controls: `apiBaseUrl`, `realtimeWsUrl`, `tursoDbUrl`, `firebaseProjectId`, `enableLogging`, `enableCrashlytics`, `shorebirdAppId`
+  * Controls: `apiBaseUrl`, `realtimeWsUrl`, `tursoDbUrl`, `firebaseProjectId`, `enableLogging`, `enableCrashlytics`
   * Defined in `lib/core/backend/config/env_config.dart`
-* **Flavor** (`--dart-define=FLAVOR=<local|cloud|landing|admin>`):
+* **Flavor** (`--dart-define=FLAVOR=<local|cloud|admin>`):
   * Controls: `requiresAuth`, `requiresLicense`, `hasCloudSync`, `hasAdminDashboard`, `hasLocalPrinting`, `hasPushNotifications`, `maxDevices`, `supportedPlatforms`
   * Defined in `lib/core/backend/config/flavor_config.dart`
 * **Initialization Order:** `EnvConfig.initializeFromEnv()` → `FlavorConfig.initializeFromEnv()` → Hive init (in `main.dart`)

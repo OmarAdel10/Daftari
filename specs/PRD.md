@@ -605,15 +605,15 @@ Settings surface adapts per business type: read-only business-type card, favorit
   * `cloudflareWorkerUrl` (deprecated) — legacy single worker URL
   * `tursoDbUrl` — Turso libSQL database URL
   * `firebaseProjectId` — Firebase project ID (auth only)
-  * `enableLogging`, `enableCrashlytics`, `shorebirdAppId`
+  * `enableLogging`, `enableCrashlytics`
 * **Initialization:** `EnvConfig.initializeFromEnv()` called at startup from `main.dart`.
 
 #### R3: Build Flavors (`lib/core/config/flavor_config.dart`)
-* **Four Flavors** (set via `--dart-define=FLAVOR=<name>`):
+* **Three Flavors** (set via `--dart-define=FLAVOR=<name>`):
   * **local**: Desktop only, no cloud sync, license required, max 1 device, platforms: windows/linux
   * **cloud**: Desktop + web, cloud sync via Turso, tier-dependent device limits (up to 4), platforms: windows/linux
-  * **landing**: Web (Jaspr), no auth/license, marketing site, platform: web
   * **admin**: Flutter web WASM, full admin dashboard, cloud sync, platform: web
+  (The Jaspr marketing site is a separate package — `landing_page/` — not an app flavor.)
 * **FlavorConfig Properties:** `requiresAuth`, `requiresLicense`, `autoLicenseOnPayment`, `hasCloudSync`, `hasAdminDashboard`, `hasLocalPrinting`, `hasPushNotifications`, `maxDevices`, `supportedPlatforms`.
 * **Initialization:** `FlavorConfig.initializeFromEnv()` called at startup from `main.dart`.
 
@@ -734,11 +734,11 @@ Settings surface adapts per business type: read-only business-type card, favorit
 * **Interface:** `PrintService` (abstract) — defines all print operations.
 * **Factory:** `PrintServiceFactory` — singleton + create() for platform-specific instances.
 * **Platform Implementations:**
-  * **Desktop** (`print_service_desktop.dart`): Windows/Linux via HTTP to PrintServer sidecar (port 5000/5150).
+  * **Desktop** (`print_service_desktop.dart`): Windows/Linux via HTTP to PrintServer sidecar (port 5150).
   * **Windows** (`print_service_windows.dart`): Extended with PrintException handling.
   * **Linux (Experimental / Development Only)** (`print_service_linux.dart`): CUPS-backed, 500KB SVG limit, timeouts. Linux print service is experimental and requires a working CUPS installation.
   * **Web** (`print_service_web.dart`): Delegates to PrintServer via HTTP.
-  * **Stub** (`print_service_stub.dart`): Unsupported platforms, throws `UnsupportedError`.
+  * **Stub** (`print_service_stub.dart`): No-op stub used until platform detection is wired up — print and export calls resolve without output, printer enumeration is empty and the health check reports the sidecar as unavailable.
 * **Conditional Export:** `print_service.dart` uses `if (dart.library.io)` / `if (dart.library.html)` for platform selection.
 * **Updated Consumers:** `ReceiptPrintHelper`, `SalesPdfExporter`, `ProductFormDialog`, `OnboardingBrandingScreen`, `AdminGeneralSection`, `PrinterDropdownField`, `TableModeSections`, `AppShell` all use `PrintServiceFactory.create()`.
 

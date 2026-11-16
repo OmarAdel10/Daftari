@@ -16,8 +16,7 @@ lib/
 ├── core/                         # Shared cross-cutting concerns
 │   ├── audit/                    # AuditService + AuditEntry (encrypted Hive log)
 │   ├── backend/                  # Backend abstraction layer (NEW)
-│   │   ├── config/               # EnvConfig (3 envs), FlavorConfig (4 flavors)
-│   │   ├── hwid/                 # HWID Provider interface + platform impls
+│   │   ├── config/               # EnvConfig (3 envs), FlavorConfig (3 flavors)
 │   │   ├── migrations/           # Migration framework (14 versions, runner)
 │   │   ├── pricing/              # PricingTiers enum + DeviceLimitChecker
 │   │   ├── sharding/             # ShardManager (tiered storage limits)
@@ -58,15 +57,15 @@ lib/
 
 ### 2. Concrete Technology Stack 
 * **UI Framework:** Flutter Desktop (Windows + Linux desktop targets; kiosk fullscreen via `window_manager` — fullScreen, hidden title bar, skipTaskbar).
-* **State Management & Local Cache Engine:** `flutter_bloc` ^9.1.1 with **plain `Bloc`/`Cubit` classes only** — no `HydratedBloc`/`HydratedCubit` is instantiated anywhere in `lib/` (the `hydrated_bloc` package remains in `pubspec.yaml` but is unused). Persistence is explicit: each bloc writes/reads through its Hive-backed repository instead of automatic state hydration.
+* **State Management & Local Cache Engine:** `flutter_bloc` ^9.1.1 with **plain `Bloc`/`Cubit` classes only** — no `HydratedBloc`/`HydratedCubit` is instantiated anywhere in `lib/` (the `hydrated_bloc` package is a dev dependency used by tests only). Persistence is explicit: each bloc writes/reads through its Hive-backed repository instead of automatic state hydration.
 * **Hive Encryption:** All Hive boxes encrypted via `HiveAesCipher` using a 32-byte key generated on first run and persisted in `flutter_secure_storage`. Boxes opened with `encryptionCipher: cipher` parameter (not deprecated `encryptionKey`).
 * **Barcode Layout Engine:** `barcode_widget` package using native vector rendering mechanics.
 * **Barcode Export:** `RenderRepaintBoundary.toImage()` for PNG capture; `file_picker` for directory selection.
 * **UUID Generation:** `uuid` package for entity IDs (shift entities, receipts).
 * **Cloudflare Workers Backend:** `http` package for REST API calls to daftari-api; WebSocket for daftari-api (admin flavor only). Auth via Bearer Firebase ID tokens.
-* **Build Flavors:** Four flavors via `--dart-define=FLAVOR=<local|cloud|landing|admin>` — local (desktop only), cloud (desktop+web, Turso sync), landing (web/Jaspr, marketing), admin (web/WASM, dashboard).
+* **Build Flavors:** Three flavors via `--dart-define=FLAVOR=<local|cloud|admin>` — local (desktop only), cloud (desktop+web, Turso sync), admin (web/WASM, dashboard). The Jaspr marketing site is a separate package (`landing_page/`), not an app flavor.
 * **Environment Config:** Three environments via `--dart-define=ENV=<development|staging|production>` — each with dedicated Cloudflare Worker URLs and Turso DB.
-* **HWID Provider:** Platform-specific hardware identification (Windows WMI, Linux system files, Web fingerprinting) for license binding and device tracking.
+* **HWID Provider:** Platform-specific hardware identification for license binding, implemented in `lib/core/licensing/infrastructure/hwid/` (Windows `reg query` MachineGuid, Linux `/etc/machine-id`).
 * **Database Migrations:** 14-version migration framework with dry-run, retry, rollback, and shard limit enforcement.
 * **Pricing Tiers:** Starter (1 device), Professional (2 devices), Business (4 devices) — enforced via DeviceLimitChecker and SessionSyncService.
 * **Theme Manager:** 4 themes (Modern Slate, High-Contrast Dark Emerald, Warm Espresso & Sand, Industrial Blue) with 2 receipt/invoice/export styles each and business-type recommendations.
@@ -584,7 +583,7 @@ main.dart (root, startup sequence):
   ├─ getApplicationSupportDirectory() → Hive.initFlutter(appSupportDir.path)
   ├─ ensureKioskFullscreen() — window_manager: fullScreen, hidden title bar, skipTaskbar
   ├─ **EnvConfig.initializeFromEnv()** — loads environment config (3 envs, Cloudflare URLs)
-  ├─ **FlavorConfig.initializeFromEnv()** — loads flavor config (4 flavors, feature flags)
+  ├─ **FlavorConfig.initializeFromEnv()** — loads flavor config (3 flavors, feature flags)
   ├─ Register all hand-written TypeAdapters: settings(0), product(1), user, shift, receipt(4),
   │   refund(5), receipt_item(6), station(7), session_record(8), zone(11),
   │   table(9), table_round(10), table_order_line(12), expense(13)
@@ -1213,9 +1212,9 @@ The `skipPrint` flag is set when `saveReceiptAsImage == true && !autoPrintEnable
 | `PrintServer.Linux.csproj` | `PrintServer.Linux/PrintServer.Linux.csproj` | Self-contained .NET 8 `linux-x64` sidecar with CUPS printing, SkiaSharp/HarfBuzz rendering, Arabic fonts, SVG validation, and sales/invoice export services **(Experimental / Development Only)** |
 | `Program.cs` | `PrintServer/Program.cs` | Kestrel host on `127.0.0.1:5150`, 9 endpoints (health, local-printers, receipt, save-png, save-pdf, sales-export, validate-svg, barcode, ticket), rate limiter (30 req/s). POST /receipt returns `{ printed, pngPath }` where `printed = !SkipPrint && PrintReceipt(...)` — PNG save errors surface as HTTP 500 and print is still attempted (Program.cs:49-56) |
 
-#### Settings Events (Full SettingsBloc Register — 38 Event Classes)
+#### Settings Events (Full SettingsBloc Register — 37 Event Classes)
 
-All dispatched from settings UI sections and handled by `SettingsBloc` (38 event classes in `settings_event.dart`; `RefreshLocalPrinters` has no handler and no dispatch site — dead/unused):
+All dispatched from settings UI sections and handled by `SettingsBloc` (37 event classes in `settings_event.dart`):
 
 | Event | UI Trigger | Side Effects |
 |---|---|---|
@@ -1239,7 +1238,6 @@ All dispatched from settings UI sections and handled by `SettingsBloc` (38 event
 | `LogoSvgChanged(String?)` | AdminGeneralSection file picker | Persists `logoSvgData` (base64 SVG) |
 | `ReceiptPrinterNameChanged(String)` | PrintingSection dropdown | Persists `receiptPrinterName` |
 | `BarcodePrinterNameChanged(String)` | PrintingSection dropdown | Persists `barcodePrinterName` |
-| `RefreshLocalPrinters` | (declared, settings_event.dart:107) | No handler registered and no dispatch site — dead/unused event class |
 | `BarcodeActionPreferenceChanged(String)` | ProductFormDialog barcode action selector | Persists `barcodeActionPreference` |
 | `PaymentTypeVisibilityChanged(...)` | PaymentTypesSection | Persists `shownPaymentTypeIds` |
 | `PrepCategoryVisibilityChanged(...)` | PrepCategoriesSection | Persists prep-category visibility |
@@ -1587,20 +1585,19 @@ class EnvConfig {
   static late final String firebaseProjectId;
   static late final bool enableLogging;
   static late final bool enableCrashlytics;
-  static late final String shorebirdAppId;
 
   static void initializeFromEnv() { ... }  // reads --dart-define=ENV
 }
 ```
 
 * **Three Environments:** `development`, `staging`, `production` — set via `--dart-define=ENV=<name>`.
-* **Per-Environment Values:** Each environment has dedicated Cloudflare Worker URLs (api, realtime), Turso database URL, Firebase project ID, and feature flags (logging, Crashlytics, Shorebird).
+* **Per-Environment Values:** Each environment has dedicated Cloudflare Worker URLs (api, realtime), Turso database URL, Firebase project ID, and feature flags (logging, Crashlytics).
 * **Initialization:** Called in `main.dart` before Hive box opening.
 
 #### 5k.2 Flavor Configuration (`lib/core/config/flavor_config.dart`)
 
 ```dart
-enum AppFlavor { local, cloud, landing, admin }
+enum AppFlavor { local, cloud, admin }
 
 class FlavorConfig {
   static late final AppFlavor flavor;
@@ -1619,20 +1616,20 @@ class FlavorConfig {
 }
 ```
 
-* **Four Flavors:** `local`, `cloud`, `landing`, `admin` — set via `--dart-define=FLAVOR=<name>`.
+* **Three Flavors:** `local`, `cloud`, `admin` — set via `--dart-define=FLAVOR=<name>`. The Jaspr marketing site is a separate package (`landing_page/`), not an app flavor.
 * **Feature Matrix:**
 
-| Feature | local | cloud | landing | admin |
-|---|---|---|---|---|
-| Auth Required | ✓ | ✓ | ✗ | ✓ |
-| License Required | ✓ | ✓ | ✗ | ✗ |
-| Auto License on Payment | ✓ | ✓ | ✗ | ✗ |
-| Cloud Sync (Turso) | ✗ | ✓ | ✗ | ✓ |
-| Admin Dashboard | ✗ | ✗ | ✗ | ✓ |
-| Local Printing | ✓ | ✓ | ✗ | ✗ |
-| Push Notifications | ✓ | ✓ | ✗ | ✗ |
-| Max Devices | 1 | 4 | 0 | 0 |
-| Platforms | win/linux | win/linux | web | web |
+| Feature | local | cloud | admin |
+|---|---|---|---|
+| Auth Required | ✓ | ✓ | ✓ |
+| License Required | ✓ | ✓ | ✗ |
+| Auto License on Payment | ✓ | ✓ | ✗ |
+| Cloud Sync (Turso) | ✗ | ✓ | ✓ |
+| Admin Dashboard | ✗ | ✗ | ✓ |
+| Local Printing | ✓ | ✓ | ✗ |
+| Push Notifications | ✓ | ✓ | ✗ |
+| Max Devices | 1 | 4 | 0 |
+| Platforms | win/linux | win/linux | web |
 
 * **Usage:** Feature flags gate backend services (e.g., `SessionSyncService` only for cloud/admin), UI elements, and licensing behavior.
 
@@ -1709,7 +1706,7 @@ The `PrintService` has been refactored from a single `dart:io`-based implementat
 * **Interface** (`print_service_interface.dart`): Abstract `PrintService` with all operations (printers, receipt, barcode, ticket, save PNG/PDF, sales export, validate SVG, health check). `PrintException` with endpoint/statusCode/originalError.
 * **Factory** (`print_service_factory.dart`): `PrintServiceFactory.instance` (singleton), `create()` (new instance), `overrideForTesting()`, `reset()`. Platform detection delegates to conditional imports.
 * **Platform Implementations:**
-  * **Desktop** (`print_service_desktop.dart`): Windows/Linux → HTTP to PrintServer sidecar (port 5000/5150).
+  * **Desktop** (`print_service_desktop.dart`): Windows/Linux → HTTP to PrintServer sidecar (port 5150).
   * **Windows** (`print_service_windows.dart`): Extended with timeouts, `PrintException` wrapping.
   * **Linux** (`print_service_linux.dart`): CUPS-backed, 500KB SVG limit, 10s/30s timeouts.
   * **Web** (`print_service_web.dart`): Delegates to PrintServer via HTTP.
@@ -1740,7 +1737,7 @@ JAAS handle `licenses/<tenant_id>/` (R2). Admin dashboard pulls sales via `/api/
 ### Flutter Integration
 
 * **EnvConfig** (`lib/core/backend/config/env_config.dart`): Three environments (development/staging/production) with per-env Cloudflare Worker URLs, Turso DB URLs, Firebase project IDs.
-* **FlavorConfig** (`lib/core/config/flavor_config.dart`): Four flavors (local/cloud/landing/admin) with feature flags.
+* **FlavorConfig** (`lib/core/config/flavor_config.dart`): Three flavors (local/cloud/admin) with feature flags.
 * **ApiClient** (`lib/core/backend/workers/api_client.dart`): HTTP client with Bearer Firebase ID token auth.
 * **AuthSyncService**: Syncs Firebase user to Workers DB (Option A), fetches profile/license.
 * **SessionSyncService**: Device registration with per-tenant limits, heartbeats, active session listing (cloud/admin flavors only).

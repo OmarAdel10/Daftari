@@ -1749,7 +1749,7 @@ Retention: 90-day rolling
    │  Sets: apiBaseUrl, realtimeWsUrl, tursoDbUrl, firebaseProjectId, etc.
    ▼
 [ FlavorConfig.initializeFromEnv() ]
-   │  Reads --dart-define=FLAVOR (local|cloud|landing|admin)
+   │  Reads --dart-define=FLAVOR (local|cloud|admin)
    │  Sets: requiresAuth, requiresLicense, hasCloudSync, hasAdminDashboard,
    │         hasLocalPrinting, hasPushNotifications, maxDevices, supportedPlatforms
    ▼
@@ -1759,7 +1759,6 @@ Retention: 90-day rolling
 * **Build Commands:**
   * Local desktop: `--dart-define=ENV=development --dart-define=FLAVOR=local`
   * Cloud desktop: `--dart-define=ENV=production --dart-define=FLAVOR=cloud`
-  * Landing web: `--dart-define=ENV=production --dart-define=FLAVOR=landing`
   * Admin web: `--dart-define=ENV=production --dart-define=FLAVOR=admin`
 
 #### 20b. Authentication Sync Flow (Option A + B)
