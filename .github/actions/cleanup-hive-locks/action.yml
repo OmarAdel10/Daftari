@@ -13,6 +13,10 @@ runs:
         # Directory (relative to the repo root) that holds the Hive test fixtures.
         HIVE_TEST_ROOT: ${{ inputs.directory }}
       run: |
+        if [ ! -d "$HIVE_TEST_ROOT" ]; then
+          echo "Hive test root not found: $HIVE_TEST_ROOT - nothing to clean."
+          exit 0
+        fi
         cd "$HIVE_TEST_ROOT"
         for dir in test/_hive_test*; do
           [ -d "$dir" ] || continue
