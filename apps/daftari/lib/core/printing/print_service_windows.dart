@@ -37,6 +37,8 @@ class WindowsPrintService implements PrintService {
         endpoint: '/api/printing/local-printers',
         statusCode: response.statusCode,
       );
+    } on PrintException {
+      rethrow;
     } on http.ClientException catch (e) {
       throw PrintException(
         'Network error getting printers: $e',
