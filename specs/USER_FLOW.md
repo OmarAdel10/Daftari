@@ -1789,9 +1789,10 @@ Retention: 90-day rolling
 
 * **Admin Dashboard / License Check:** `AuthSyncService.fetchProfile(idToken)` → GET `/auth/me` → returns profile + license.
 
-#### 20c. Device Session Registration Flow (Cloud/Admin Flavors Only)
+#### 20c. Device Session Registration Flow (Cloud/Admin Flavors Only) — **planned, not wired**
 
 ```
+[ PLANNED — no live Flutter caller executes these steps today ]
 [ App starts (cloud/admin flavor) → LicenseEngine.verifyLicense() valid ]
               │
               ▼
@@ -1815,10 +1816,10 @@ Retention: 90-day rolling
   & cleanup     Business=4)
 ```
 
-* **Client wiring:** `SessionSyncService` is the only client-side caller of these endpoints and currently has **zero importers** — the server routes exist, but no live Flutter code starts a device session yet (tracked as DAFTARI-184).
-* **Heartbeat:** Periodic `SessionSyncService.heartbeat(sessionId, idToken)` → POST `/sessions/heartbeat`.
-* **Cleanup:** On logout/shift end → `SessionSyncService.endSession(sessionId, idToken)`.
-* **Active Sessions List:** `SessionSyncService.activeSessions(idToken)` → GET `/sessions/active`.
+* **Client wiring (planned, not wired):** `SessionSyncService` is the only client-side caller of these endpoints and currently has **zero importers** — the server routes exist, but no live Flutter code starts a device session yet (tracked as DAFTARI-184). The diagram and the bullets below describe the intended flow, not current app behaviour, so the app does **not** enforce device limits through sessions today.
+* **Heartbeat (planned):** Periodic `SessionSyncService.heartbeat(sessionId, idToken)` → POST `/sessions/heartbeat`.
+* **Cleanup (planned):** On logout/shift end → `SessionSyncService.endSession(sessionId, idToken)`.
+* **Active Sessions List (planned):** `SessionSyncService.activeSessions(idToken)` → GET `/sessions/active`.
 
 #### 20d. Analytics Batching Flow
 
