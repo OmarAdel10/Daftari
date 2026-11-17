@@ -103,7 +103,7 @@
 ### FINDING-DUP-03 — Two parallel HWID abstractions (DUP/ARCH, P2, High confidence)
 
 **Component:** `apps/daftari/lib/core/hwid/`, `apps/daftari/lib/core/licensing/infrastructure/hwid/`, `apps/daftari/lib/core/licensing/engine/license_engine.dart`
-**File/lines:** 
+**File/lines:**
 - `lib/core/hwid/hwid_provider_interface.dart` (abstract interface class HwidProvider) + platform impls (`hwid_provider_desktop.dart`, `_linux.dart`, `_stub.dart`, `_web.dart`, `_windows.dart`)
 - `lib/core/licensing/infrastructure/hwid/hwid_provider.dart` (abstract class HwidProvider) + `linux_hwid_provider.dart`, `windows_hwid_provider.dart`
 - `lib/core/licensing/engine/license_engine.dart:31-33` (`_defaultHwidProvider()` returns `LinuxHwidProvider()` / `WindowsHwidProvider()`)
@@ -138,7 +138,7 @@
 ### FINDING-ARCH-01 — Print port inconsistency (ARCH, P2, High confidence)
 
 **Component:** `apps/daftari/lib/core/printing/print_service_desktop.dart`, `print_service_web.dart`, `print_server_manager.dart`
-**File/lines:** 
+**File/lines:**
 - `print_service_desktop.dart`: `static const String _defaultBaseUrl = 'http://127.0.0.1:5000';`
 - `print_service_web.dart`: `WebPrintService({this.baseUrl = 'http://localhost:5001'});`
 - `print_server_manager.dart`: `static const String _healthEndpoint = 'http://127.0.0.1:5150/api/printing/health';`
@@ -156,7 +156,7 @@
 
 **Component:** `apps/daftari/lib/core/config/env_config.dart`, `apps/daftari/pubspec.yaml`, `.github/workflows/release.yml`
 **File/lines:** `env_config.dart:53,73,98,112,126,146,159`; `pubspec.yaml:127`; `release.yml`
-**Current implementation:** 
+**Current implementation:**
 - `env_config.dart` declares `shorebirdAppId` (static late field + constructor param) but it is **unused anywhere else in `lib/`** (`grep shorebirdAppId` outside `env_config.dart` = empty).
 - `pubspec.yaml:127` lists `shorebird.yaml` as an asset, but `shorebird_code_push` package is **not a dependency**.
 - CI `release.yml` uses `shorebirdtech/setup-shorebird` and runs `shorebird patch` / `shorebird release` for Windows.
