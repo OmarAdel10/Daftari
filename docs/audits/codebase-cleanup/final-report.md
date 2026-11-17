@@ -3,8 +3,8 @@
 **Branch:** `feat/codebase-cleanup-dedup`
 **Base:** `origin/development` @ `db8fb5a`
 **Plane project:** `DAFTARI`
-**Reviewed HEAD:** `130b4d4` + this SHA-pinning commit (27 commits ahead of base, 0 behind) — the sound full gate was run on `8fe3802` (25 ahead)
-**Verdict:** CONDITIONAL PASS — every branch-owned gate step is green (one known pre-existing timing flake failed once on the final gate's first attempt and passed on its immediate retry), and every finding raised by the review rounds to date is either fixed in-branch or tracked as an explicit out-of-scope follow-up. Merge-readiness still depends on the final independent-review round on the current HEAD (CodeRabbit round 3 + fresh QA + coverage dispatches), green PR checks, and the user's manual merge — this report does not assert READY TO MERGE ahead of those.
+**Reviewed HEAD:** `a0b195d` + `26321f4` + `d095d82` + this artifact commit (30 commits ahead of base, 0 behind) — the sound full gate was run on `8fe3802` (25 ahead)
+**Verdict:** CONDITIONAL PASS — every branch-owned gate step is green (one known pre-existing timing flake failed once on the final gate's first attempt and passed on its immediate retry), and every finding raised by the review rounds to date is either fixed in-branch or tracked as an explicit out-of-scope follow-up. CodeRabbit round 3 is now green (score 100 on `a0b195d`; 2 Low findings fixed, 1 `major` rejected on a false premise), so merge-readiness now depends on the fresh QA + coverage dispatches on the current HEAD, green PR checks, and the user's manual merge — this report does not assert READY TO MERGE ahead of those.
 
 ---
 
@@ -38,7 +38,7 @@ Seven further real defects that the audit had not originally recorded were disco
 | TypeScript packages | 5 (`shared`, `api`, `realtime`, `admin_host`, `paymob_webhook`) |
 | C# projects | 3 (`PrintServer`, `PrintServer.Linux`, `PrintServer.Tests`, `PrintServer.Linux.Tests`) |
 | First-party source directories audited | 100% accounted for |
-| Files changed by this branch | 55 (19 added, 7 deleted, 29 modified; +2 853 / −979 as of `130b4d4`) |
+| Files changed by this branch | 55 (19 added, 7 deleted, 29 modified; +2 854 / −979 as of `a0b195d`) |
 | Files deleted | 7 (the dead `apps/daftari/lib/core/hwid/` tree) |
 | Files introduced | 19 — 2 shared implementations (`print_server_config.dart`, `ip-rate-limiter.ts`), 1 shared C# source file (`PrintServer.Common/ParentPidParser.cs`), 1 CI composite action, 6 test files, 9 audit artifacts |
 | Files modified | 29 |
@@ -184,9 +184,10 @@ See `independent-review.md` for the full dispositions.
 | CodeRabbit round 1 | 7 findings → 2 confirmed Medium (both fixed), 3 rejected on a false premise, 1 pre-existing/out-of-scope, 1 false premise closed with an extra test |
 | CodeRabbit round 2 | 1 finding → rejected on a false premise proven at the base commit; the underlying pre-existing product defect was tracked as DAFTARI-188 |
 | CodeRabbit final (after round-1 fixes) | Critical 0 · High 0 · Medium 0 · Low 0 · **score 100** |
+| CodeRabbit round 3 (on the artifact wave, `a0b195d`) | 3 findings → 1 `major` rejected on a false premise (the dead `print_service.dart` barrel has zero importers), 2 `minor` fixed (`26321f4` cloud-flavor spec line, `d095d82` follow-up #76 routes) · Critical 0 · High 0 · Medium 0 · Low 0 · **score 100** |
 | `qa-post-implementation` reviewer | Rounds 1–2 failed with provider HTTP 429 (concurrent-session rate limit); **round 3 reported — STATUS BLOCKED** with 4 blockers and 7 spec-drift items (all actionable items fixed in the round-2 wave); **round 4 reported — STATUS BLOCKED**, Risk High, 3 High / 12 Medium / 4 Low findings, with 4 mandatory review sections NOT RUN. Dispositions: SEC-1 (pre-existing Worker limiter lifecycle) → DAFTARI-191 / #85; SEC-1-TEST → partly closed in `2b6e0a2`, Worker half → DAFTARI-192 / #86; CODE-L1 → fixed in `d5fa35e`; SEC-L1 → DAFTARI-193 / #87; SPEC-1…SPEC-5 → fixed in `73e3db8`; AUD-1…AUD-10 → fixed in this artifact wave |
 | `test-coverage-analysis` reviewer | Rounds 1–2 failed with HTTP 429; **round 3 reported — VERDICT FAIL** with 3 Medium coverage gaps (G1 `getLocalPrinters` untested, G2 `createIpRateLimiter` untested, G3 `/sales/sync` fallback denial untested), all closed test-first in `e9b4436` / `111a0fe`; **round 5 reported — VERDICT FAIL** with 3 Medium gaps (M1 Linux `getLocalPrinters`, M2 Windows `getLocalPrinters`, M3 limiter fail-open semantics) — all closed in `68d0696` / `2b6e0a2` — plus 4 Low gaps (the bounded-scan gap closed in `2b6e0a2`; the rest tracked as DAFTARI-194…198) |
-| Final reviewers (after fix round 3) | Dispatched on the final HEAD with fresh, context-free sessions — CodeRabbit round 3 + QA + coverage. The provider rate-limits concurrent reviewer sessions, so each gate is dispatched separately with a fresh session; the results are recorded in `independent-review.md` |
+| Final reviewers (after fix round 3) | CodeRabbit round 3 **PASSED** on `a0b195d` (score 100; 2 Low fixed, 1 `major` rejected on a false premise). The fresh QA + coverage pair was dispatched on `a0b195d` with context-free sessions (`ses_e184bfa2fffed6No6l8QDIcXLW`, `ses_e184bfa2effe9NnBubMDczfV0a`); the provider rate-limits concurrent reviewer sessions, so each gate is dispatched separately. The results are recorded in `independent-review.md` |
 
 ---
 
@@ -224,11 +225,11 @@ DAFTARI-188 is the most consequential of these: it means the desktop app's print
 |------|-------|
 | Working branch | `feat/codebase-cleanup-dedup` |
 | Base | `origin/development` @ `db8fb5a` |
-| Commits | 27 — 8 batch commits + 18 review-fix / documentation commits + 1 SHA-pinning commit (see `implementation-progress.md` for the full list) |
+| Commits | 30 — 8 batch commits + 11 round-1/round-2 review-fix and documentation commits + 7 round-3 fix-wave and artifact commits + 1 SHA-pinning commit + 2 CodeRabbit-round-3 Low fixes + this artifact commit (see `implementation-progress.md` for the full list) |
 | Working tree status | the 9 audit artifacts are committed explicitly (never `git add -A`); the two untracked user files (`enhance-code-prompt.md`, `untitled.excalidraw`) stay untracked and untouched |
 | Scope of changes | Dart printing/config/settings, Dart pubspec, TypeScript API routes + one new service, C# print server + one new shared source file, CI workflow + one composite action, specs, audit artifacts, follow-up registry |
 | Pre-existing user changes preserved | Yes — untracked user files untouched and never staged |
-| Branch state vs `origin/development` | 27 ahead / 0 behind after `130b4d4` + this SHA-pinning commit (already in sync) |
+| Branch state vs `origin/development` | 30 ahead / 0 behind after `d095d82` + this artifact commit (already in sync) |
 | Merge policy | The agent does **not** merge. The PR is opened against `development` and the user merges manually. |
 
 ---
@@ -237,7 +238,7 @@ DAFTARI-188 is the most consequential of these: it means the desktop app's print
 
 **CONDITIONAL PASS — the branch's own gates are green per step; merge-readiness still depends on the final independent-review round on the current HEAD, green PR checks, and the user's manual merge.**
 
-- **Zero Critical / High / Medium findings** on the CodeRabbit gate after the round-1 fixes (score `100 − 25×C − 10×H − 5×M − 1×L` = **100**, strictly above the required 90). CodeRabbit round 3 on the final HEAD is pending.
+- **Zero Critical / High / Medium findings** on the CodeRabbit gate: rounds 1–2 after the round-1 fixes and round 3 on `a0b195d` (score `100 − 25×C − 10×H − 5×M − 1×L` = **100**, strictly above the required 90). Round 3 produced 3 findings — 2 Low fixed (`26321f4` spec cloud-flavor correction, `d095d82` follow-up #76 route correction) and 1 `major` rejected on a false premise (the dead `print_service.dart` barrel has zero importers; every consumer imports `print_service_interface.dart` directly).
 - **Every actionable finding raised by the independent reviewers to date is either fixed in-branch or explicitly tracked as an out-of-scope follow-up**: the round-3 coverage gaps (G1 `getLocalPrinters`, G2 `createIpRateLimiter`, G3 `/sales/sync` fallback denial) were closed test-first in `e9b4436` / `111a0fe`; the round-4 QA findings (SPEC-1…SPEC-5) were fixed in `73e3db8`; the round-5 coverage gaps (M1/M2 platform `getLocalPrinters`, M3 limiter fail-open) were closed in `68d0696` / `2b6e0a2`; the audit-accuracy findings (AUD-1…AUD-10) were fixed in this artifact wave; and the out-of-scope findings (SEC-1, SEC-1-TEST, SEC-L1 and the test-quality gaps) are tracked in `docs/followups.md` #85–#92 and Plane DAFTARI-191…198.
 - **Coverage of the changed units**: every new production unit introduced by this branch has direct tests — `ip-rate-limiter.ts` (11 unit tests, including the fail-open and bounded-scan semantics), `print_service_desktop.dart` (8), `print_service_linux.dart` (8), `print_service_windows.dart` (8), `ParentPidParser.cs` (8 facts), `print_server_config.dart` (2), the stub semantics, plus the `/sales/sync` fallback integration test. The remaining known gaps are enumerated as Low follow-ups rather than silently omitted.
 - **The deltas are enumerated, not asserted away** (see the table in the executive summary): the rate-limiter map is now hard-bounded and its per-call scan capped (delta 1); the print-service base URL moved to the sidecar's real `:5150` (delta 2, no consumer reads `baseUrl`); the dead HWID tree was deleted (delta 3, 0 importers); `hydrated_bloc` became a dev dependency (delta 4); the factory's no-op stub semantics are unchanged (delta 5); and the per-request Worker limiter state is **pre-existing**, not a branch delta (delta 6 — tracked as DAFTARI-191).

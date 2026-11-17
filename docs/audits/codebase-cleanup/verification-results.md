@@ -38,6 +38,11 @@
 | R3-6 | `8fe3802` (findings.md trailing whitespace) | n/a (docs) | `git diff --check` → exit 0 (branch-wide) | n/a | PASS |
 | R3-7 | `130b4d4` (AUD-1…AUD-10 rewrite) | n/a (docs) | `git diff --check` → exit 0 | n/a | PASS |
 
+| R3-8 | `a0b195d` (artifact SHA pin + scope totals) | n/a (docs) | `git diff --check` → exit 0 | n/a | PASS |
+| R3-9 | `26321f4` (spec cloud-flavor correction) | 510 files, 0 changed (exit 0) | `flutter analyze` → "No issues found!" (exit 0) | n/a (documentation) | PASS |
+| R3-10 | `d095d82` (follow-up #76 route correction) | 510 files, 0 changed (exit 0) | `flutter analyze` → "No issues found!" (exit 0) | n/a (documentation) | PASS |
+| R3-11 | this artifact commit (CodeRabbit round-3 dispositions + final metrics) | n/a (docs) | `git diff --check` → exit 0 | n/a | PASS |
+
 ### Staged-diff scans (every commit)
 
 `git diff --staged` reviewed before each commit; scope checked against the batch's declared domain.
@@ -156,7 +161,7 @@ Status vocabulary: **PASSED** (executed, exit 0) · **FAILED → GREEN ON RETRY*
 | Mandatory review section — security auditor | Branch diff | **NOT RUN** (provider HTTP 429 / content-safety error) | QA round-4 report; re-dispatched on the final HEAD |
 | Mandatory review section — broad spec compliance | Branch diff | **NOT RUN** (provider HTTP 429 / content-safety error) | QA round-4 report; re-dispatched on the final HEAD |
 | Mandatory review section — full test coverage | Branch diff | **NOT RUN** (provider HTTP 429 / content-safety error) | QA round-4 report; re-dispatched on the final HEAD |
-| CodeRabbit local review | Branch diff vs `origin/development` | **PASSED** on rounds 1–2 (score 100); round 3 pending on the final HEAD | `independent-review.md`, CodeRabbit gate table |
+| CodeRabbit local review | Branch diff vs `origin/development` | **PASSED** on rounds 1–3 (score 100); round 3 ran on `a0b195d` — 0 Critical/High/Medium, 2 Low fixed (`26321f4`, `d095d82`), 1 `major` rejected on a false premise | `independent-review.md`, CodeRabbit gate table |
 | Independent QA reviewer | Branch diff | **REPORTED — STATUS BLOCKED** (round 4); final dispatch pending on the final HEAD | `independent-review.md` |
 | Independent coverage reviewer | Changed units | **REPORTED — VERDICT FAIL** (round 5, 3 Medium gaps — all closed in `68d0696` / `2b6e0a2`); final dispatch pending | `independent-review.md` |
 
@@ -172,7 +177,7 @@ Status vocabulary: **PASSED** (executed, exit 0) · **FAILED → GREEN ON RETRY*
 | 3 | not re-run (no source changes since round 2) | 429 — `ses_e1e4c6266ffemfQLlxP3aOC0mD` | 429 (solo, no fan-out) — `ses_e1e3bd9afffeIgyD1CfPEv8zs0`, `ses_e1e317d28ffejdNyzQcat9w75W`, `ses_e1e2e2ae0ffeLQJPhFTHN48Pb6` | 100 | **BLOCKED** — provider 429 on every independent-reviewer dispatch |
 | 4 | not re-run (no source changes since round 2) | **Reported — STATUS BLOCKED** (`ses_e1e1ec11affe0bDohEg9voDNB3`): 0 Critical / 0 High code defects; 4 blockers (V-1 unsound gate, V-2 stale evidence, V-3 not pushed / no PR / no CI, V-4 dirty tree) + 7 spec-drift items | **Reported — VERDICT FAIL** (`ses_e1e1ae786ffeGu8xsMHo999aAf`): 3 Medium gaps — G1 `getLocalPrinters` untested, G2 `createIpRateLimiter` untested, G3 `/sales/sync` fallback denial untested | 100 | **FAIL** on the two independent gates — fix round required |
 | 5 (post-fix wave, HEAD `1ed1f7b`) | 0 C/H/M/L — unchanged since round 2 | **Reported — STATUS BLOCKED** (`ses_e1b9126a5ffeBHPasu5nlaQMIf`): 3 High (SEC-1, AUD-1, AUD-2) · 12 Medium · 4 Low · 4 mandatory review sections NOT RUN | **Reported — VERDICT FAIL** (`ses_e1b400d92ffdJtqEie50Kw8Wh4`): M1 Linux `getLocalPrinters` untested, M2 Windows `getLocalPrinters` untested, M3 limiter fail-open semantics unproven | 93 pre-fix | **FAIL** — fix round 3 required |
-| 6 (fix round 3, HEAD `130b4d4` + this SHA-pinning commit) | pending re-run on the final HEAD | pending final dispatch | pending final dispatch | — | pending |
+| 6 (fix round 3, HEAD `130b4d4` + `a0b195d` + `26321f4` + `d095d82` + this artifact commit) | round 3 **PASSED** on `a0b195d` (score 100; 2 Low fixed, 1 `major` rejected on a false premise) | dispatched on `a0b195d` (`ses_e184bfa2fffed6No6l8QDIcXLW`) | dispatched on `a0b195d` (`ses_e184bfa2effe9NnBubMDczfV0a`) | — | pending the two reviewer reports |
 
 **Round 1 fix commits (applied after the Medium findings):** `31560ba` (sales limiter map caps), `a371de1` (desktop `getLocalPrinters` → `PrintException` + 10 s timeout), `2668f4a` (negative parent-pid test), `4782788` (follow-up registry entries).
 
@@ -180,7 +185,7 @@ Status vocabulary: **PASSED** (executed, exit 0) · **FAILED → GREEN ON RETRY*
 
 **TDD evidence for the round-2 wave:** the `PrintException` double-wrap was proven first — with the `on PrintException { rethrow; }` removed, `flutter test test/core/printing/print_service_desktop_test.dart` failed with `which has statusCode with value <null>`; the limiter test failed with `TypeError: limiter.size is not a function` and a missing-`maxEntries` failure before the implementation existed.
 
-**Round 3 fix wave (applied after the round-4 QA BLOCKED report and the round-5 coverage FAIL):** `68d0696` (Linux + Windows `getLocalPrinters` behaviour tests, 8 + 8), `2b6e0a2` (limiter eviction-semantics tests: exact soft-cap/hard-bound counts, hard-bound fail-open re-admission, bounded per-call eviction scan), `d5fa35e` (`maxEntries` made a required limiter option), `73e3db8` (SPEC-1…SPEC-5 HWID spec re-sync), `a4ab4d3` (follow-ups #85–#92 + 8 Plane work items), `8fe3802` (findings.md trailing whitespace), plus `130b4d4` (AUD-1…AUD-10 rewrite) and this SHA-pinning commit. **This is fix round 3 of 3 — the cap from `implement-review-ship`; anything still open at its end is a human checkpoint, not a fourth round.**
+**Round 3 fix wave (applied after the round-4 QA BLOCKED report and the round-5 coverage FAIL):** `68d0696` (Linux + Windows `getLocalPrinters` behaviour tests, 8 + 8), `2b6e0a2` (limiter eviction-semantics tests: exact soft-cap/hard-bound counts, hard-bound fail-open re-admission, bounded per-call eviction scan), `d5fa35e` (`maxEntries` made a required limiter option), `73e3db8` (SPEC-1…SPEC-5 HWID spec re-sync), `a4ab4d3` (follow-ups #85–#92 + 8 Plane work items), `8fe3802` (findings.md trailing whitespace), plus `130b4d4` (AUD-1…AUD-10 rewrite), `a0b195d` (artifact-commit SHA pinning + measured scope totals), `26321f4` (spec cloud-flavor correction), `d095d82` (follow-up #76 route correction), plus this artifact commit. **This is fix round 3 of 3 — the cap from `implement-review-ship`; anything still open at its end is a human checkpoint, not a fourth round.**
 
 **TDD evidence for the round-3 wave:** the platform `PrintException` re-wrap was proven first — with the `on PrintException { rethrow; }` removed from both platform services, the new 503 tests failed with `which has statusCode with value <null>` (`MUTATION_TEST_EXIT=1`); the limiter tests were proven by removing the `maxEntries` eviction block (`MUTATION_MAX_ENTRIES_EXIT=1`) and the per-call scan cap (`MUTATION_SCAN_CAP_EXIT=1`); the required-`maxEntries` change was proven by `npm run typecheck` failing with 6 × TS2345 before the test constructions were updated (`TYPE_CHECK_RED_EXIT=2`) and with TS2344 + 2 × TS18048 when the option was reverted to optional (`TYPE_CHECK_MUTATION_EXIT=2`).
 

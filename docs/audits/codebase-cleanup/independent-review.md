@@ -157,6 +157,16 @@ Every finding was independently verified against the source before disposition. 
 |---|--------------------|----------|-------|------------------|-----------|--------|
 | 8 | major | `print_service_factory.dart` / `print_service_stub.dart` | "Can a real print or export caller receive `PrintServiceStub` and treat normal completion as success? Both operations previously reported that they were unsupported." | **False premise, proven at the base commit** with `git show db8fb5a:…`: the base `_createService()` returned the no-op `StubPrintService`, whose print/export methods completed successfully and returned `''`. The throwing class was a different, dead class. The only observable delta on the factory path is `baseUrl` (`http://localhost:5001` → `http://127.0.0.1:5150`), and no consumer reads `PrintService.baseUrl`. | Informational — rejected | None. The *underlying* product defect (the factory never wires a real platform implementation) is pre-existing and is now tracked as **DAFTARI-188** / `docs/followups.md` #82 |
 
+### Round 3 — 3 findings (1 `major`, 2 `minor`), on the artifact wave
+
+`coderabbit review --agent --base origin/development` run on `a0b195d`; 55 files reviewed; the CLI reported `review_completed`.
+
+| # | CodeRabbit severity | Location | Claim | Verified verdict | Gate class | Action |
+|---|--------------------|----------|-------|------------------|-----------|--------|
+| 9 | major | `apps/daftari/lib/core/printing/print_service_stub.dart` | Callers may obtain `PrintService` through `print_service.dart` / `print_service_stub.dart`; removing the local declaration removes that exported name | **False premise.** `print_service.dart` has **zero importers** — it is the dead barrel already tracked as **DAFTARI-182** / follow-up #77. Every consumer imports `print_service_interface.dart` directly (`sales_pdf_exporter.dart:5`, `print_service_windows.dart:8`, `print_service_web.dart:11`, `print_service_factory.dart:6`, `print_service_desktop.dart:8`, `print_service_linux.dart:8`, plus the 6 printing test files); `print_service_stub.dart` is imported by `print_service_factory.dart`, `test/core/printing/print_server_config_test.dart` and `test/core/printing/print_service_test.dart`. `flutter analyze` reports no issues and the full Dart suite compiles every test file, so no caller breaks. | Informational — rejected | None |
+| 10 | minor | `docs/followups.md:106` | The WebPrintService follow-up lists receipt routes that do not exist on the sidecar | **True** — the entry named `/api/printing/print-receipt`, while `PrintServer/Program.cs` maps `/api/printing/receipt` (:70), `barcode` (:202), `ticket` (:217), `health` (:61) and `local-printers` (:64); `PrintServer.Linux/Program.cs` mirrors them at :93/:249/:277 | Low | **Fixed** in `d095d82` — the entry now lists the real routes |
+| 11 | minor | `specs/ARCHITECTURE.md:66` | The Build Flavors summary listed web as a cloud target | **True** — `flavor_config.dart:76` local → `['windows','linux']`, `:89` cloud → `['windows','linux']`, `:102` admin → `['web']`. The line is inside the branch diff (`313bd72` changed "Four flavors" → "Three flavors" on that exact line and left the pre-existing platform inaccuracy) | Low | **Fixed** in `26321f4` — the line now reads `cloud (desktop only, Turso sync)` |
+
 ### CodeRabbit gate result
 
 | Round | Reviewed commit | Critical | High | Medium | Low | Score (`100 − 25C − 10H − 5M − L`) | Gate |
@@ -164,7 +174,7 @@ Every finding was independently verified against the source before disposition. 
 | 1 | `50cc0c7` (end of Batch 8, pre-fix) | 0 | 0 | 2 | 0 | 90 (pre-fix) | FAIL — 2 Medium blockers |
 | 1 (post-fix) | `4782788` (after the round-1 fix wave) | 0 | 0 | 0 | 0 | 100 | PASS |
 | 2 | `4782788` | 0 | 0 | 0 | 0 | 100 | PASS |
-| 3 | final artifact-commit HEAD | — | — | — | — | — | pending the post-artifact re-run |
+| 3 | `a0b195d` (after the artifact wave) | 0 | 0 | 0 | 0 | 100 | PASS — 2 Low fixed, 1 `major` rejected on a false premise |
 
 Zero confirmed Critical/High/Medium remain on the current HEAD. CodeRabbit findings were **not** passed to the independent reviewers.
 
@@ -206,6 +216,10 @@ Driven by the round-4 QA report (STATUS BLOCKED) and the round-5 coverage report
 | `a4ab4d3` | docs | `docs/followups.md` #85–#92 + the 8 Plane items DAFTARI-191…198 for the out-of-scope findings (SEC-1, SEC-1-TEST, SEC-L1 and the test-quality gaps) | n/a (documentation) | n/a (documentation) |
 | `8fe3802` | docs | `findings.md`: removed the 3 trailing-whitespace errors the QA reviewer flagged | n/a (documentation) | `git diff --check` → exit 0 |
 | `130b4d4` | docs | AUD-1…AUD-10: the five audit artifacts rewritten for truthfulness (per-gate status, enumerated deltas, recomputed metrics, reconciled HWID claims, exact reviewed commits) | n/a (documentation) | n/a (documentation) |
+| `a0b195d` | docs | Every "artifact commit" placeholder pinned to `130b4d4`; scope totals (55 files = 19 added / 7 deleted / 29 modified; +2 854 / −979 as of `a0b195d`) and the commit counts recorded per HEAD | n/a (documentation) | `git diff --check` → exit 0; `dart format --set-exit-if-changed lib test` → 510 files, 0 changed; `flutter analyze` → "No issues found!" |
+| `26321f4` | specs | CodeRabbit round-3 Low: `specs/ARCHITECTURE.md:66` cloud flavor platforms corrected to `cloud (desktop only, Turso sync)` (verified against `flavor_config.dart:76` / `:89` / `:102`) | n/a (documentation) | `dart format --set-exit-if-changed lib test` → 510 files, 0 changed; `flutter analyze` → "No issues found!" |
+| `d095d82` | docs | CodeRabbit round-3 Low: follow-up #76 now lists the real sidecar routes (`/api/printing/health`, `/api/printing/local-printers`, `/api/printing/receipt|barcode|ticket`) instead of the non-existent `/api/printing/print-receipt` | n/a (documentation) | `dart format --set-exit-if-changed lib test` → 510 files, 0 changed; `flutter analyze` → "No issues found!" |
+| this commit | docs | CodeRabbit round-3 dispositions recorded in the round-3 finding table and the CodeRabbit gate table; final metrics re-measured | n/a (documentation) | `git diff --check` → exit 0 |
 
 ---
 

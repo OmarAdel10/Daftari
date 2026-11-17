@@ -4,7 +4,7 @@
 **Base:** `origin/development` @ `db8fb5a`
 **Plane project:** `DAFTARI`
 **Started:** Sun Nov 15 2026
-**Status:** All 8 implementation batches complete, plus three review-fix waves (4 round-1 + 5 round-2 + 6 round-3 commits). Sound full gate **green per step** — 20 of 21 steps PASSED; `PrintServer.Linux.Tests` failed on its first attempt on the proven pre-existing `DAFTARI-185` timing flake and passed on the immediate retry (106/106, plus a 10/10 isolated run). Pending: CodeRabbit round 3 + fresh QA + coverage dispatches on the final HEAD, then PR handoff.
+**Status:** All 8 implementation batches complete, plus three review-fix waves (4 round-1 + 5 round-2 + 6 round-3 commits). Sound full gate **green per step** — 20 of 21 steps PASSED; `PrintServer.Linux.Tests` failed on its first attempt on the proven pre-existing `DAFTARI-185` timing flake and passed on the immediate retry (106/106, plus a 10/10 isolated run). CodeRabbit round 3 is recorded (PASS, score 100, on `a0b195d` — 2 Low fixed, 1 `major` rejected on a false premise). Pending: the fresh QA + coverage dispatch results on the final HEAD, then PR handoff.
 
 ---
 
@@ -60,7 +60,10 @@
 | 24 | `a4ab4d3` | 📝 docs(followups): record audit review gaps | R3 |
 | 25 | `8fe3802` | 📝 docs(audit): strip findings trailing whitespace | R3 |
 | 26 | `130b4d4` | 📝 docs(audit): reconcile audit artifacts with the evidence | docs |
-| 27 | this commit | 📝 docs(audit): pin the artifact commit SHA | docs |
+| 27 | `a0b195d` | 📝 docs(audit): pin the artifact commit SHA | docs |
+| 28 | `26321f4` | 📝 docs(specs): correct cloud flavor platforms | R3 |
+| 29 | `d095d82` | 📝 docs(followups): correct the WebPrintService route list | R3 |
+| 30 | this commit | 📝 docs(audit): record CodeRabbit round 3 and final metrics | docs |
 
 Base commit: `db8fb5a` (📦 chore(ci): remove duplicated verify jobs (#110)).
 
