@@ -1,10 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import { createIpRateLimiter } from '../ip-rate-limiter';
 
 describe('createIpRateLimiter', () => {
   it('allows requests below the per-window maximum', () => {
-    const limiter = createIpRateLimiter({ windowMs: 60_000, maxPerWindow: 3 });
+    const limiter = createIpRateLimiter({
+      windowMs: 60_000,
+      maxPerWindow: 3,
+      maxEntries: 1_000,
+    });
 
     for (let i = 0; i < 3; i += 1) {
       expect(limiter('1.2.3.4', 1_000 + i)).toEqual({
@@ -15,7 +19,11 @@ describe('createIpRateLimiter', () => {
   });
 
   it('denies the request that exceeds the per-window maximum', () => {
-    const limiter = createIpRateLimiter({ windowMs: 60_000, maxPerWindow: 2 });
+    const limiter = createIpRateLimiter({
+      windowMs: 60_000,
+      maxPerWindow: 2,
+      maxEntries: 1_000,
+    });
     limiter('1.2.3.4', 1_000);
     limiter('1.2.3.4', 2_000);
 
@@ -26,7 +34,11 @@ describe('createIpRateLimiter', () => {
   });
 
   it('keeps a separate budget per IP', () => {
-    const limiter = createIpRateLimiter({ windowMs: 60_000, maxPerWindow: 1 });
+    const limiter = createIpRateLimiter({
+      windowMs: 60_000,
+      maxPerWindow: 1,
+      maxEntries: 1_000,
+    });
     limiter('1.2.3.4', 1_000);
 
     expect(limiter('1.2.3.4', 1_100).allowed).toBe(false);
@@ -34,14 +46,22 @@ describe('createIpRateLimiter', () => {
   });
 
   it('releases the budget once the window has elapsed', () => {
-    const limiter = createIpRateLimiter({ windowMs: 60_000, maxPerWindow: 1 });
+    const limiter = createIpRateLimiter({
+      windowMs: 60_000,
+      maxPerWindow: 1,
+      maxEntries: 1_000,
+    });
     limiter('1.2.3.4', 1_000);
 
     expect(limiter('1.2.3.4', 61_000).allowed).toBe(true);
   });
 
   it('does not extend the window when a request is denied', () => {
-    const limiter = createIpRateLimiter({ windowMs: 60_000, maxPerWindow: 1 });
+    const limiter = createIpRateLimiter({
+      windowMs: 60_000,
+      maxPerWindow: 1,
+      maxEntries: 1_000,
+    });
     limiter('1.2.3.4', 1_000);
 
     expect(limiter('1.2.3.4', 2_000)).toEqual({
@@ -148,11 +168,23 @@ describe('createIpRateLimiter', () => {
   });
 
   it('reports how many IPs are currently tracked', () => {
-    const limiter = createIpRateLimiter({ windowMs: 60_000, maxPerWindow: 5 });
+    const limiter = createIpRateLimiter({
+      windowMs: 60_000,
+      maxPerWindow: 5,
+      maxEntries: 1_000,
+    });
 
     expect(limiter.size()).toBe(0);
     limiter('1.1.1.1', 1_000);
     limiter('2.2.2.2', 1_000);
     expect(limiter.size()).toBe(2);
+  });
+
+  it('cannot be constructed without a hard entry bound', () => {
+    // Compile-time contract: a limiter without maxEntries would grow its
+    // map without limit, so the option must stay required and non-optional.
+    expectTypeOf<
+      Parameters<typeof createIpRateLimiter>[0]['maxEntries']
+    >().toEqualTypeOf<number>();
   });
 });

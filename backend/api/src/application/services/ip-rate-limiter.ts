@@ -18,12 +18,13 @@ export interface IpRateLimiterOptions {
   /** Start evicting fully-expired IPs once the map exceeds this size. */
   softCap?: number;
   /**
-   * Hard upper bound on the number of tracked IPs. When the map exceeds it,
-   * the oldest entries are evicted even if they are still inside the window
+   * Hard upper bound on the number of tracked IPs. REQUIRED: a limiter
+   * without a bound can grow without limit. When the map exceeds it, the
+   * oldest entries are evicted even if they are still inside the window
    * (the limiter fails open under memory pressure rather than growing
    * without bound).
    */
-  maxEntries?: number;
+  maxEntries: number;
 }
 
 export interface IpRateLimiter {
@@ -62,7 +63,7 @@ export function createIpRateLimiter(
         }
       }
 
-      if (maxEntries != null && hits.size > maxEntries) {
+      if (hits.size > maxEntries) {
         // Map iteration follows insertion order, so the oldest-seen IPs are
         // dropped first. Entries still inside their window are evicted too:
         // under memory pressure the limiter fails open rather than growing
