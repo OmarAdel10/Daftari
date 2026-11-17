@@ -36,9 +36,11 @@
 | FINDING-CONFIG-01 | RESOLVED — dead `shorebirdAppId` removed | 6 | `25d0f8c` |
 | FINDING-CONFIG-02 | REJECTED — no duplication exists (complementary jobs) | — | — |
 | FINDING-CONFIG-03 | RESOLVED — shared composite action | 7 | `42bfcae` |
-| FINDING-DUP-02 | RESOLVED — shared parser + 7 new tests | 8 | `50cc0c7` |
+| FINDING-DUP-02 | RESOLVED — shared parser + 8 new tests | 8 | `50cc0c7` |
 
 **Totals:** 10 resolved, 1 rejected with evidence, 0 open, 0 deferred.
+
+**Review-round findings (outside the audit scope):** the QA and coverage review rounds raised 8 further findings that are out of this branch's scope. They are tracked in `docs/followups.md` #85–#92 and as Plane items DAFTARI-191 … DAFTARI-198; none is fixed here.
 
 ## Confirmed findings
 
@@ -98,7 +100,7 @@
 **Expected improvement:** Eliminate exact Type-1 copy (if extracted) or document justification (if retained).
 **Regression risk:** Low either way.
 **Required validation:** `dotnet build` + `dotnet test`.
-**Recommendation:** RESOLVED in Batch 8 — the copy was extracted into `PrintServer.Common/ParentPidParser.cs` (MSBuild shared-source `Compile Include`, no new project ⇒ no CI job changes), both hosts now call `ParentPidParser.Parse(args)`, and 7 new xunit tests in `PrintServer.Tests` cover the previously untested parser (`50cc0c7`).
+**Recommendation:** RESOLVED in Batch 8 — the copy was extracted into `PrintServer.Common/ParentPidParser.cs` (MSBuild shared-source `Compile Include`, no new project ⇒ no CI job changes), both hosts now call `ParentPidParser.Parse(args)`, and 8 new xunit tests in `PrintServer.Tests` cover the previously untested parser (`50cc0c7`; the 8th, negative-value case, landed in `2668f4a`).
 
 ### FINDING-DUP-03 — Two parallel HWID abstractions (DUP/ARCH, P2, High confidence)
 
@@ -107,10 +109,10 @@
 - `lib/core/hwid/hwid_provider_interface.dart` (abstract interface class HwidProvider) + platform impls (`hwid_provider_desktop.dart`, `_linux.dart`, `_stub.dart`, `_web.dart`, `_windows.dart`)
 - `lib/core/licensing/infrastructure/hwid/hwid_provider.dart` (abstract class HwidProvider) + `linux_hwid_provider.dart`, `windows_hwid_provider.dart`
 - `lib/core/licensing/engine/license_engine.dart:31-33` (`_defaultHwidProvider()` returns `LinuxHwidProvider()` / `WindowsHwidProvider()`)
-**Current implementation:** Two separate HWID provider abstractions with the same name (`HwidProvider`) and overlapping platform implementations (LinuxHwidProvider, WindowsHwidProvider exist in both trees). `core/hwid` is used by printing; `licensing/infrastructure/hwid` is used by `license_engine.dart` (Ed25519 offline licensing).
-**Evidence:** `grep` confirms `core/hwid/HwidProvider` used by printing layer; `licensing/infrastructure/hwid/HwidProvider` + `LinuxHwidProvider`/`WindowsHwidProvider` used by `license_engine.dart`. Both define platform-specific HWID retrieval. No consumer references both simultaneously.
-**Problem:** Duplicate source of truth for hardware ID acquisition across two domain boundaries (printing vs licensing). Risk of inconsistent HWID values between licensing and printing features.
-**Affected consumers:** Printing layer (`core/hwid`), licensing engine (`licensing/infrastructure/hwid` + `license_engine.dart`).
+**Current implementation:** Two separate HWID provider abstractions with the same name (`HwidProvider`) and overlapping platform implementation names (LinuxHwidProvider, WindowsHwidProvider exist in both trees). The `core/hwid` tree had **zero importers** — it was not used by the printing layer; `licensing/infrastructure/hwid` is the only live HWID abstraction and is used by `license_engine.dart` (Ed25519 offline licensing).
+**Evidence:** A repository-wide grep for `core/hwid` imports returns **no matches**; the only references to the dead tree are its own declarations. `licensing/infrastructure/hwid/HwidProvider` + `LinuxHwidProvider`/`WindowsHwidProvider` are imported by `license_engine.dart`. Three distinct `HwidProvider` interfaces existed (the canonical async licensing interface `Future<String?> getHardwareId()`, a duplicate sync abstract class in `core/hwid/hwid_provider_stub.dart`, and `core/hwid/hwid_provider_interface.dart`).
+**Problem:** Duplicate source of truth for hardware ID acquisition existed in the tree, with a standing risk of inconsistent HWID values if the dead tree were ever wired up. Because the duplicate tree had zero importers, the risk was latent rather than live.
+**Affected consumers:** None for the dead `core/hwid` tree; the licensing engine (`licensing/infrastructure/hwid` + `license_engine.dart`) is the only live consumer.
 **Proposed change:** Consolidate into a single HWID abstraction with clear ownership. Options: (a) make `core/hwid` the single source and have licensing depend on it, or (b) keep both but delegate. Requires consumer audit before change.
 **Expected improvement:** Single source of truth for HWID; consistent device identification across licensing and printing.
 **Regression risk:** Medium — touches licensing domain (Ed25519 offline licensing, security-sensitive). Must not change business behavior or license validation.

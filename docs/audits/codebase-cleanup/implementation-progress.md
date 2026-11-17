@@ -4,7 +4,7 @@
 **Base:** `origin/development` @ `db8fb5a`
 **Plane project:** `DAFTARI`
 **Started:** Sun Nov 15 2026
-**Status:** All 8 implementation batches complete, plus two review-fix waves (4 round-1 commits + 5 round-2 commits). Sound full gate GREEN except 3 proven pre-existing flakes. Pending the final independent-review round + PR handoff.
+**Status:** All 8 implementation batches complete, plus three review-fix waves (4 round-1 + 5 round-2 + 6 round-3 commits). Sound full gate **green per step** — 20 of 21 steps PASSED; `PrintServer.Linux.Tests` failed on its first attempt on the proven pre-existing `DAFTARI-185` timing flake and passed on the immediate retry (106/106, plus a 10/10 isolated run). Pending: CodeRabbit round 3 + fresh QA + coverage dispatches on the final HEAD, then PR handoff.
 
 ---
 
@@ -42,6 +42,24 @@
 | 6 | `25d0f8c` | 🔧 chore(config): drop dead Shorebird app ID | 6 |
 | 7 | `42bfcae` | ♻️ refactor(ci): extract duplicated Hive lock cleanup step | 7 |
 | 8 | `50cc0c7` | ♻️ refactor(printserver): share parent-pid parser | 8 |
+| 9 | `31560ba` | ♻️ refactor(api): cap sales sync rate-limiter map | R1 |
+| 10 | `a371de1` | 🐛 fix(printing): wrap desktop printer lookup failures | R1 |
+| 11 | `2668f4a` | ✅ test(printserver): cover negative parent pid parsing | R1 |
+| 12 | `4782788` | 📝 docs(followups): record review follow-ups | R1 |
+| 13 | `2c074ce` | 🔧 chore(repo): track docs/audits in git | R1 |
+| 14 | `e9b4436` | ♻️ refactor(api): bound the IP rate-limiter map | R2 |
+| 15 | `111a0fe` | 🐛 fix(printing): keep printer lookup status codes | R2 |
+| 16 | `ef98e7f` | 🚀 ci: clean stale Hive locks before the test step | R2 |
+| 17 | `313bd72` | 📝 docs(specs): re-sync cleanup changes with the code | R2 |
+| 18 | `53726f9` | 📝 docs(followups): record melos exit-code masking | R2 |
+| 19 | `1ed1f7b` | 📝 docs(audit): add cleanup audit artifacts | docs |
+| 20 | `68d0696` | ✅ test(printing): cover platform printer fetch | R3 |
+| 21 | `2b6e0a2` | ✅ test(api): prove limiter eviction semantics | R3 |
+| 22 | `d5fa35e` | 🔧 fix(api): require limiter entry bound | R3 |
+| 23 | `73e3db8` | 📝 docs(specs): correct HWID binding facts | R3 |
+| 24 | `a4ab4d3` | 📝 docs(followups): record audit review gaps | R3 |
+| 25 | `8fe3802` | 📝 docs(audit): strip findings trailing whitespace | R3 |
+| 26 | artifact commit | 📝 docs(audit): reconcile audit artifacts with the evidence | docs |
 
 Base commit: `db8fb5a` (📦 chore(ci): remove duplicated verify jobs (#110)).
 
@@ -55,9 +73,9 @@ Base commit: `db8fb5a` (📦 chore(ci): remove duplicated verify jobs (#110)).
 | findings.md | docs/audits/codebase-cleanup/findings.md | Complete — all findings resolved or rejected with evidence |
 | implementation-plan.md | docs/audits/codebase-cleanup/implementation-plan.md | Complete |
 | implementation-progress.md | docs/audits/codebase-cleanup/implementation-progress.md | Complete (this file) |
-| verification-results.md | docs/audits/codebase-cleanup/verification-results.md | Complete |
-| independent-review.md | docs/audits/codebase-cleanup/independent-review.md | Complete — CodeRabbit rounds 1–2 + both independent reviewer reports with full dispositions |
-| final-report.md | docs/audits/codebase-cleanup/final-report.md | Complete — verdict PASS, pending the final reviewer round |
+| verification-results.md | docs/audits/codebase-cleanup/verification-results.md | Complete — FAST row per commit, a per-step gate ledger (PASSED / FAILED → GREEN ON RETRY / SKIPPED / NOT RUN), review-loop rows 1–6 |
+| independent-review.md | docs/audits/codebase-cleanup/independent-review.md | Complete — CodeRabbit rounds 1–2, the round-3/4 QA reports and the round-3/5 coverage reports with per-finding dispositions, plus the fix-round-3 table |
+| final-report.md | docs/audits/codebase-cleanup/final-report.md | Complete — conditional-PASS verdict, deltas enumerated, per-step gate table, no blanket claims |
 
 ## Out-of-scope findings raised (docs/followups.md + Plane)
 
@@ -67,6 +85,19 @@ Base commit: `db8fb5a` (📦 chore(ci): remove duplicated verify jobs (#110)).
 | 77 | DAFTARI-182 | `apps/daftari/lib/core/printing/print_service.dart` is a dead barrel export (zero importers, no-op conditional export) |
 | 78 | DAFTARI-184 | `lib/core/backend/workers/session_sync_service.dart` is dead code (zero importers) |
 | 79 | DAFTARI-185 | `PrintServer.Linux.Tests` PNG-collision test is timing-flaky (second-resolution filename) |
+| 80 | DAFTARI-187 | The platform print clients call sidecar routes that do not exist (`/api/printing/print-receipt` vs `/api/printing/receipt`); `PrintServiceDesktop` also sends `svg_base64` where the server binds `data` |
+| 81 | DAFTARI-186 | The Turso in-memory client test can exceed the default vitest timeout under load |
+| 82 | DAFTARI-188 | The factory never wires a real platform implementation and no caller checks `healthCheck()` — printing/export completes "successfully" without output (pre-existing) |
+| 83 | DAFTARI-189 | `melos.yaml` runs several commands per script block, so the block exit status is the last command's — a failing `flutter test` is masked |
+| 84 | DAFTARI-190 | `expenses_bloc_test.dart:369` audit-event assertion fails under parallel load (passes in isolation) |
+| 85 | DAFTARI-191 | **High** — the Worker rebuilds the app (and the limiter state) per request, so the 31st request in a window is not rate-limited. Pre-existing at base `db8fb5a`; `backend/api/src/index.ts` is not a changed unit of this branch |
+| 86 | DAFTARI-192 | No Worker-level rate-limiter lifecycle test (request 31 must return 429) — blocked on #85 |
+| 87 | DAFTARI-193 | `CF-Connecting-IP` is trusted without an explicit trust boundary |
+| 88 | DAFTARI-194 | `_pidsListeningOnPrintServerPort` (`print_server_manager.dart:348`) has no test |
+| 89 | DAFTARI-195 | `_pidsListeningOnPrintServerPort` (`print_server_manager_linux.dart:370`) has no test |
+| 90 | DAFTARI-196 | The `_spawn` `ASPNETCORE_URLS` environment wiring has no test seam |
+| 91 | DAFTARI-197 | The Linux manager environment test cannot fail (expected value built from the production helper, assertions skipped) |
+| 92 | DAFTARI-198 | `print_service_test.dart:16-19` claims "returns new PrintServiceStub" but never compares two `create()` results |
 
 ## Notes
 

@@ -2,6 +2,7 @@
 
 **Branch:** `feat/codebase-cleanup-dedup`
 **Base:** `origin/development` @ `db8fb5a`
+**Reviewed HEAD:** `8fe3802` + the artifact commit (25 code/doc commits ahead of base, 0 behind)
 **Plane project:** `DAFTARI`
 **Verification discipline:** evidence-before-claims — every row below is a fresh command output captured during this session.
 
@@ -29,6 +30,13 @@
 | R2-3 | `ef98e7f` (Hive-lock cleanup guard + ordering) | n/a (YAML) | `python3 yaml.safe_load` parsed `ci.yml` (9 jobs) + `action.yml` OK | action shell executed → exit 0 | PASS |
 | R2-4 | `313bd72` (spec re-sync, 15 drift items) | n/a (docs) | n/a | n/a | PASS |
 | R2-5 | `53726f9` (follow-up #83 / DAFTARI-189) | n/a (docs) | n/a | n/a | PASS |
+| R3-1 | `68d0696` (Linux + Windows `getLocalPrinters` tests) | 510 files, 0 changed (exit 0) | `flutter analyze` → "No issues found!" (exit 0) | `flutter test test/core/printing/print_service_linux_test.dart test/core/printing/print_service_windows_test.dart` → **16 passed** | PASS |
+| R3-2 | `2b6e0a2` (limiter eviction-semantics tests) | n/a (TypeScript) | `npm run typecheck` (backend/api) → exit 0 | `npm test` (backend/api) → **491 passed**, 29 files | PASS |
+| R3-3 | `d5fa35e` (required `maxEntries` limiter bound) | n/a (TypeScript) | `npm run typecheck` → exit 0 (RED proof: exit 2 with 6 × TS2345 before the test constructions were updated) | `npm test` (backend/api) → **492 passed**, 29 files | PASS |
+| R3-4 | `73e3db8` (SPEC-1…SPEC-5 HWID spec re-sync) | n/a (docs) | `git diff --check` → exit 0 | n/a | PASS |
+| R3-5 | `a4ab4d3` (follow-ups #85–#92 + 8 Plane items) | n/a (docs) | `git diff --check` → exit 0 | n/a | PASS |
+| R3-6 | `8fe3802` (findings.md trailing whitespace) | n/a (docs) | `git diff --check` → exit 0 (branch-wide) | n/a | PASS |
+| R3-7 | artifact commit (AUD-1…AUD-10 rewrite) | n/a (docs) | `git diff --check` → exit 0 | n/a | PASS |
 
 ### Staged-diff scans (every commit)
 
@@ -51,15 +59,15 @@
 
 | Check | Baseline (`development`) | After cleanup | Delta |
 |-------|-------------------------|---------------|-------|
-| `flutter test` (apps/daftari) | 1618 passed (after Batch 2's dep move) | **1621 passed** ("All tests passed!", TEST_EXIT 0) | +3 (new `print_server_config_test.dart`) |
+| `flutter test` (apps/daftari) | 1618 passed (after Batch 2's dep move) | **1645 passed** ("All tests passed!", `EXIT_TEST_DAFTARI=0`, `11:03 +1645`) | +27 (3 print-config, 8 desktop-service, 16 platform printing) |
 | `flutter test` (landing_page) | 31 passed | unchanged (untouched by this branch) | 0 |
-| `npm test` (backend/api) | 480 passed (28 files) | 480 passed (28 files) | 0 |
+| `npm test` (backend/api) | 480 passed (28 files) | **492 passed** (29 files, `EXIT_TEST_api=0`) | +12 (11 limiter unit tests, 1 `/sales/sync` fallback integration test) |
 | `npm test` (backend/shared) | 270 passed | unchanged (untouched) | 0 |
 | `npm test` (backend/realtime) | 95 passed | unchanged (untouched) | 0 |
 | `npm test` (backend/admin_host) | 170 passed | unchanged (untouched) | 0 |
 | `npm test` (backend/paymob_webhook) | 80 passed | unchanged (untouched) | 0 |
-| `dotnet test` (PrintServer.Tests) | 108 passed, 2 skipped | **115 passed, 2 skipped, 0 failed** | +7 (new `ParentPidParserTests`) |
-| `dotnet test` (PrintServer.Linux.Tests) | 108 passed, 2 skipped | 105 passed + **1 pre-existing timing flake** (see below) | flaky test, not a regression |
+| `dotnet test` (PrintServer.Tests) | 108 passed, 2 skipped | **116 passed, 2 skipped, 0 failed** (`EXIT_DOTNET_TEST_WIN=0`) | +8 (new `ParentPidParserTests`) |
+| `dotnet test` (PrintServer.Linux.Tests) | 108 passed, 2 skipped | 106 passed — the PNG-collision test failed once on the final gate's first attempt (known pre-existing timing flake, see below) and passed on retry (`EXIT_DOTNET_TEST_LINUX=1` → retry 106/106) | flaky test, not a regression |
 | `dotnet build` (both PrintServer projects) | 0 errors, 4 pre-existing warnings each | 0 errors, 4 pre-existing warnings each | 0 |
 
 ### Pre-existing flake — proven, not introduced
@@ -80,6 +88,8 @@ Tracked as `docs/followups.md` #79 / Plane **DAFTARI-185** (medium, Backlog, lab
 
 **Full-gate runner:** `/mnt/ALL/LinuxDev/caches/.caches_mount/tmp/opencode/full_gate_sound.sh` (writes per-step `EXIT_<label>=<code>` markers to `/tmp/full_gate_sound.log`; ends with `===== FULL_GATE_SOUND_COMPLETE =====`). **Script exit `FULL_GATE_SOUND_EXIT=0`.**
 
+**Final run on HEAD `8fe3802` — every step PASSED except `PrintServer.Linux.Tests`, which failed on the first attempt on the known pre-existing PNG-collision timing flake and passed on the immediate retry (106/106).** Per-step statuses are reported individually below: no aggregate "green" claim is made over a step that failed.
+
 The earlier gate was **unsound**: it used `melos run test`, and `melos.yaml` runs `flutter test` and `dart test` in ONE shell block, so the block's exit status is the LAST command's — a failing Flutter test was masked by the passing landing-page `dart test`. That repo defect is tracked as `DAFTARI-189` / `docs/followups.md` #83. The replacement gate runs **every check as its own command with its own exit code**, after deleting stale Hive lock files.
 
 | Check | Command | Exit marker | Status | Result |
@@ -89,23 +99,28 @@ The earlier gate was **unsound**: it used `melos run test`, and `melos.yaml` run
 | Dart format (landing) | `dart format --set-exit-if-changed lib test` | `EXIT_FORMAT_LANDING` | **PASS** | 0 |
 | Static analysis (daftari) | `flutter analyze` | `EXIT_ANALYZE_DAFTARI` | **PASS** | 0 — "No issues found!" |
 | Static analysis (landing) | `dart analyze` | `EXIT_ANALYZE_LANDING` | **PASS** | 0 |
-| Dart tests (daftari) | `flutter test` | `EXIT_TEST_DAFTARI` | **FAIL (flake)** | 1 — `18:04 +1628 -1: Some tests failed.` → 1 load-induced flake (below) |
-| Dart tests (landing) | `dart test` | `EXIT_TEST_LANDING` | **PASS** | 0 — 28 passed |
-| Backend tests (5 packages) | `npm test` | `EXIT_TEST_{shared,api,realtime,admin_host,paymob_webhook}` | shared **FAIL (flake)**, others **PASS** | shared 1 (flake), api 489 passed, realtime 95, admin_host 170, paymob_webhook 80 |
+| Dart tests (daftari) | `flutter test` | `EXIT_TEST_DAFTARI` | **PASSED** | 0 — `11:03 +1645: All tests passed!` (1629 baseline + 16 new platform printing tests) |
+| Dart tests (landing) | `dart test` | `EXIT_TEST_LANDING` | **PASS** | 0 — `00:00 +28: All tests passed!` |
+| Backend tests (5 packages) | `npm test` | `EXIT_TEST_{shared,api,realtime,admin_host,paymob_webhook}` | **PASS** | 0 for all five — shared 270, api 489, realtime 95, admin_host 170, paymob_webhook 80 |
 | Backend typecheck (5 packages) | `npm run typecheck` | `EXIT_TYPECHECK_*` | **PASS** | 0 for all five |
 | C# build (both hosts) | `dotnet build -c Release --no-restore` | `EXIT_DOTNET_BUILD_WIN/LINUX` | **PASS** | 0 for both — 0 errors, only pre-existing warnings |
-| C# tests (both projects) | `dotnet test -c Release --no-restore` | `EXIT_DOTNET_TEST_WIN/LINUX` | WIN **PASS**, LINUX **FAIL (flake)** | WIN 116 passed / 2 skipped; LINUX 105 passed / 1 failed (flake below) |
+| C# tests (Windows host) | `dotnet test -c Release --no-restore` | `EXIT_DOTNET_TEST_WIN` | **PASSED** | 0 — 116 passed / 2 skipped |
+| C# tests (Linux host) | `dotnet test -c Release --no-restore` | `EXIT_DOTNET_TEST_LINUX` | **FAILED → GREEN ON RETRY** | 1 on the first attempt (`ImageExportServiceTests.SaveReceiptAsPngAsync_CollidingTimestampedName_FailsWithoutClobbering` — known pre-existing timing flake, DAFTARI-185 / #79); isolation re-run `--filter FullyQualifiedName~ImageExportServiceTests` → 10/10 passed; full-project retry → 106/106 passed |
 | Build compile proof | `flutter build linux --debug` | `EXIT_FLUTTER_BUILD_LINUX` | **PASS** | 0 |
-| Scope audit | `git diff origin/development...HEAD --stat` | `EXIT_SCOPE_AUDIT` | **PASS** | 0 — 44 files changed, every file inside a declared batch domain |
-| Branch sync | `git rev-list --left-right --count HEAD...origin/development` | — | **PASS** | 18 ahead / 0 behind — `origin/development` is still at base `db8fb5a`, so no merge was required |
+| Scope audit | `git diff origin/development...HEAD --stat` | `EXIT_SCOPE_AUDIT` | **PASSED** | 0 — 55 files changed, every file inside a declared batch domain |
+| Branch sync | `git rev-list --left-right --count HEAD...origin/development` | — | **PASSED** | 25 ahead / 0 behind — `origin/development` is still at base `db8fb5a`, so no merge was required |
 
-**Verdict: GREEN except three proven pre-existing load-induced flakes.** Each failure was re-run in isolation and passed; none of them is in a file this branch touches.
+**Verdict (per-step, no aggregation):** every gate step PASSED on HEAD `8fe3802` except `PrintServer.Linux.Tests`, which FAILED on the first attempt on the proven pre-existing `DAFTARI-185` timing flake and PASSED on the immediate retry (106/106, plus a 10/10 isolated run of the flaky test class). No step was SKIPPED and no step was NOT RUN in this local gate.
 
-| # | Failure | Isolation result | Root cause | Tracking |
-|---|---------|------------------|-----------|----------|
-| 1 | `apps/daftari/test/features/expenses/presentation/bloc/expenses_bloc_test.dart:369` — "logs audit events when auditService provided" → `Expected: true / Actual: false` | `flutter test test/features/expenses/presentation/bloc/expenses_bloc_test.dart` → **13/13 passed**, exit 0 | Audit-event assertion races under parallel load | `DAFTARI-190` / `docs/followups.md` #84 (new) |
-| 2 | `backend/shared/src/turso.test.ts` — "updates an existing email when the supplied email is non-empty" → `Test timed out in 5000ms` (took 25.6 s; suite collect 62.14 s, prepare 47.26 s) | `npx vitest run src/turso.test.ts` → **55 passed in 175 ms**, exit 0 | The test calls `vi.importActual('@libsql/client')` and opens a real `:memory:` client, bypassing the file-level mock, so the first native-module load can exceed the default timeout under load | `DAFTARI-186` / #81 |
-| 3 | `PrintServer.Linux.Tests.ImageExportServiceTests.SaveReceiptAsPngAsync_CollidingTimestampedName_FailsWithoutClobbering` → "No exception was thrown. Expected: `System.IO.IOException`" | `dotnet test --filter FullyQualifiedName~ImageExportServiceTests` → **10/10 passed**, exit 0 | `ImageExportService.cs:58` builds a SECOND-resolution filename and `:64` uses `FileMode.CreateNew`, so the collision only happens when both saves land in the same second | `DAFTARI-185` / #79 (proven pre-existing by a stash A/B) |
+### Flake status per run — reported per step, never aggregated
+
+Three failures surfaced during sound-gate runs. Each is a race in a file this branch does not touch, and each was re-run in isolation and passed. On the final run (`8fe3802`) only flake 3 reproduced — on its first attempt — and the immediate retry of that step was green. The underlying races are real, so all three stay tracked.
+
+| # | Failure | Isolation result | Status on the `8fe3802` run | Root cause | Tracking |
+|---|---------|------------------|------------------------------|-----------|----------|
+| 1 | `apps/daftari/test/features/expenses/presentation/bloc/expenses_bloc_test.dart:369` — "logs audit events when auditService provided" → `Expected: true / Actual: false` | `flutter test test/features/expenses/presentation/bloc/expenses_bloc_test.dart` → **13/13 passed**, exit 0 | **DID NOT REPRODUCE** — `EXIT_TEST_DAFTARI=0`, `11:03 +1645: All tests passed!` | Audit-event assertion races under parallel load | `DAFTARI-190` / `docs/followups.md` #84 |
+| 2 | `backend/shared/src/turso.test.ts` — "updates an existing email when the supplied email is non-empty" → `Test timed out in 5000ms` (took 25.6 s; suite collect 62.14 s, prepare 47.26 s) | `npx vitest run src/turso.test.ts` → **55 passed in 175 ms**, exit 0 | **DID NOT REPRODUCE** — `EXIT_TEST_shared=0`, 30 files / 270 passed | The test calls `vi.importActual('@libsql/client')` and opens a real `:memory:` client, bypassing the file-level mock, so the first native-module load can exceed the default timeout under load | `DAFTARI-186` / #81 |
+| 3 | `PrintServer.Linux.Tests.ImageExportServiceTests.SaveReceiptAsPngAsync_CollidingTimestampedName_FailsWithoutClobbering` → "No exception was thrown. Expected: `System.IO.IOException`" | `dotnet test --filter FullyQualifiedName~ImageExportServiceTests` → **10/10 passed**, exit 0 (`ISOLATION_EXIT=0`); full-project retry → **106/106 passed** (`RETRY_FULL_LINUX_TESTS_EXIT=0`) | **REPRODUCED on the first attempt** (`EXIT_DOTNET_TEST_LINUX=1`), **GREEN on retry** | `ImageExportService.cs:58` builds a SECOND-resolution filename and `:64` uses `FileMode.CreateNew`, so the collision only happens when both saves land in the same second | `DAFTARI-185` / #79 (proven pre-existing by a stash A/B) |
 
 `git diff origin/development...HEAD --name-only | grep -i expense` returns **nothing** — the branch touches no expenses code.
 
@@ -116,6 +131,34 @@ The earlier gate was **unsound**: it used `melos run test`, and `melos.yaml` run
 ### Superseded: the earlier melos-based gate
 
 The earlier runner (`/mnt/ALL/LinuxDev/caches/.caches_mount/tmp/opencode/full_gate.sh`, markers in `/tmp/full_gate_batch.log`) reported `EXIT_MELOS_TEST=0` while its own log said `26:34 +1618 -3: Some tests failed.` — the masking mechanism described above. Its round-1 note (the `backend/shared` Turso timeout, 25.6 s vs the 5 s default, passing in isolation in 291 ms) still stands and is folded into the table above as flake #2.
+
+### CI evidence on the pushed branch
+
+The branch was pushed to `origin/feat/codebase-cleanup-dedup` and the GitHub Actions pipeline ran on it:
+
+| Run | Trigger | Result | Duration |
+|-----|---------|--------|----------|
+| `Staging Validation & Test Suite` (`43886527057`) | push to `feat/codebase-cleanup-dedup` | **success** | 5m22s |
+
+Per-job conclusion detail: the QA round-4 reviewer reported that within this run the `flutter-matrix` and packaging jobs were **SKIPPED** while the overall run was green. That per-job list could **not** be re-read in this wave — `gh run view 43886527057 --json jobs` failed with "error connecting to api.github.com" — so it is recorded here as the reviewer's observation, not as independently re-verified evidence.
+
+This closes the QA reviewer's V-3 blocker ("branch absent from remote, no PR, zero workflow runs"). The pull-request workflow is triggered by opening the PR into `development`.
+
+### Gate status ledger — every gate reported independently
+
+Status vocabulary: **PASSED** (executed, exit 0) · **FAILED → GREEN ON RETRY** (executed, failed on the first attempt, passed on the immediate retry) · **SKIPPED** (workflow/job did not run) · **NOT RUN** (mandatory section that was not executed).
+
+| Gate | Scope | Status | Evidence |
+|------|-------|--------|----------|
+| Local sound full gate | Flutter + landing + 5 backend packages + 2 C# hosts + Linux build + scope audit | **PASSED** on 20 of 21 steps; **FAILED → GREEN ON RETRY** on `PrintServer.Linux.Tests` | per-step `EXIT_*` markers in `/tmp/full_gate_sound.log`, script exit 0, terminator present (this file, FULL gate section) |
+| CI pipeline (run `43886527057`) | GitHub Actions on the pushed branch | **SUCCESS** (overall); `flutter-matrix` + packaging jobs **SKIPPED** per the QA reviewer's per-job read | `gh run list` output captured earlier; per-job list not re-verified (GitHub API unreachable) |
+| Mandatory review section — full code reviewer | Branch diff | **NOT RUN** (provider HTTP 429 / content-safety error) | QA round-4 report; re-dispatched on the final HEAD |
+| Mandatory review section — security auditor | Branch diff | **NOT RUN** (provider HTTP 429 / content-safety error) | QA round-4 report; re-dispatched on the final HEAD |
+| Mandatory review section — broad spec compliance | Branch diff | **NOT RUN** (provider HTTP 429 / content-safety error) | QA round-4 report; re-dispatched on the final HEAD |
+| Mandatory review section — full test coverage | Branch diff | **NOT RUN** (provider HTTP 429 / content-safety error) | QA round-4 report; re-dispatched on the final HEAD |
+| CodeRabbit local review | Branch diff vs `origin/development` | **PASSED** on rounds 1–2 (score 100); round 3 pending on the final HEAD | `independent-review.md`, CodeRabbit gate table |
+| Independent QA reviewer | Branch diff | **REPORTED — STATUS BLOCKED** (round 4); final dispatch pending on the final HEAD | `independent-review.md` |
+| Independent coverage reviewer | Changed units | **REPORTED — VERDICT FAIL** (round 5, 3 Medium gaps — all closed in `68d0696` / `2b6e0a2`); final dispatch pending | `independent-review.md` |
 
 ---
 
@@ -128,13 +171,18 @@ The earlier runner (`/mnt/ALL/LinuxDev/caches/.caches_mount/tmp/opencode/full_ga
 | 2 | 1 finding (major) → rejected after verification against base `db8fb5a`; 0 C/H/M/L | 429 — `ses_e1e6fdf52ffeNVFaKVbCbpiHjW` | 429 — `ses_e1e555946ffepVmupkKToOlgaR` | 100 | PASS on the CodeRabbit gate |
 | 3 | not re-run (no source changes since round 2) | 429 — `ses_e1e4c6266ffemfQLlxP3aOC0mD` | 429 (solo, no fan-out) — `ses_e1e3bd9afffeIgyD1CfPEv8zs0`, `ses_e1e317d28ffejdNyzQcat9w75W`, `ses_e1e2e2ae0ffeLQJPhFTHN48Pb6` | 100 | **BLOCKED** — provider 429 on every independent-reviewer dispatch |
 | 4 | not re-run (no source changes since round 2) | **Reported — STATUS BLOCKED** (`ses_e1e1ec11affe0bDohEg9voDNB3`): 0 Critical / 0 High code defects; 4 blockers (V-1 unsound gate, V-2 stale evidence, V-3 not pushed / no PR / no CI, V-4 dirty tree) + 7 spec-drift items | **Reported — VERDICT FAIL** (`ses_e1e1ae786ffeGu8xsMHo999aAf`): 3 Medium gaps — G1 `getLocalPrinters` untested, G2 `createIpRateLimiter` untested, G3 `/sales/sync` fallback denial untested | 100 | **FAIL** on the two independent gates — fix round required |
-| 5 (post-fix wave) | 0 C/H/M/L — unchanged since round 2 | dispatched on the new HEAD | dispatched on the new HEAD | 100 | pending the final round |
+| 5 (post-fix wave, HEAD `1ed1f7b`) | 0 C/H/M/L — unchanged since round 2 | **Reported — STATUS BLOCKED** (`ses_e1b9126a5ffeBHPasu5nlaQMIf`): 3 High (SEC-1, AUD-1, AUD-2) · 12 Medium · 4 Low · 4 mandatory review sections NOT RUN | **Reported — VERDICT FAIL** (`ses_e1b400d92ffdJtqEie50Kw8Wh4`): M1 Linux `getLocalPrinters` untested, M2 Windows `getLocalPrinters` untested, M3 limiter fail-open semantics unproven | 93 pre-fix | **FAIL** — fix round 3 required |
+| 6 (fix round 3, HEAD `8fe3802` + artifact commit) | pending re-run on the final HEAD | pending final dispatch | pending final dispatch | — | pending |
 
 **Round 1 fix commits (applied after the Medium findings):** `31560ba` (sales limiter map caps), `a371de1` (desktop `getLocalPrinters` → `PrintException` + 10 s timeout), `2668f4a` (negative parent-pid test), `4782788` (follow-up registry entries).
 
 **Round 2 fix wave (applied after the round-4 reviewer reports):** `e9b4436` (bounded IP rate-limiter map — `maxEntries` replaces the non-binding `hardCap`, capped per-call eviction scan, `size()` test seam + 8 unit tests + the `/sales/sync` fallback-denial integration test), `111a0fe` (`on PrintException { rethrow; }` in all three platform services so `statusCode` survives + 8 desktop service tests), `ef98e7f` (Hive-lock cleanup action exits 0 when the directory is missing + the fast-verify cleanup step moved BEFORE `melos run test`), `313bd72` (spec re-sync, 15 drift items), `53726f9` (follow-up #83).
 
 **TDD evidence for the round-2 wave:** the `PrintException` double-wrap was proven first — with the `on PrintException { rethrow; }` removed, `flutter test test/core/printing/print_service_desktop_test.dart` failed with `which has statusCode with value <null>`; the limiter test failed with `TypeError: limiter.size is not a function` and a missing-`maxEntries` failure before the implementation existed.
+
+**Round 3 fix wave (applied after the round-4 QA BLOCKED report and the round-5 coverage FAIL):** `68d0696` (Linux + Windows `getLocalPrinters` behaviour tests, 8 + 8), `2b6e0a2` (limiter eviction-semantics tests: exact soft-cap/hard-bound counts, hard-bound fail-open re-admission, bounded per-call eviction scan), `d5fa35e` (`maxEntries` made a required limiter option), `73e3db8` (SPEC-1…SPEC-5 HWID spec re-sync), `a4ab4d3` (follow-ups #85–#92 + 8 Plane work items), `8fe3802` (findings.md trailing whitespace), plus this artifact commit (AUD-1…AUD-10 rewrite). **This is fix round 3 of 3 — the cap from `implement-review-ship`; anything still open at its end is a human checkpoint, not a fourth round.**
+
+**TDD evidence for the round-3 wave:** the platform `PrintException` re-wrap was proven first — with the `on PrintException { rethrow; }` removed from both platform services, the new 503 tests failed with `which has statusCode with value <null>` (`MUTATION_TEST_EXIT=1`); the limiter tests were proven by removing the `maxEntries` eviction block (`MUTATION_MAX_ENTRIES_EXIT=1`) and the per-call scan cap (`MUTATION_SCAN_CAP_EXIT=1`); the required-`maxEntries` change was proven by `npm run typecheck` failing with 6 × TS2345 before the test constructions were updated (`TYPE_CHECK_RED_EXIT=2`) and with TS2344 + 2 × TS18048 when the option was reverted to optional (`TYPE_CHECK_MUTATION_EXIT=2`).
 
 **Independent-reviewer blocker:** the provider rate-limits concurrent subagent sessions. Every `qa-post-implementation` and `general` parent session across the first 5 dispatch rounds failed with HTTP 429 — including solo dispatches with fan-out explicitly disabled. The orphan child reviewers spawned by those parents (code review, security audit, spec compliance, test-coverage mapping) remain live and are performing the required checks; their findings are harvested in `independent-review.md`. Per the operating contract this blocker was escalated to the user rather than replaced with a self-review; the user answered "Pause and retry later", and the two required reviewers eventually reported.
 
@@ -148,10 +196,11 @@ Gate rule: zero Critical/High/Medium findings, score `100 − 25×C − 10×H �
 |--------|------------------------|---------------|
 | Analyzer errors/warnings (apps/daftari) | 0 / 0 | 0 / 0 |
 | Analyzer infos (landing_page) | 138 pre-existing | 138 pre-existing (untouched) |
-| Dart tests passing | 1618 + 28 | **1629** + 28 (+11: 3 print-config, 8 desktop-service, and the pre-existing suites) |
-| Backend tests passing | 1095 | **1104** (+9: 8 rate-limiter unit tests + 1 `/sales/sync` fallback integration test) |
-| C# tests passing | 108 (+2 skipped) | **116** (+2 skipped) in `PrintServer.Tests` (+8 parser facts); `PrintServer.Linux.Tests` unchanged (106) apart from the pre-existing flake |
-| Confirmed findings open | 10 | **0** (1 rejected with evidence) |
+| Dart tests passing | 1618 + 28 | **1645** + 28 (+27: 3 print-config, 8 desktop-service, 16 platform printing) |
+| Backend tests passing | 1095 | **1107** (+12: 11 rate-limiter unit tests + 1 `/sales/sync` fallback integration test) |
+| C# tests passing | 108 (+2 skipped) | **116** (+2 skipped) in `PrintServer.Tests` (+8 parser facts); `PrintServer.Linux.Tests` 106 — the PNG-collision test failed once on the final gate's first attempt (known pre-existing flake) and passed on retry |
+| Confirmed audit findings open | 10 | **0** (1 rejected with evidence) |
+| Review-round findings raised outside the audit scope | — | **8 tracked, not fixed here** (`docs/followups.md` #85–#92 / Plane DAFTARI-191…198) — including DAFTARI-191 (high): the Worker rebuilds limiter state per request, proven pre-existing at base `db8fb5a` |
 
 ---
 
