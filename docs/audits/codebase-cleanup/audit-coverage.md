@@ -22,7 +22,7 @@ Heavy generated artifacts, installed dependencies, binary files, caches, and ven
 |-----------|---------|-------|-------|
 | `apps/daftari/lib/` | Yes | ~350 | Core + features + presentation |
 | `apps/daftari/lib/core/` | Yes | ~90 | audit, backend, business, clock, config, crypto, error, exports, hwid, licensing, printing, theme, utils, widgets |
-| `apps/daftari/lib/core/hwid/` | Yes | 6 | Parallel HWID abstraction (see FINDING-DUP-03) |
+| `apps/daftari/lib/core/hwid/` | Yes (audit-time) | 7 files | Parallel HWID abstraction — **7 files, deleted by this branch** (see FINDING-DUP-03) |
 | `apps/daftari/lib/core/printing/` | Yes | 17 | Print service redundancy (see FINDING-DUP-04, FINDING-ARCH-01) |
 | `apps/daftari/lib/core/licensing/` | Yes | ~30 | Ed25519 offline licensing; HWID infra duplication (FINDING-DUP-03) |
 | `apps/daftari/lib/features/*` | Yes | ~200 | 10 features, each data/domain/presentation |
@@ -88,7 +88,7 @@ See repository-inventory.md §7: build outputs, node_modules, .dart_tool, .NET b
 | Metric | Value |
 |--------|-------|
 | Applications audited | 5 (Flutter Desktop, Flutter Web admin, Jaspr landing, TypeScript backend x5 packages, C# print server) |
-| Packages audited | 2 Dart (daftari, landing_page) + 5 TypeScript + 3 C# projects |
+| Packages audited | 2 Dart (daftari, landing_page) + 5 TypeScript + 4 .NET projects (PrintServer, PrintServer.Linux, PrintServer.Tests, PrintServer.Linux.Tests) |
 | Directories audited | All first-party source directories (see table above) |
 | Files inspected | All relevant first-party source files individually |
 | Files excluded | Generated/build artifacts only (justified) |

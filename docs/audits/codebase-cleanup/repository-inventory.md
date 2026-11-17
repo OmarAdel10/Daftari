@@ -18,7 +18,7 @@
 | Programming language | Dart / Flutter stable |
 | Relevant files | ~513 Dart files (lib + test) |
 | Package manager | pub (via Melos 6, package mode) |
-| Dependencies | flutter, flutter_bloc, hive, hive_encrypt, http, equatable, either_dart, ed25519, intl, uuid, flutter_localizations, etc. (`hydrated_bloc ^11.0.0` declared as regular dep but test-only — see FINDING-DEP-01) |
+| Dependencies | flutter, flutter_bloc, hive, hive_encrypt, http, equatable, either_dart, ed25519, intl, uuid, flutter_localizations, etc. (`hydrated_bloc ^11.0.0` was declared as a regular dependency but is test-only — moved to `dev_dependencies` by this branch, see FINDING-DEP-01) |
 | Entry points | `lib/main.dart`, `lib/main_admin.dart`, `lib/app.dart`, `lib/app_admin.dart` |
 | Audit status | Complete (read-only inspection finished) |
 

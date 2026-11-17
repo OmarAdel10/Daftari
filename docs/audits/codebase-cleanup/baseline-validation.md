@@ -12,7 +12,7 @@
 |-------|---------|--------|---------|
 | Formatting | `melos run format` | **PASS** | 0 files changed (daftari 513 files, landing 18 files) |
 | Static analysis | `melos run analyze` | **PASS** (exit 0) | daftari app clean; landing page has 138 pre-existing infos (deprecated Jaspr `text` member in home_page/pricing_page; dangling_library_doc_comments in tokens.dart; depend_on_referenced_packages in routing_web.dart imports `web` not a dep) — infos only, not failures |
-| Unit/widget tests (Dart) | `melos run test` | **PASS** | daftari flutter tests all pass; landing dart tests all 31 pass (I18n, pricing, routing, assets, BillingInterval/PricingPlan enums) |
+| Unit/widget tests (Dart) | `melos run test` | **PASS** | daftari flutter tests all pass; landing dart tests all 28 pass (I18n, pricing, routing, assets, BillingInterval/PricingPlan enums) — re-measured on this branch: `dart test` → `00:00 +28: All tests passed!` (the earlier note recorded 31) |
 | Backend tests + typecheck | `npm test` + `npm run typecheck` (x5 packages) | **PASS** | shared (30 files/270 tests), api (28 files/480 tests), realtime (9 files/95 tests), admin_host (14 files/170 tests), paymob_webhook (13 files/80 tests). Vite configLoader warnings are pre-existing info only. |
 | C# build | `dotnet build PrintServer.Linux -c Release --no-restore` | **PASS** | 0 errors, 4 pre-existing warnings (SKTextBlobBuilder obsolete CS0618 x1, CS8604 possible null x3) |
 | C# tests | `dotnet test PrintServer.Tests -c Release` | **PASS** | Failed:0, Passed:108, Skipped:2 (platform-specific skips, pre-existing), duration 15s |

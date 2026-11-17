@@ -4,7 +4,7 @@
 **Base:** `origin/development` @ `db8fb5a`
 **Plane project:** `DAFTARI`
 **Started:** Sun Nov 15 2026
-**Status:** All 8 implementation batches complete, plus three review-fix waves (4 round-1 + 5 round-2 + 6 round-3 commits). Sound full gate **green per step** — 20 of 21 steps PASSED; `PrintServer.Linux.Tests` failed on its first attempt on the proven pre-existing `DAFTARI-185` timing flake and passed on the immediate retry (106/106, plus a 10/10 isolated run). CodeRabbit round 3 is recorded (PASS, score 100, on `a0b195d` — 2 Low fixed, 1 `major` rejected on a false premise). The final reviewer pair reported: the QA reviewer returned **STATUS BLOCKED** (0 Critical/High, 6 Medium + 3 Low documentation/spec findings; its 4 mandatory sub-sections NOT RUN because of the no-dispatch constraint) and the coverage reviewer returned **VERDICT FAIL** on the strict zero-gap clause (0 Critical/High/Medium, 6 Low, score 94). The three `implement-review-ship` fix rounds are spent, so a fourth remediation wave and the PR opening are a human checkpoint.
+**Status:** All 8 implementation batches complete, plus three review-fix waves (4 round-1 + 5 round-2 + 6 round-3 commits) and the user-authorized wave 4 (3 commits). Sound full gate **green per step** — the final wave-4 run (Run B, HEAD `a361643`) passed **all 21 of 21 steps on the first attempt**; the earlier Run A on `8fe3802` reported one exception honestly: `PrintServer.Linux.Tests` failed on its first attempt on the proven pre-existing `DAFTARI-185` timing flake and passed on the immediate retry (106/106, plus a 10/10 isolated run). CodeRabbit rounds 1–4 are recorded (PASS; round 3 score 100 on `a0b195d`, round 4 score 99 on `4d7fc43`). The final reviewer pair reported: the QA reviewer returned **STATUS BLOCKED** (0 Critical/High, 6 Medium + 3 Low documentation/spec findings; its 4 mandatory sub-sections NOT RUN because of the no-dispatch constraint) and the coverage reviewer returned **VERDICT FAIL** on the strict zero-gap clause (0 Critical/High/Medium, 6 Low, score 94). The user authorized wave 4 (all 9 documentation/spec/comment findings + coverage gaps G4 and G6 closed in-branch; G1–G3 and G5 deferred as tracked follow-ups) and reviewer fan-out, so a fresh reviewer pair runs on the final HEAD before the PR is opened.
 
 ---
 
@@ -23,12 +23,12 @@
 
 ### Batch outcome notes
 
-- **Batch 3** — New shared helper `backend/api/src/application/services/ip-rate-limiter.ts` (`createIpRateLimiter`). `sessions.ts` keeps its map-capping (soft cap 10 000 / hard cap 5 000); `sales.ts` keeps the uncapped variant. Both routes still expose the same 30/min/IP behaviour and the same injectable-limiter override.
+- **Batch 3** — New shared helper `backend/api/src/application/services/ip-rate-limiter.ts` (`createIpRateLimiter`). Both routes now pass the same map bounds — `softCap: 10_000` and `maxEntries: 10_000` (`maxEntries` is a hard bound added later by this branch; the base code had no cap at all). Both routes still expose the same 30/min/IP behaviour and the same injectable-limiter override.
 - **Batch 4** — `print_service_interface.dart` is now the single `PrintService` contract. New `print_server_config.dart` holds the canonical sidecar host/port (5150, verified against `PrintServer/Program.cs` and `PrintServer.Linux/Program.cs` `UseUrls`). The factory stub keeps its previous **silent no-op** semantics (it previously threw `UnsupportedError`, which would have been a regression for `receipt_print_helper.dart`). Ports `5000`/`5001` corrected to `5150`.
 - **Batch 5** — The entire `apps/daftari/lib/core/hwid/` tree (7 files, 3 duplicate `HwidProvider` interfaces) was dead code with zero importers; it was deleted rather than merged. The live licensing tree (`lib/core/licensing/infrastructure/hwid/`) is untouched. Specs (`PRD.md`, `ARCHITECTURE.md`, `PERFORMANCE_GUIDELINES.md`, `USER_FLOW.md`) re-synced to the real implementation.
 - **Batch 6** — Official Shorebird docs confirm the app ID lives in `shorebird.yaml` (not Dart code) and that `shorebird_code_push` is only needed for programmatic/immediate update checks (auto-update is enabled here). `apps/daftari/shorebird.yaml`, the `pubspec.yaml` asset entry, and all `release.yml` shorebird jobs are retained unchanged.
 - **Batch 7** — The original "fast-verify vs flutter-matrix duplication" finding was **rejected with evidence** (they are complementary: quality gates vs cross-platform compile proof). The real duplication — an identical 12-line Hive-lock cleanup step in both jobs — was extracted into `.github/actions/cleanup-hive-locks/action.yml`.
-- **Batch 8** — `ParseParentPid` was an exact Type-1 copy in both `Program.cs` files with zero test coverage. Extracted to `PrintServer.Common/ParentPidParser.cs` (MSBuild shared-source `Compile Include`, no new project ⇒ no CI job changes) and covered by 7 new xunit tests in `PrintServer.Tests`.
+- **Batch 8** — `ParseParentPid` was an exact Type-1 copy in both `Program.cs` files with zero test coverage. Extracted to `PrintServer.Common/ParentPidParser.cs` (MSBuild shared-source `Compile Include`, no new project ⇒ no CI job changes) and covered by 8 new xunit tests in `PrintServer.Tests`.
 
 ## Commit log (this branch)
 
@@ -64,7 +64,11 @@
 | 28 | `26321f4` | 📝 docs(specs): correct cloud flavor platforms | R3 |
 | 29 | `d095d82` | 📝 docs(followups): correct the WebPrintService route list | R3 |
 | 30 | `bb4a5ca` | 📝 docs(audit): record CodeRabbit round 3 and final metrics | docs |
-| 31 | this commit | 📝 docs(audit): record coverage round 6 dispositions | docs |
+| 31 | `4d7fc43` | 📝 docs(audit): record coverage round 6 dispositions | docs |
+| 32 | `702e26e` | ✅ test(printing): assert factory returns new stub (G4) | W4 |
+| 33 | `48523fe` | ✅ test(api): cover limiter soft cap eviction (G6) | W4 |
+| 34 | `a361643` | 📝 docs(specs): correct flavor and factory facts (SPEC-01/02/03 + CODE-01) | W4 |
+| 35 | this commit | 📝 docs(audit): record wave-4 fixes and gate proof | W4 |
 
 Base commit: `db8fb5a` (📦 chore(ci): remove duplicated verify jobs (#110)).
 
@@ -78,8 +82,8 @@ Base commit: `db8fb5a` (📦 chore(ci): remove duplicated verify jobs (#110)).
 | findings.md | docs/audits/codebase-cleanup/findings.md | Complete — all findings resolved or rejected with evidence |
 | implementation-plan.md | docs/audits/codebase-cleanup/implementation-plan.md | Complete |
 | implementation-progress.md | docs/audits/codebase-cleanup/implementation-progress.md | Complete (this file) |
-| verification-results.md | docs/audits/codebase-cleanup/verification-results.md | Complete — FAST row per commit, a per-step gate ledger (PASSED / FAILED → GREEN ON RETRY / SKIPPED / NOT RUN), review-loop rows 1–6 |
-| independent-review.md | docs/audits/codebase-cleanup/independent-review.md | Complete — CodeRabbit rounds 1–2, the round-3/4 QA reports and the round-3/5 coverage reports with per-finding dispositions, plus the fix-round-3 table |
+| verification-results.md | docs/audits/codebase-cleanup/verification-results.md | Complete — FAST row per commit, a per-step gate ledger (PASSED / FAILED → GREEN ON RETRY / SKIPPED / NOT RUN), review-loop rows 1–7, both sound full-gate runs (Run A 20/21 with the `DAFTARI-185` flake → retry; Run B 21/21) |
+| independent-review.md | docs/audits/codebase-cleanup/independent-review.md | Complete — CodeRabbit rounds 1–4, the round-3/4 QA reports and the round-3/5/6 coverage reports with per-finding dispositions, plus the fix-round-3 and fix-round-4 (wave-4) tables |
 | final-report.md | docs/audits/codebase-cleanup/final-report.md | Complete — conditional-PASS verdict, deltas enumerated, per-step gate table, no blanket claims |
 
 ## Out-of-scope findings raised (docs/followups.md + Plane)
@@ -102,9 +106,9 @@ Base commit: `db8fb5a` (📦 chore(ci): remove duplicated verify jobs (#110)).
 | 89 | DAFTARI-195 | `_pidsListeningOnPrintServerPort` (`print_server_manager_linux.dart:370`) has no test |
 | 90 | DAFTARI-196 | The `_spawn` `ASPNETCORE_URLS` environment wiring has no test seam |
 | 91 | DAFTARI-197 | The Linux manager environment test cannot fail (expected value built from the production helper, assertions skipped) |
-| 92 | DAFTARI-198 | `print_service_test.dart:16-19` claims "returns new PrintServiceStub" but never compares two `create()` results |
+| 92 | DAFTARI-198 | **RESOLVED in wave 4** — `print_service_test.dart:16-19` now compares two `create()` results and asserts they are distinct instances (`702e26e`) |
 | 93 | DAFTARI-199 | The Hive-lock cleanup composite action has no fixture test (lock removal, selective deletion, missing-dir, custom dir) |
-| 94 | DAFTARI-200 | `ip-rate-limiter.ts` soft-cap eviction is only tested with fully expired IPs — active-entry survival and retained budget are unproven |
+| 94 | DAFTARI-200 | **RESOLVED in wave 4** — `ip-rate-limiter.ts` soft-cap eviction is now tested with a mixed active/expired set: the active entry survives and keeps its spent budget (`48523fe`) |
 
 ## Notes
 

@@ -3,14 +3,14 @@
 **Branch:** `feat/codebase-cleanup-dedup`
 **Base:** `origin/development` @ `db8fb5a`
 **Plane project:** `DAFTARI`
-**Reviewed HEAD:** `bb4a5ca` + this artifact commit (31 commits ahead of base, 0 behind) — the sound full gate was run on `8fe3802` (25 ahead)
-**Verdict:** CONDITIONAL PASS — every branch-owned gate step is green (one known pre-existing timing flake failed once on the final gate's first attempt and passed on its immediate retry), and every finding raised by the review rounds to date is either fixed in-branch or tracked as an explicit out-of-scope follow-up. CodeRabbit round 3 is now green (score 100 on `a0b195d`; 2 Low findings fixed, 1 `major` rejected on a false premise), so merge-readiness now depends on the fresh QA + coverage dispatches on the current HEAD, green PR checks, and the user's manual merge — this report does not assert READY TO MERGE ahead of those.
+**Reviewed HEAD:** `a361643` + this artifact commit (34 commits ahead of base, 0 behind; the pinned SHA list is in `implementation-progress.md`) — the sound full gate was run on `8fe3802` (25 ahead) and re-run on the wave-4 HEAD
+**Verdict:** CONDITIONAL PASS — every branch-owned gate step is green (one known pre-existing timing flake failed once on the final gate's first attempt and passed on its immediate retry), and every finding raised by the review rounds to date is either fixed in-branch or tracked as an explicit out-of-scope follow-up. The user-authorized wave 4 applied all 9 final-QA findings and closed the G4 + G6 coverage gaps; CodeRabbit round 4 is green (score 99 on `4d7fc43`, its 1 Low fixed in the wave-4 artifact commit), so merge-readiness now depends on the fresh QA + coverage dispatches on the current HEAD, green PR checks, and the user's manual merge — this report does not assert READY TO MERGE ahead of those.
 
 ---
 
 ## Executive summary
 
-A full read-only audit of the Daftari monorepo (Flutter app + shared `lib/`, Flutter Web admin, Jaspr landing page, 5 TypeScript backend packages, 3 C# projects, CI/CD, specs and docs) produced **11 tracked findings**: 10 confirmed and actionable, 1 later raised during implementation. All 10 confirmed findings are now **resolved**; the 11th (a suspected CI duplication) was **rejected with evidence** after a line-by-line reading showed the two jobs are complementary, not redundant.
+A full read-only audit of the Daftari monorepo (Flutter app + shared `lib/`, Flutter Web admin, Jaspr landing page, 5 TypeScript backend packages, 4 .NET projects, CI/CD, specs and docs) produced **11 tracked findings**: 10 confirmed and actionable, 1 later raised during implementation. All 10 confirmed findings are now **resolved**; the 11th (a suspected CI duplication) was **rejected with evidence** after a line-by-line reading showed the two jobs are complementary, not redundant.
 
 The cleanup is **deliberately narrow, and it is not a blanket "no behaviour changed" claim**. Every change was verified against the base commit `db8fb5a` rather than against assumptions: where a duplicate abstraction existed in a dead tree, the tree was deleted; where a duplicate existed in live code, the shared implementation was extracted with byte-identical logic; where a value was duplicated in configuration, a single constant now owns it.
 
@@ -33,12 +33,12 @@ Seven further real defects that the audit had not originally recorded were disco
 
 | Metric | Value |
 |--------|-------|
-| Applications audited | 5 (Flutter desktop app, Flutter Web admin, Jaspr landing, TypeScript backend × 5 packages, .NET 8 print server × 3 projects) |
+| Applications audited | 5 (Flutter desktop app, Flutter Web admin, Jaspr landing, TypeScript backend × 5 packages, .NET 8 print server × 4 projects) |
 | Dart packages | 2 (`apps/daftari`, `landing_page`) |
 | TypeScript packages | 5 (`shared`, `api`, `realtime`, `admin_host`, `paymob_webhook`) |
-| C# projects | 3 (`PrintServer`, `PrintServer.Linux`, `PrintServer.Tests`, `PrintServer.Linux.Tests`) |
+| .NET projects | 4 (`PrintServer`, `PrintServer.Linux`, `PrintServer.Tests`, `PrintServer.Linux.Tests`) |
 | First-party source directories audited | 100% accounted for |
-| Files changed by this branch | 55 (19 added, 7 deleted, 29 modified; +2 919 / −979 as of this artifact commit) |
+| Files changed by this branch | 55 (19 added, 7 deleted, 29 modified; **+3 047 / −986** as measured on the final HEAD, base `db8fb5a`) |
 | Files deleted | 7 (the dead `apps/daftari/lib/core/hwid/` tree) |
 | Files introduced | 19 — 2 shared implementations (`print_server_config.dart`, `ip-rate-limiter.ts`), 1 shared C# source file (`PrintServer.Common/ParentPidParser.cs`), 1 CI composite action, 6 test files, 9 audit artifacts |
 | Files modified | 29 |
@@ -129,6 +129,15 @@ Driven by the round-4 QA report (**STATUS BLOCKED**, Risk High) and the round-5 
 - **`8fe3802` — removed the trailing whitespace** the QA reviewer flagged at `findings.md:106,141,159`; `git diff --check` is now clean branch-wide.
 - **`130b4d4` — rewrote the audit artifacts** for truthfulness (AUD-1…AUD-10): no blanket "READY TO MERGE" or "no behaviour changed" claim, the deliberate deltas enumerated above, every gate reported per step (PASSED / FAILED→GREEN ON RETRY / SKIPPED / NOT RUN), and the review-round findings recorded with their dispositions.
 
+### Wave-4 fix wave (`702e26e`, `48523fe`, `a361643`, artifact commit)
+
+The three scripted fix rounds were spent, so the user was asked for a decision and chose **"Wave 4: QA fixes + G4/G6 tests"** — apply all 9 final-QA findings (6 Medium + 3 Low documentation/spec/comment level) and close the G4 + G6 coverage gaps with new tests, deferring G1–G3 and G5 as tracked follow-ups. The user also chose **"Allow fan-out"**, so the next QA dispatch may run its 4 mandatory sub-sections (code reviewer, security auditor, spec compliance, test coverage) that the no-dispatch constraint had blocked.
+
+- **`702e26e` — closed G4 (factory-identity coverage).** `PrintServiceFactory.create()` returned a new stub on every call, but the test only checked the returned type. The test now compares two `create()` results and asserts they are distinct instances. **Proven first:** with `create()` returning the cached singleton the test fails (`Expected: not same instance as <Instance of 'PrintServiceStub'>`); the source was restored byte-identical afterwards.
+- **`48523fe` — closed G6 (limiter soft-cap coverage).** The soft-cap sweep path was only exercised with fully expired IPs, so a mutation that deleted active entries would still have passed. The new test mixes an active IP with expired IPs under the soft cap and proves the active entry survives and keeps the budget it already spent. **Proven first:** with the soft-cap sweep deleting active entries the test fails (`expected +0 to be 3`); the source was restored byte-identical afterwards.
+- **`a361643` — closed SPEC-01, SPEC-02, SPEC-03 and CODE-01.** `specs/PRD.md` no longer describes the cloud flavour as "Desktop + web" (`FlavorConfig` permits only windows/linux); `specs/ARCHITECTURE.md` now documents the factory's actual no-op behaviour and cross-references DAFTARI-188 instead of implying per-platform dispatch; `specs/PERFORMANCE_GUIDELINES.md` now states that `LicenseEngine.getDeviceId()` caches the first **non-null** result and retries after a null provider result; and the `print_server_config.dart` header comment is narrowed to "single source of truth for Dart print clients" (the .NET hosts and the packaging keep their own `5150` literals).
+- **artifact commit — closed AUD-01…AUD-05 and the CodeRabbit round-4 Low.** The Batch-3 limiter note now states the current config (both routes: softCap 10 000 / maxEntries 10 000), the Batch-8 note says 8 `[Fact]`s, the landing baseline is corrected to 28, the API baseline to 493, the .NET project count to 4, the HWID tree to 7 files, `hydrated_bloc` is marked test-only, the reviewed SHA / commit count / scope totals are pinned to the final HEAD, and the residual-risk paragraph now also lists the pending final-QA findings. `docs/followups.md` #92 (DAFTARI-198) and #94 (DAFTARI-200) are marked resolved.
+
 ---
 
 ## Validation results
@@ -153,9 +162,28 @@ The earlier gate was **unsound**: it used `melos run test`, and `melos.yaml` run
 | `dotnet test` (Linux host) | `EXIT_DOTNET_TEST_LINUX` | **FAILED → GREEN ON RETRY** | 1 on the first attempt (PNG-collision flake, DAFTARI-185 / #79); isolation 10/10; retry 106/106 |
 | `flutter build linux --debug` | `EXIT_FLUTTER_BUILD_LINUX` | **PASSED** | 0 |
 | Scope audit `git diff origin/development...HEAD --stat` | `EXIT_SCOPE_AUDIT` | **PASSED** | 0 — 55 files (19 added, 7 deleted, 29 modified), all inside the declared batch domains (final totals: +2 919 / −979) |
-| Branch sync | — | **PASSED** | 25 ahead / 0 behind at the gate run (`8fe3802`); 27 ahead / 0 behind after `130b4d4` + this SHA-pinning commit (base `db8fb5a`) |
+| Branch sync | — | **PASSED** | 25 ahead / 0 behind at the gate run (`8fe3802`); 34 ahead / 0 behind after `a361643` + this artifact commit (base `db8fb5a`) |
 
-**Three failures surfaced during sound-gate runs. Each is a race in a file this branch never touches, and each was re-run in isolation and passed. On the final run (`8fe3802`) only flake 3 reproduced — on its first attempt — and the immediate retry of that step was green:**
+**Run B — the final wave-4 gate (authoritative handoff run).** HEAD `a361643` (34 commits ahead of base), same runner, same per-step exit-code discipline; log `/tmp/full_gate_sound.log`, runner exit `FULL_GATE_SOUND_EXIT=0`, terminator present. **All 21 of 21 steps PASSED on the first attempt** — including `PrintServer.Linux.Tests` (106/106, no flake on this run):
+
+| Check | Exit marker | Status | Result |
+|-------|-------------|--------|--------|
+| Stale Hive lock cleanup | `EXIT_CLEAN_HIVE_LOCKS` | **PASSED** | 0 — "remaining locks: 0" |
+| `dart format --set-exit-if-changed lib test tool` (daftari) | `EXIT_FORMAT_DAFTARI` | **PASSED** | 0 |
+| `dart format --set-exit-if-changed lib test` (landing) | `EXIT_FORMAT_LANDING` | **PASSED** | 0 |
+| `flutter analyze` | `EXIT_ANALYZE_DAFTARI` | **PASSED** | 0 — "No issues found!" |
+| `dart analyze` (landing) | `EXIT_ANALYZE_LANDING` | **PASSED** | 0 |
+| `flutter test` (daftari) | `EXIT_TEST_DAFTARI` | **PASSED** | 0 — `05:17 +1645: All tests passed!` (the wave-4 G4 change adds an assertion to an existing test, so the test count is unchanged) |
+| `dart test` (landing) | `EXIT_TEST_LANDING` | **PASSED** | 0 — 28 passed |
+| `npm test` × 5 backend packages | `EXIT_TEST_{shared,api,realtime,admin_host,paymob_webhook}` | **PASSED** | 0 for all five — shared 270, api **493**, realtime 95, admin_host 170, paymob_webhook 80 |
+| `npm run typecheck` × 5 backend packages | `EXIT_TYPECHECK_*` | **PASSED** | 0 for all five |
+| `dotnet build` × 2 host projects | `EXIT_DOTNET_BUILD_WIN/LINUX` | **PASSED** | 0 for both — 0 errors, only pre-existing warnings |
+| `dotnet test` (Windows host) | `EXIT_DOTNET_TEST_WIN` | **PASSED** | 0 — 116 passed / 2 skipped |
+| `dotnet test` (Linux host) | `EXIT_DOTNET_TEST_LINUX` | **PASSED** | 0 — 106 passed / 0 skipped, **no flake** |
+| `flutter build linux --debug` | `EXIT_FLUTTER_BUILD_LINUX` | **PASSED** | 0 |
+| Scope audit `git diff origin/development...HEAD --stat` | `EXIT_SCOPE_AUDIT` | **PASSED** | 0 — every file inside the declared batch domains |
+
+**Three failures surfaced during sound-gate runs. Each is a race in a file this branch never touches, and each was re-run in isolation and passed. On Run A (`8fe3802`) only flake 3 reproduced — on its first attempt — and the immediate retry of that step was green; on Run B (the final wave-4 HEAD) none of the three reproduced:**
 
 | # | Failure | Isolation result | Status on the final run | Root cause | Tracking |
 |---|---------|------------------|-------------------------|-----------|----------|
@@ -167,11 +195,11 @@ The earlier gate was **unsound**: it used `melos run test`, and `melos.yaml` run
 
 **The three failures the QA reviewer saw are GONE.** `app_product_model_test.dart`, `app_receipt_model_test.dart` and `sales_bloc_test.dart` had failed with 30 s `setUpAll` timeouts because of 12 stale Hive lock files left behind by interrupted test runs (all in `apps/daftari/test/_hive_test_app_shell_tables/`). The gate's lock-cleanup step (the same mechanism as the new CI composite action) fixed them — confirming the diagnosis and proving the CI action targets a real failure mode.
 
-**FAST gate** was run before every one of the 26 commits (format/analyze + targeted tests for Dart; `typecheck` + `npm test` for TypeScript; `build` + `test` for C#; YAML parse for CI; `git diff --check` for docs). Full evidence in `verification-results.md`.
+**FAST gate** was run before every one of the 35 commits (format/analyze + targeted tests for Dart; `typecheck` + `npm test` for TypeScript; `build` + `test` for C#; YAML parse for CI; `git diff --check` for docs). Full evidence in `verification-results.md`.
 
 **CI:** run `43886527057` on the pushed branch → overall **success** (5m22s). Per the QA round-4 reviewer's job-level read, the `flutter-matrix` and packaging jobs were **SKIPPED** in that run; the per-job list could not be re-read in this wave (the GitHub API was unreachable), so it is recorded as the reviewer's observation rather than independently re-verified evidence. The pull-request workflow runs again once the PR is opened.
 
-**Mandatory review sections NOT RUN in the round-4 QA dispatch** (provider HTTP 429 / content-safety errors): full code reviewer, security auditor, broad spec compliance, full test coverage. They are re-dispatched on the final HEAD before handoff.
+**Mandatory review sections NOT RUN in the round-4 QA dispatch** (provider HTTP 429 / content-safety errors): full code reviewer, security auditor, broad spec compliance, full test coverage. The wave-4 dispatch re-enables fan-out (the user's "Allow fan-out" choice), so all 4 run on the final HEAD before handoff.
 
 ---
 
@@ -185,15 +213,17 @@ See `independent-review.md` for the full dispositions.
 | CodeRabbit round 2 | 1 finding → rejected on a false premise proven at the base commit; the underlying pre-existing product defect was tracked as DAFTARI-188 |
 | CodeRabbit final (after round-1 fixes) | Critical 0 · High 0 · Medium 0 · Low 0 · **score 100** |
 | CodeRabbit round 3 (on the artifact wave, `a0b195d`) | 3 findings → 1 `major` rejected on a false premise (the dead `print_service.dart` barrel has zero importers), 2 `minor` fixed (`26321f4` cloud-flavor spec line, `d095d82` follow-up #76 routes) · Critical 0 · High 0 · Medium 0 · Low 0 · **score 100** |
+| CodeRabbit round 4 (on `4d7fc43`) | 1 Low (the residual-risk summary wording did not list the pending final-QA findings) → fixed in the wave-4 artifact commit · Critical 0 · High 0 · Medium 0 · **score 99** |
 | `qa-post-implementation` reviewer | Rounds 1–2 failed with provider HTTP 429 (concurrent-session rate limit); **round 3 reported — STATUS BLOCKED** with 4 blockers and 7 spec-drift items (all actionable items fixed in the round-2 wave); **round 4 reported — STATUS BLOCKED**, Risk High, 3 High / 12 Medium / 4 Low findings, with 4 mandatory review sections NOT RUN. Dispositions: SEC-1 (pre-existing Worker limiter lifecycle) → DAFTARI-191 / #85; SEC-1-TEST → partly closed in `2b6e0a2`, Worker half → DAFTARI-192 / #86; CODE-L1 → fixed in `d5fa35e`; SEC-L1 → DAFTARI-193 / #87; SPEC-1…SPEC-5 → fixed in `73e3db8`; AUD-1…AUD-10 → fixed in this artifact wave |
 | `test-coverage-analysis` reviewer | Rounds 1–2 failed with HTTP 429; **round 3 reported — VERDICT FAIL** with 3 Medium coverage gaps (G1 `getLocalPrinters` untested, G2 `createIpRateLimiter` untested, G3 `/sales/sync` fallback denial untested), all closed test-first in `e9b4436` / `111a0fe`; **round 5 reported — VERDICT FAIL** with 3 Medium gaps (M1 Linux `getLocalPrinters`, M2 Windows `getLocalPrinters`, M3 limiter fail-open semantics) — all closed in `68d0696` / `2b6e0a2` — plus 4 Low gaps (the bounded-scan gap closed in `2b6e0a2`; the rest tracked as DAFTARI-194…198); **round 6 reported — VERDICT FAIL under the strict zero-gap policy** with 0 Critical/High/Medium and 6 Low gaps (G1–G4 already tracked as DAFTARI-194…198; G5 CI-action fixture test → DAFTARI-199 / #93; G6 limiter soft-cap active/expired mix → DAFTARI-200 / #94), score 94 — the zero-gap clause is **not** met |
 | Final reviewers (after fix round 3) | CodeRabbit round 3 **PASSED** on `a0b195d` (score 100; 2 Low fixed, 1 `major` rejected on a false premise). The fresh QA + coverage pair was dispatched on `a0b195d` with context-free sessions (`ses_e184bfa2fffed6No6l8QDIcXLW`, `ses_e184bfa2effe9NnBubMDczfV0a`); both reported: the QA reviewer returned **STATUS BLOCKED** (0 Critical/High, 6 Medium + 3 Low documentation/spec findings, its 4 mandatory sub-sections NOT RUN because of the no-dispatch constraint), the coverage reviewer returned **VERDICT FAIL** on the zero-gap clause (6 Low). The three `implement-review-ship` fix rounds are spent, so a fourth remediation wave is a human checkpoint. Full dispositions are in `independent-review.md` |
+| Final reviewers (wave 4 — user-authorized) | The 9 final-QA findings were applied in-branch (`702e26e`, `48523fe`, `a361643`, artifact commit) and G4 + G6 were closed. The QA + coverage pair is re-dispatched on the wave-4 HEAD with **fan-out enabled** (the user's "Allow fan-out" choice), so the QA reviewer's 4 mandatory sub-sections can run. 4 Low coverage gaps (G1–G3, G5) remain deferred by explicit user decision as DAFTARI-194…197 / DAFTARI-199 |
 
 ---
 
 ## Remaining findings
 
-Nothing is left open inside this branch's scope. Nineteen items were deliberately pushed out of scope and recorded in `docs/followups.md` **and** as Plane work items in `DAFTARI` (9 from the audit and implementation rounds, 8 from the review rounds, 2 from coverage round 6):
+Nothing is left open inside this branch's scope. Nineteen items were deliberately pushed out of scope and recorded in `docs/followups.md` **and** as Plane work items in `DAFTARI` (9 from the audit and implementation rounds, 8 from the review rounds, 2 from coverage round 6). Wave 4 closed 2 of them in-branch (#92 / DAFTARI-198 and #94 / DAFTARI-200), so **17 remain open** as tracked follow-ups:
 
 | Follow-up | Plane | Priority | Summary |
 |-----------|-------|----------|---------|
@@ -213,9 +243,9 @@ Nothing is left open inside this branch's scope. Nineteen items were deliberatel
 | #89 | DAFTARI-195 | low | `_pidsListeningOnPrintServerPort` (`print_server_manager_linux.dart:370`) has no test |
 | #90 | DAFTARI-196 | low | The `_spawn` environment wiring (`ASPNETCORE_URLS`, `print_server_manager_linux.dart:208/237`) is not observed by any test seam |
 | #91 | DAFTARI-197 | low | The Linux manager environment test (`test/linux/print_server_manager_linux_test.dart:30-79`) builds its expected value from the production helper and skips its assertions, so it cannot fail |
-| #92 | DAFTARI-198 | low | `test/core/printing/print_service_test.dart:16-19` claims "returns new PrintServiceStub" but never compares two `create()` results |
+| #92 | DAFTARI-198 | low | **RESOLVED in wave 4** — `test/core/printing/print_service_test.dart:16-19` now compares two `create()` results and asserts they are distinct instances (`702e26e`) |
 | #93 | DAFTARI-199 | low | The Hive-lock cleanup composite action (`.github/actions/cleanup-hive-locks/action.yml:15-28`) has no fixture test — lock removal, selective deletion, missing-directory and custom-directory paths are unverified |
-| #94 | DAFTARI-200 | low | `ip-rate-limiter.ts:55-63` soft-cap eviction is only tested with fully expired IPs — active-entry survival and retained budget are unproven |
+| #94 | DAFTARI-200 | low | **RESOLVED in wave 4** — `ip-rate-limiter.ts:55-63` soft-cap eviction is now tested with a mixed active/expired set: the active entry survives and keeps its spent budget (`48523fe`) |
 
 DAFTARI-188 is the most consequential of these: it means the desktop app's print path is currently inert. It is **pre-existing** (proven at `db8fb5a`) and fixing it is a feature, not a cleanup, so it was not smuggled into this branch. DAFTARI-191 is the highest-priority *new* item from the review rounds: the rate limiter this branch hardened only limits anything if its state survives a request — and today it does not.
 
@@ -227,23 +257,23 @@ DAFTARI-188 is the most consequential of these: it means the desktop app's print
 |------|-------|
 | Working branch | `feat/codebase-cleanup-dedup` |
 | Base | `origin/development` @ `db8fb5a` |
-| Commits | 31 — 8 batch commits + 11 round-1/round-2 review-fix and documentation commits + 7 round-3 fix-wave and artifact commits + 1 SHA-pinning commit + 2 CodeRabbit-round-3 Low fixes + 1 CodeRabbit-round-3 artifact commit + this artifact commit (see `implementation-progress.md` for the full list) |
+| Commits | 35 — 8 batch commits + 11 round-1/round-2 review-fix and documentation commits + 7 round-3 fix-wave and artifact commits + 1 SHA-pinning commit + 2 CodeRabbit-round-3 Low fixes + 1 CodeRabbit-round-3 artifact commit + 3 wave-4 commits (`702e26e`, `48523fe`, `a361643`) + this artifact commit (see `implementation-progress.md` for the full list) |
 | Working tree status | the 9 audit artifacts are committed explicitly (never `git add -A`); the two untracked user files (`enhance-code-prompt.md`, `untitled.excalidraw`) stay untracked and untouched |
 | Scope of changes | Dart printing/config/settings, Dart pubspec, TypeScript API routes + one new service, C# print server + one new shared source file, CI workflow + one composite action, specs, audit artifacts, follow-up registry |
 | Pre-existing user changes preserved | Yes — untracked user files untouched and never staged |
-| Branch state vs `origin/development` | 31 ahead / 0 behind after `bb4a5ca` + this artifact commit (already in sync) |
+| Branch state vs `origin/development` | 35 ahead / 0 behind after `a361643` + this artifact commit (already in sync) |
 | Merge policy | The agent does **not** merge. The PR is opened against `development` and the user merges manually. |
 
 ---
 
 ## Final verdict
 
-**CONDITIONAL PASS — the branch's own gates are green per step, but the independent coverage gate's zero-gap clause is NOT met (6 Low gaps, all tracked) and the three `implement-review-ship` fix rounds are spent. A fourth remediation wave and the PR opening are therefore a human checkpoint; this report does not assert READY TO MERGE.**
+**CONDITIONAL PASS — the branch's own gates are green per step, but the independent coverage gate's strict zero-gap clause is still not met (4 Low gaps, deferred by explicit user decision as DAFTARI-194…197 / DAFTARI-199) and the fresh wave-4 reviewer pair must still report. This report does not assert READY TO MERGE.**
 
-- **Zero Critical / High / Medium findings** on the CodeRabbit gate: rounds 1–2 after the round-1 fixes and round 3 on `a0b195d` (score `100 − 25×C − 10×H − 5×M − 1×L` = **100**, strictly above the required 90). Round 3 produced 3 findings — 2 Low fixed (`26321f4` spec cloud-flavor correction, `d095d82` follow-up #76 route correction) and 1 `major` rejected on a false premise (the dead `print_service.dart` barrel has zero importers; every consumer imports `print_service_interface.dart` directly).
-- **Every actionable finding raised by the independent reviewers to date is either fixed in-branch or explicitly tracked as an out-of-scope follow-up**: the round-3 coverage gaps (G1 `getLocalPrinters`, G2 `createIpRateLimiter`, G3 `/sales/sync` fallback denial) were closed test-first in `e9b4436` / `111a0fe`; the round-4 QA findings (SPEC-1…SPEC-5) were fixed in `73e3db8`; the round-5 coverage gaps (M1/M2 platform `getLocalPrinters`, M3 limiter fail-open) were closed in `68d0696` / `2b6e0a2`; the audit-accuracy findings (AUD-1…AUD-10) were fixed in this artifact wave; and the out-of-scope findings (SEC-1, SEC-1-TEST, SEC-L1 and the test-quality gaps) are tracked in `docs/followups.md` #85–#92 and Plane DAFTARI-191…198. The final QA dispatch added 6 Medium + 3 Low documentation/spec findings and the coverage round-6 report added 2 new Low gaps — **all are recorded, not silently dropped**, and applying them is the pending wave-4 decision.
-- **Coverage of the changed units**: every new production unit introduced by this branch has direct tests — `ip-rate-limiter.ts` (11 unit tests, including the fail-open and bounded-scan semantics), `print_service_desktop.dart` (8), `print_service_linux.dart` (8), `print_service_windows.dart` (8), `ParentPidParser.cs` (8 facts), `print_server_config.dart` (2), the stub semantics, plus the `/sales/sync` fallback integration test. The six remaining Low gaps the coverage reviewer listed (netstat/`ss` parser seams, the spawned `ASPNETCORE_URLS` seam, the ineffective environment test, the factory-identity assertion, the CI-action fixture test and the limiter soft-cap active/expired mix) are enumerated as follow-ups #88–#92 and #93–#94 rather than omitted.
+- **Zero Critical / High / Medium findings** on the CodeRabbit gate: rounds 1–2 after the round-1 fixes, round 3 on `a0b195d` (score `100 − 25×C − 10×H − 5×M − 1×L` = **100**, strictly above the required 90) and round 4 on `4d7fc43` (**99** — 1 Low fixed in the wave-4 artifact commit). Round 3 produced 3 findings — 2 Low fixed (`26321f4` spec cloud-flavor correction, `d095d82` follow-up #76 route correction) and 1 `major` rejected on a false premise (the dead `print_service.dart` barrel has zero importers; every consumer imports `print_service_interface.dart` directly).
+- **Every actionable finding raised by the independent reviewers to date is either fixed in-branch or explicitly tracked as an out-of-scope follow-up**: the round-3 coverage gaps (G1 `getLocalPrinters`, G2 `createIpRateLimiter`, G3 `/sales/sync` fallback denial) were closed test-first in `e9b4436` / `111a0fe`; the round-4 QA findings (SPEC-1…SPEC-5) were fixed in `73e3db8`; the round-5 coverage gaps (M1/M2 platform `getLocalPrinters`, M3 limiter fail-open) were closed in `68d0696` / `2b6e0a2`; the audit-accuracy findings (AUD-1…AUD-10) were fixed in the round-3 artifact wave; the final QA dispatch's 6 Medium + 3 Low documentation/spec findings were fixed in the user-authorized wave 4 (`702e26e`, `48523fe`, `a361643`, artifact commit); and the out-of-scope findings (SEC-1, SEC-1-TEST, SEC-L1 and the test-quality gaps) are tracked in `docs/followups.md` #85–#91, #93 and Plane DAFTARI-191…197 / DAFTARI-199.
+- **Coverage of the changed units**: every new production unit introduced by this branch has direct tests — `ip-rate-limiter.ts` (12 unit tests, including the fail-open, bounded-scan and soft-cap active/expired-mix semantics), `print_service_desktop.dart` (8), `print_service_linux.dart` (8), `print_service_windows.dart` (8), `ParentPidParser.cs` (8 facts), `print_server_config.dart` (2), the stub semantics plus the factory-identity assertion, and the `/sales/sync` fallback integration test. The 4 remaining Low gaps the coverage reviewer listed (the netstat/`ss` parser seams, the spawned `ASPNETCORE_URLS` seam, the ineffective environment test and the CI-action fixture test) are enumerated as follow-ups #88–#91 and #93 rather than omitted.
 - **The deltas are enumerated, not asserted away** (see the table in the executive summary): the rate-limiter map is now hard-bounded and its per-call scan capped (delta 1); the print-service base URL moved to the sidecar's real `:5150` (delta 2, no consumer reads `baseUrl`); the dead HWID tree was deleted (delta 3, 0 importers); `hydrated_bloc` became a dev dependency (delta 4); the factory's no-op stub semantics are unchanged (delta 5); and the per-request Worker limiter state is **pre-existing**, not a branch delta (delta 6 — tracked as DAFTARI-191).
-- **The full gate is green per step**, with one exception reported honestly: the `PrintServer.Linux.Tests` step failed on its first attempt on the proven pre-existing `DAFTARI-185` timing flake and passed on the immediate retry (106/106, plus a 10/10 isolated run). Two earlier load-induced flakes (expenses bloc, Turso timeout) did not reproduce. CI run `43886527057` was green overall (with the `flutter-matrix` and packaging jobs reported as SKIPPED by the QA reviewer), and CI run `44015350358` at `a0b195d` was green with **3 002 tests passed, 0 failed, 2 skipped** (Flutter 1 645, landing 28, backend api 492 / shared 270 / realtime 95 / admin_host 170 / paymob_webhook 80, PrintServer Windows 116 + 2 skipped, Linux 106) and `git diff --check` clean.
+- **The full gate is green per step**, with every one of the 21 steps PASSED on the first attempt on the final wave-4 HEAD (Run B: Flutter 1 645, landing 28, backend api 493 / shared 270 / realtime 95 / admin_host 170 / paymob_webhook 80, PrintServer Windows 116 + 2 skipped, Linux 106, `flutter build linux --debug` OK, `git diff --check` clean). The earlier Run A on `8fe3802` reported one exception honestly: the `PrintServer.Linux.Tests` step failed on its first attempt on the proven pre-existing `DAFTARI-185` timing flake and passed on the immediate retry (106/106, plus a 10/10 isolated run); that flake did not reproduce on Run B, and the two other load-induced flakes (expenses bloc, Turso timeout) did not reproduce on either run. CI run `43886527057` was green overall (with the `flutter-matrix` and packaging jobs reported as SKIPPED by the QA reviewer), and CI run `44015350358` at `a0b195d` was green with **3 002 tests passed, 0 failed, 2 skipped** (Flutter 1 645, landing 28, backend api 492 / shared 270 / realtime 95 / admin_host 170 / paymob_webhook 80, PrintServer Windows 116 + 2 skipped, Linux 106).
 
-Residual risk is confined to the nineteen out-of-scope follow-ups above. Two are **high** priority: DAFTARI-188 (the pre-existing inert print path) and DAFTARI-191 (the Worker rebuilds limiter state per request, so the rate limiting hardened here only takes effect where a limiter instance outlives one request).
+Residual risk is **not** confined to the nineteen out-of-scope follow-ups above: wave 4 additionally applied the nine final-QA findings (AUD-01…AUD-05, SPEC-01…SPEC-03, CODE-01 — dispositions in `independent-review.md`) and closed the two coverage gaps the user selected (G4 factory identity, G6 limiter soft-cap mix), while G1–G3 and G5 stay tracked as DAFTARI-194…197 and DAFTARI-199. Two follow-ups are **high** priority: DAFTARI-188 (the pre-existing inert print path) and DAFTARI-191 (the Worker rebuilds limiter state per request, so the rate limiting hardened here only takes effect where a limiter instance outlives one request).

@@ -40,7 +40,7 @@
 
 **Totals:** 10 resolved, 1 rejected with evidence, 0 open, 0 deferred.
 
-**Review-round findings (outside the audit scope):** the QA and coverage review rounds raised 8 further findings that are out of this branch's scope. They are tracked in `docs/followups.md` #85–#92 and as Plane items DAFTARI-191 … DAFTARI-198; none is fixed here.
+**Review-round findings (outside the audit scope):** the QA and coverage review rounds raised 8 further findings that are out of this branch's scope. They are tracked in `docs/followups.md` #85–#92 and as Plane items DAFTARI-191 … DAFTARI-198; none is fixed here. Wave 4 later closed one of them in-branch (#92 / DAFTARI-198 — the `PrintServiceFactory.create()` identity assertion, `702e26e`), so 7 of these remain open as tracked follow-ups.
 
 ## Confirmed findings
 
