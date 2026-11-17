@@ -4,7 +4,7 @@
 **Base:** `origin/development` @ `db8fb5a`
 **Plane project:** `DAFTARI`
 **Started:** Sun Nov 15 2026
-**Status:** All 8 implementation batches complete, plus three review-fix waves (4 round-1 + 5 round-2 + 6 round-3 commits). Sound full gate **green per step** — 20 of 21 steps PASSED; `PrintServer.Linux.Tests` failed on its first attempt on the proven pre-existing `DAFTARI-185` timing flake and passed on the immediate retry (106/106, plus a 10/10 isolated run). CodeRabbit round 3 is recorded (PASS, score 100, on `a0b195d` — 2 Low fixed, 1 `major` rejected on a false premise). Pending: the fresh QA + coverage dispatch results on the final HEAD, then PR handoff.
+**Status:** All 8 implementation batches complete, plus three review-fix waves (4 round-1 + 5 round-2 + 6 round-3 commits). Sound full gate **green per step** — 20 of 21 steps PASSED; `PrintServer.Linux.Tests` failed on its first attempt on the proven pre-existing `DAFTARI-185` timing flake and passed on the immediate retry (106/106, plus a 10/10 isolated run). CodeRabbit round 3 is recorded (PASS, score 100, on `a0b195d` — 2 Low fixed, 1 `major` rejected on a false premise). The final reviewer pair reported: the QA reviewer returned **STATUS BLOCKED** (0 Critical/High, 6 Medium + 3 Low documentation/spec findings; its 4 mandatory sub-sections NOT RUN because of the no-dispatch constraint) and the coverage reviewer returned **VERDICT FAIL** on the strict zero-gap clause (0 Critical/High/Medium, 6 Low, score 94). The three `implement-review-ship` fix rounds are spent, so a fourth remediation wave and the PR opening are a human checkpoint.
 
 ---
 
@@ -63,7 +63,8 @@
 | 27 | `a0b195d` | 📝 docs(audit): pin the artifact commit SHA | docs |
 | 28 | `26321f4` | 📝 docs(specs): correct cloud flavor platforms | R3 |
 | 29 | `d095d82` | 📝 docs(followups): correct the WebPrintService route list | R3 |
-| 30 | this commit | 📝 docs(audit): record CodeRabbit round 3 and final metrics | docs |
+| 30 | `bb4a5ca` | 📝 docs(audit): record CodeRabbit round 3 and final metrics | docs |
+| 31 | this commit | 📝 docs(audit): record coverage round 6 dispositions | docs |
 
 Base commit: `db8fb5a` (📦 chore(ci): remove duplicated verify jobs (#110)).
 
@@ -102,6 +103,8 @@ Base commit: `db8fb5a` (📦 chore(ci): remove duplicated verify jobs (#110)).
 | 90 | DAFTARI-196 | The `_spawn` `ASPNETCORE_URLS` environment wiring has no test seam |
 | 91 | DAFTARI-197 | The Linux manager environment test cannot fail (expected value built from the production helper, assertions skipped) |
 | 92 | DAFTARI-198 | `print_service_test.dart:16-19` claims "returns new PrintServiceStub" but never compares two `create()` results |
+| 93 | DAFTARI-199 | The Hive-lock cleanup composite action has no fixture test (lock removal, selective deletion, missing-dir, custom dir) |
+| 94 | DAFTARI-200 | `ip-rate-limiter.ts` soft-cap eviction is only tested with fully expired IPs — active-entry survival and retained budget are unproven |
 
 ## Notes
 

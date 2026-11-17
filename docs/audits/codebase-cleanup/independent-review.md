@@ -18,7 +18,7 @@
 | 3 | `ses_e1e6fdf52ffeNVFaKVbCbpiHjW` | Provider error HTTP 429 | — | — | n/a |
 | 3 (serial, no fan-out) | `ses_e1e1ec11affe0bDohEg9voDNB3` | **Reported — STATUS BLOCKED** | 0 Critical · 0 High code defects · 4 blockers · 7 spec-drift items · 1 gate-soundness blocker | — | All fixable findings addressed in the round-2 wave; the remaining blockers are handoff steps (push, PR, CI, fresh gate), not code defects |
 | 4 | `ses_e1b9126a5ffeBHPasu5nlaQMIf` | **Reported — STATUS BLOCKED** (reviewed HEAD `1ed1f7b`) | 3 High (SEC-1, AUD-1, AUD-2) · 12 Medium (SEC-1-TEST, SPEC-1…SPEC-5, AUD-3…AUD-7, plus the two Low notes below) · 4 Low (CODE-L1, SEC-L1, AUD-8, AUD-9/AUD-10) · 4 mandatory review sections NOT RUN (provider 429) | 93 (pre-fix) | Every actionable finding is addressed below; the pre-existing Worker-limiter defect (SEC-1) is tracked as DAFTARI-191 rather than fixed here |
-| 5 | _pending_ | Final dispatch on the artifact-commit HEAD | — | — | — | — |
+| 5 | `ses_e184bfa2fffed6No6l8QDIcXLW` | **Reported — STATUS BLOCKED** (reviewed HEAD `d095d82`, upstream `a0b195d`) | 0 Critical · 0 High · 6 Medium · 3 Low · 4 mandatory sub-sections NOT RUN | 67 (pre-fix) | All 9 findings are documentation/spec/comment level; confirmed but **not applied in-branch** — the three fix rounds are spent, so wave 4 is a human checkpoint |
 
 **Report (round 3):** the reviewer judged the cleanup itself **technically sound** — the 7 deleted HWID files had zero importers; the extracted `PrintService` contract, `print_server_config.dart`, `createIpRateLimiter` and `ParentPidParser` are behaviour-preserving; `hydrated_bloc` is genuinely test-only; the CI shell-block deduplication did not change ordering. **No Critical or High code defect was found inline.** The four blockers were:
 
@@ -68,6 +68,26 @@ Additional findings from the same report and their disposition:
 
 ---
 
+**Report (final dispatch) — STATUS BLOCKED, Risk Level High.** The reviewer ran the `qa-post-implementation` skill against the branch diff on HEAD `d095d82` (upstream `a0b195d`) and accepted **9 findings — 0 Critical, 0 High, 6 Medium, 3 Low** (gate score `100 − 25×C − 10×H − 5×M − L` = **67**, pre-fix). No runtime defect was claimed. Its four mandatory independent sub-sections (`full_code_reviewer`, `security_auditor`, `broad_spec_compliance`, `full_test_coverage`) could **not run** because the dispatch instruction forbids sub-agent fan-out in this session (the provider 429s concurrent sessions) — a process blocker, not a code finding, escalated at the human checkpoint together with the coverage gate. Its CI evidence: run **`44015350358`** at `a0b195d` = green, **3 002 tests passed / 0 failed / 2 skipped** (Flutter 1 645, landing 28, backend api 492 / shared 270 / realtime 95 / admin_host 170 / paymob_webhook 80, PrintServer Windows 116 + 2 skipped, Linux 106), app analyze clean, app format "511 files (0 changed)", landing format "17 files (0 changed)", Trivy scan + worker dry-run successful, `git diff --check` exit 0, and no new TODO/FIXME, debug prints or secret patterns in the diff.
+
+| # | Finding | Class | Location | Reviewer fix | Disposition |
+|---|---------|-------|----------|--------------|-------------|
+| AUD-01 | Batch-3 note still says sessions keeps soft 10 000 / hard 5 000 and sales is uncapped; Batch-8 note says 7 xunit tests | Medium | `implementation-progress.md:26,31` | state the current limiter config (both routes: softCap 10 000, maxEntries 10 000) and the 8 `[Fact]`s in `ParentPidParserTests.cs` | Confirmed — drift introduced by this branch. **Not applied in-branch:** the three fix rounds are spent, so wave 4 is a human checkpoint |
+| AUD-02 | Evidence table reports landing 31, API 489 and a stale branch state | Medium | `verification-results.md:68,109,116` | landing 28, API 492; keep historical rows only when dated; pin the reviewed SHA | Confirmed — **not applied in-branch** (human checkpoint) |
+| AUD-03 | Reviewed HEAD / commit count / scope totals pinned to an older SHA; "3 C# projects" while naming four | Medium | `final-report.md:6,13,39,41` | pin the final SHA, say 4 C# projects, regenerate totals from `git diff --stat` | Confirmed — **not applied in-branch** (human checkpoint) |
+| AUD-04 | HWID tree recorded as 6 files although 7 were deleted; .NET project count 3 although four exist | Medium | `audit-coverage.md:25,91` | "7 files, deleted by this branch"; 4 .NET projects | Confirmed — **not applied in-branch** (human checkpoint) |
+| AUD-05 | Landing baseline says 31 (CI measures 28); inventory lists `hydrated_bloc` as a regular dependency although it is test-only now | Medium | `baseline-validation.md:15`, `repository-inventory.md:21` | correct the landing baseline to 28; mark the dependency row test-only / a pre-change snapshot | Confirmed — **not applied in-branch** (human checkpoint) |
+| SPEC-01 | Cloud flavour described as "Desktop + web" while `FlavorConfig` permits only windows/linux | Medium | `specs/PRD.md:614` | "cloud: Desktop only, cloud sync via Turso … platforms: windows/linux" | Confirmed (ARCHITECTURE was already corrected in `26321f4`) — **not applied in-branch** (human checkpoint) |
+| SPEC-02 | Architecture implies the factory dispatches per platform and the stub throws `UnsupportedError` | Low | `specs/ARCHITECTURE.md:1706-1716` | document the current no-op behaviour, reference DAFTARI-188, do not imply conditional dispatch | Confirmed — deferrable, **not applied in-branch** (human checkpoint) |
+| SPEC-03 | "HWID provider queried at most once" — `LicenseEngine.getDeviceId()` retries after a null provider result | Low | `specs/PERFORMANCE_GUIDELINES.md:202,233` | "caches the first non-null result; retries after a null provider result" | Confirmed — deferrable, **not applied in-branch** (human checkpoint) |
+| CODE-01 | The Dart config file is called the sidecar network config's "single source of truth" while both .NET hosts and packaging keep their own `5150` literals | Low | `apps/daftari/lib/core/printing/print_server_config.dart:3-7` | narrow to "single source of truth for Dart print clients" | Confirmed — deferrable, **not applied in-branch** (human checkpoint) |
+
+The security section raised **no** new findings: no auth, payment, PII or crypto surface changed and no secret assignments were found; residual risks were listed as Info only — DAFTARI-191 (Worker limiter state per request), DAFTARI-193 (`CF-Connecting-IP` trust boundary), DAFTARI-188 (inert factory print path) and DAFTARI-185 (Linux PNG flake).
+
+**Gate consequence:** the final QA dispatch reports 0 Critical and 0 High, but 6 Medium documentation/spec findings + 3 Low findings remain open and its four mandatory independent sub-sections did not run. Under the `implement-review-ship` cap the three fix rounds are spent, so applying wave 4 and opening the PR are a human checkpoint; see `verification-results.md` for the gate ledger and the user-facing decision request.
+
+---
+
 ## Reviewer 2 — Correctness and regression prevention (`general` / test-coverage-analysis)
 
 **Scope:** Functional regressions, incorrect code removal, changed business behavior, security regressions, data integrity, API/IPC compatibility, resource lifecycle, concurrency, test adequacy.
@@ -80,7 +100,7 @@ Additional findings from the same report and their disposition:
 | 3 (serial, no fan-out) | `ses_e1e1ae786ffeGu8xsMHo999aAf` | **Reported — VERDICT FAIL** | 3 Medium gaps (G1, G2, G3 below) | **All three addressed** in `e9b4436` / `111a0fe` |
 | 4 | `ses_e1b9090e2ffeTflDiHEy0McwGG` | No report returned (provider error) — superseded by round 5 | — | n/a |
 | 5 | `ses_e1b400d92ffdJtqEie50Kw8Wh4` | **Reported — VERDICT FAIL** (reviewed HEAD `1ed1f7b`) | 3 Medium (M1 `LinuxPrintService.getLocalPrinters`, M2 `WindowsPrintService.getLocalPrinters`, M3 limiter fail-open semantics) + 4 Low | **All 3 Medium closed** in `68d0696` / `2b6e0a2`; 1 of the 4 Low gaps closed by the same limiter test, the other 3 tracked as DAFTARI-194…196; two weak-test notes tracked as DAFTARI-197 / DAFTARI-198 |
-| 6 | _pending_ | Final dispatch on the artifact-commit HEAD | — | — |
+| 6 | `ses_e184bfa2effe9NnBubMDczfV0a` | **Reported — VERDICT FAIL** (reviewed HEAD `a0b195d`) | 6 Low (G1…G6 below), 0 Critical/High/Medium, score 94 | 4 gaps already tracked as **DAFTARI-194…198**; G5 + G6 newly raised and tracked as **DAFTARI-199** / **DAFTARI-200** |
 
 **Report (round 3):** the reviewer ran the full analysis on the branch diff and returned **FAIL — the zero-gap gate was not met**. Its measured evidence: Flutter printing tests 6 passed; API route tests 191 passed; Parent PID parser tests 8 passed; the new TypeScript helper at 66.66 % statements / 50 % branches / 78.57 % lines with `ip-rate-limiter.ts:47-49` uncovered; `print_service_desktop.dart` at 2/79 lines with the new `getLocalPrinters()` at 0 %.
 
@@ -113,6 +133,21 @@ Low-priority test-quality notes the reviewer raised, and their disposition:
 | **N2** | Low note | `print_service_test.dart:16-19` claims "returns new PrintServiceStub" but never compares two `create()` results; the limiter tests used loose `size <= 3` assertions | **Partly closed** — the limiter assertions are now exact (`2b6e0a2`); the factory-identity note is tracked as **DAFTARI-198** / #92 |
 
 The reviewer also confirmed the existing tests it inspected as sound: `ParentPidParserTests.cs` (8 facts), `print_server_config_test.dart`, `print_service_test.dart`'s stub-semantics test, and the session fallback limiter test.
+
+**Report (round 6) — VERDICT FAIL under the strict zero-gap policy (0 Critical/High/Medium, 6 Low, score 94).** The reviewer re-ran the changed-unit coverage analysis on HEAD `a0b195d` (55 files changed; 17 changed production sources, 15 of them mapped to tests, 2 deletion-only) and returned FAIL: the zero-gap rule is still not met, although **no Critical, High or Medium gap remains** and the severity score is 94 (> 90). Its evidence: C# targeted 8 passed, 0 failed; Flutter targeted changed printing/manager tests 50 passed, 0 failed; vitest limiter + API route tests 203 passed, 0 failed; limiter coverage 100 % statements/lines/functions and 94.44 % branches; targeted changed-line coverage — desktop service 18/18, factory 1/1, Linux/Windows/stub/Web services 1/1 each, Windows manager 2/6 (parser path uncovered), Linux manager 1/7 (environment and parser paths uncovered).
+
+| Gap | Class | Unit | Disposition |
+|-----|-------|------|-------------|
+| **G1** | Low | `_pidsListeningOnPrintServerPort` (`print_server_manager.dart:348-361`) — the netstat parser is untested because the existing tests inject `pidsOnPort` | **Deferred** — already tracked as **DAFTARI-194** / `docs/followups.md` #88 |
+| **G2** | Low | `_pidsListeningOnPrintServerPort` (`print_server_manager_linux.dart:370-386`) — the `ss` parser is untested for the same reason | **Deferred** — already tracked as **DAFTARI-195** / #89 |
+| **G3** | Low | The spawned `ASPNETCORE_URLS` is never observed (`print_server_manager_linux.dart:229-239`), and the existing environment test (`test/linux/print_server_manager_linux_test.dart:30-79`) cannot fail | **Deferred** — already tracked as **DAFTARI-196** / #90 and **DAFTARI-197** / #91 |
+| **G4** | Low | `PrintServiceFactory.create` identity is not asserted (`print_service_factory.dart:20-22`, `print_service_test.dart:16-19`) | **Deferred** — already tracked as **DAFTARI-198** / #92 |
+| **G5** | Low | The CI composite action (`.github/actions/cleanup-hive-locks/action.yml:15-28`) has no fixture test proving lock removal, selective deletion, missing-directory behaviour or custom directory handling | **Deferred — newly tracked** as **DAFTARI-199** / #93 |
+| **G6** | Low | The soft-cap eviction path (`ip-rate-limiter.ts:55-63`) is exercised only with fully expired IPs, so active-entry survival and the retained rate-limit budget after a soft-cap sweep are unproven (a mutation that deletes active entries would still pass) | **Deferred — newly tracked** as **DAFTARI-200** / #94 |
+
+The reviewer listed one informational item that it did not count: the `ipHits[0] ?? now` branch (`ip-rate-limiter.ts:46`) is uncovered and is reachable only with `maxPerWindow == 0`, i.e. defensive behaviour for an invalid option.
+
+**Gate consequence:** the coverage gate's zero-gap clause is therefore **not** met — 6 Low changed-unit gaps remain (4 previously deferred, 2 newly tracked), while Critical/High/Medium are all zero and the score is 94 (> 90). Under the `implement-review-ship` cap this branch has already spent its three fix rounds, so closing these gaps in-branch is a wave-4 decision that is reserved for the user; until then no merge-readiness claim is made.
 
 ---
 
