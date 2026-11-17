@@ -13,9 +13,13 @@ void main() {
       expect(service, isA<PrintServiceStub>());
     });
 
-    test('create returns new PrintServiceStub', () {
-      final service = PrintServiceFactory.create();
-      expect(service, isA<PrintServiceStub>());
+    test('create returns a new PrintServiceStub on every call', () {
+      final first = PrintServiceFactory.create();
+      final second = PrintServiceFactory.create();
+
+      expect(first, isA<PrintServiceStub>());
+      expect(second, isA<PrintServiceStub>());
+      expect(second, isNot(same(first)));
     });
 
     test('can override for testing', () {
