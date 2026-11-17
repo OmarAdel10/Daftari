@@ -2,7 +2,7 @@
 
 **Branch:** `feat/codebase-cleanup-dedup`
 **Base:** `origin/development` @ `db8fb5a`
-**Reviewed HEAD:** `8fe3802` + the artifact commit (25 code/doc commits ahead of base, 0 behind)
+**Reviewed HEAD:** `130b4d4` + this SHA-pinning commit (27 commits ahead of base, 0 behind) — the sound full gate was run on `8fe3802` (25 ahead)
 **Plane project:** `DAFTARI`
 **Verification discipline:** evidence-before-claims — every row below is a fresh command output captured during this session.
 
@@ -36,7 +36,7 @@
 | R3-4 | `73e3db8` (SPEC-1…SPEC-5 HWID spec re-sync) | n/a (docs) | `git diff --check` → exit 0 | n/a | PASS |
 | R3-5 | `a4ab4d3` (follow-ups #85–#92 + 8 Plane items) | n/a (docs) | `git diff --check` → exit 0 | n/a | PASS |
 | R3-6 | `8fe3802` (findings.md trailing whitespace) | n/a (docs) | `git diff --check` → exit 0 (branch-wide) | n/a | PASS |
-| R3-7 | artifact commit (AUD-1…AUD-10 rewrite) | n/a (docs) | `git diff --check` → exit 0 | n/a | PASS |
+| R3-7 | `130b4d4` (AUD-1…AUD-10 rewrite) | n/a (docs) | `git diff --check` → exit 0 | n/a | PASS |
 
 ### Staged-diff scans (every commit)
 
@@ -107,8 +107,8 @@ The earlier gate was **unsound**: it used `melos run test`, and `melos.yaml` run
 | C# tests (Windows host) | `dotnet test -c Release --no-restore` | `EXIT_DOTNET_TEST_WIN` | **PASSED** | 0 — 116 passed / 2 skipped |
 | C# tests (Linux host) | `dotnet test -c Release --no-restore` | `EXIT_DOTNET_TEST_LINUX` | **FAILED → GREEN ON RETRY** | 1 on the first attempt (`ImageExportServiceTests.SaveReceiptAsPngAsync_CollidingTimestampedName_FailsWithoutClobbering` — known pre-existing timing flake, DAFTARI-185 / #79); isolation re-run `--filter FullyQualifiedName~ImageExportServiceTests` → 10/10 passed; full-project retry → 106/106 passed |
 | Build compile proof | `flutter build linux --debug` | `EXIT_FLUTTER_BUILD_LINUX` | **PASS** | 0 |
-| Scope audit | `git diff origin/development...HEAD --stat` | `EXIT_SCOPE_AUDIT` | **PASSED** | 0 — 55 files changed, every file inside a declared batch domain |
-| Branch sync | `git rev-list --left-right --count HEAD...origin/development` | — | **PASSED** | 25 ahead / 0 behind — `origin/development` is still at base `db8fb5a`, so no merge was required |
+| Scope audit | `git diff origin/development...HEAD --stat` | `EXIT_SCOPE_AUDIT` | **PASSED** | 0 — 55 files changed (19 added, 7 deleted, 29 modified; +2 853 / −979 as of `130b4d4`), every file inside a declared batch domain |
+| Branch sync | `git rev-list --left-right --count HEAD...origin/development` | — | **PASSED** | 25 ahead / 0 behind at the gate run (`8fe3802`); 27 ahead / 0 behind after `130b4d4` + this SHA-pinning commit — `origin/development` is still at base `db8fb5a`, so no merge was required |
 
 **Verdict (per-step, no aggregation):** every gate step PASSED on HEAD `8fe3802` except `PrintServer.Linux.Tests`, which FAILED on the first attempt on the proven pre-existing `DAFTARI-185` timing flake and PASSED on the immediate retry (106/106, plus a 10/10 isolated run of the flaky test class). No step was SKIPPED and no step was NOT RUN in this local gate.
 
@@ -172,7 +172,7 @@ Status vocabulary: **PASSED** (executed, exit 0) · **FAILED → GREEN ON RETRY*
 | 3 | not re-run (no source changes since round 2) | 429 — `ses_e1e4c6266ffemfQLlxP3aOC0mD` | 429 (solo, no fan-out) — `ses_e1e3bd9afffeIgyD1CfPEv8zs0`, `ses_e1e317d28ffejdNyzQcat9w75W`, `ses_e1e2e2ae0ffeLQJPhFTHN48Pb6` | 100 | **BLOCKED** — provider 429 on every independent-reviewer dispatch |
 | 4 | not re-run (no source changes since round 2) | **Reported — STATUS BLOCKED** (`ses_e1e1ec11affe0bDohEg9voDNB3`): 0 Critical / 0 High code defects; 4 blockers (V-1 unsound gate, V-2 stale evidence, V-3 not pushed / no PR / no CI, V-4 dirty tree) + 7 spec-drift items | **Reported — VERDICT FAIL** (`ses_e1e1ae786ffeGu8xsMHo999aAf`): 3 Medium gaps — G1 `getLocalPrinters` untested, G2 `createIpRateLimiter` untested, G3 `/sales/sync` fallback denial untested | 100 | **FAIL** on the two independent gates — fix round required |
 | 5 (post-fix wave, HEAD `1ed1f7b`) | 0 C/H/M/L — unchanged since round 2 | **Reported — STATUS BLOCKED** (`ses_e1b9126a5ffeBHPasu5nlaQMIf`): 3 High (SEC-1, AUD-1, AUD-2) · 12 Medium · 4 Low · 4 mandatory review sections NOT RUN | **Reported — VERDICT FAIL** (`ses_e1b400d92ffdJtqEie50Kw8Wh4`): M1 Linux `getLocalPrinters` untested, M2 Windows `getLocalPrinters` untested, M3 limiter fail-open semantics unproven | 93 pre-fix | **FAIL** — fix round 3 required |
-| 6 (fix round 3, HEAD `8fe3802` + artifact commit) | pending re-run on the final HEAD | pending final dispatch | pending final dispatch | — | pending |
+| 6 (fix round 3, HEAD `130b4d4` + this SHA-pinning commit) | pending re-run on the final HEAD | pending final dispatch | pending final dispatch | — | pending |
 
 **Round 1 fix commits (applied after the Medium findings):** `31560ba` (sales limiter map caps), `a371de1` (desktop `getLocalPrinters` → `PrintException` + 10 s timeout), `2668f4a` (negative parent-pid test), `4782788` (follow-up registry entries).
 
@@ -180,7 +180,7 @@ Status vocabulary: **PASSED** (executed, exit 0) · **FAILED → GREEN ON RETRY*
 
 **TDD evidence for the round-2 wave:** the `PrintException` double-wrap was proven first — with the `on PrintException { rethrow; }` removed, `flutter test test/core/printing/print_service_desktop_test.dart` failed with `which has statusCode with value <null>`; the limiter test failed with `TypeError: limiter.size is not a function` and a missing-`maxEntries` failure before the implementation existed.
 
-**Round 3 fix wave (applied after the round-4 QA BLOCKED report and the round-5 coverage FAIL):** `68d0696` (Linux + Windows `getLocalPrinters` behaviour tests, 8 + 8), `2b6e0a2` (limiter eviction-semantics tests: exact soft-cap/hard-bound counts, hard-bound fail-open re-admission, bounded per-call eviction scan), `d5fa35e` (`maxEntries` made a required limiter option), `73e3db8` (SPEC-1…SPEC-5 HWID spec re-sync), `a4ab4d3` (follow-ups #85–#92 + 8 Plane work items), `8fe3802` (findings.md trailing whitespace), plus this artifact commit (AUD-1…AUD-10 rewrite). **This is fix round 3 of 3 — the cap from `implement-review-ship`; anything still open at its end is a human checkpoint, not a fourth round.**
+**Round 3 fix wave (applied after the round-4 QA BLOCKED report and the round-5 coverage FAIL):** `68d0696` (Linux + Windows `getLocalPrinters` behaviour tests, 8 + 8), `2b6e0a2` (limiter eviction-semantics tests: exact soft-cap/hard-bound counts, hard-bound fail-open re-admission, bounded per-call eviction scan), `d5fa35e` (`maxEntries` made a required limiter option), `73e3db8` (SPEC-1…SPEC-5 HWID spec re-sync), `a4ab4d3` (follow-ups #85–#92 + 8 Plane work items), `8fe3802` (findings.md trailing whitespace), plus `130b4d4` (AUD-1…AUD-10 rewrite) and this SHA-pinning commit. **This is fix round 3 of 3 — the cap from `implement-review-ship`; anything still open at its end is a human checkpoint, not a fourth round.**
 
 **TDD evidence for the round-3 wave:** the platform `PrintException` re-wrap was proven first — with the `on PrintException { rethrow; }` removed from both platform services, the new 503 tests failed with `which has statusCode with value <null>` (`MUTATION_TEST_EXIT=1`); the limiter tests were proven by removing the `maxEntries` eviction block (`MUTATION_MAX_ENTRIES_EXIT=1`) and the per-call scan cap (`MUTATION_SCAN_CAP_EXIT=1`); the required-`maxEntries` change was proven by `npm run typecheck` failing with 6 × TS2345 before the test constructions were updated (`TYPE_CHECK_RED_EXIT=2`) and with TS2344 + 2 × TS18048 when the option was reverted to optional (`TYPE_CHECK_MUTATION_EXIT=2`).
 

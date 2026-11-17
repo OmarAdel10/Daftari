@@ -205,7 +205,7 @@ Driven by the round-4 QA report (STATUS BLOCKED) and the round-5 coverage report
 | `73e3db8` | specs | SPEC-1…SPEC-5: the HWID sections of `ARCHITECTURE.md`, `PERFORMANCE_GUIDELINES.md` and `USER_FLOW.md` now match the licensing implementation (provider tree, platform selection, `Future<…>` signatures, the real Windows/Linux algorithms, the dead `SessionSyncService` caller) | n/a (documentation) | `git diff --check` on the three spec files → exit 0 |
 | `a4ab4d3` | docs | `docs/followups.md` #85–#92 + the 8 Plane items DAFTARI-191…198 for the out-of-scope findings (SEC-1, SEC-1-TEST, SEC-L1 and the test-quality gaps) | n/a (documentation) | n/a (documentation) |
 | `8fe3802` | docs | `findings.md`: removed the 3 trailing-whitespace errors the QA reviewer flagged | n/a (documentation) | `git diff --check` → exit 0 |
-| artifact commit | docs | AUD-1…AUD-10: the five audit artifacts rewritten for truthfulness (per-gate status, enumerated deltas, recomputed metrics, reconciled HWID claims, exact reviewed commits) | n/a (documentation) | n/a (documentation) |
+| `130b4d4` | docs | AUD-1…AUD-10: the five audit artifacts rewritten for truthfulness (per-gate status, enumerated deltas, recomputed metrics, reconciled HWID claims, exact reviewed commits) | n/a (documentation) | n/a (documentation) |
 
 ---
 

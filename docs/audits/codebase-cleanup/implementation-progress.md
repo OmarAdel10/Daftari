@@ -59,7 +59,8 @@
 | 23 | `73e3db8` | 📝 docs(specs): correct HWID binding facts | R3 |
 | 24 | `a4ab4d3` | 📝 docs(followups): record audit review gaps | R3 |
 | 25 | `8fe3802` | 📝 docs(audit): strip findings trailing whitespace | R3 |
-| 26 | artifact commit | 📝 docs(audit): reconcile audit artifacts with the evidence | docs |
+| 26 | `130b4d4` | 📝 docs(audit): reconcile audit artifacts with the evidence | docs |
+| 27 | this commit | 📝 docs(audit): pin the artifact commit SHA | docs |
 
 Base commit: `db8fb5a` (📦 chore(ci): remove duplicated verify jobs (#110)).
 

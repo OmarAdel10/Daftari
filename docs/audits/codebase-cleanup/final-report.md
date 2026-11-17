@@ -3,7 +3,7 @@
 **Branch:** `feat/codebase-cleanup-dedup`
 **Base:** `origin/development` @ `db8fb5a`
 **Plane project:** `DAFTARI`
-**Reviewed HEAD:** `8fe3802` + the artifact commit (26 commits ahead of base, 0 behind)
+**Reviewed HEAD:** `130b4d4` + this SHA-pinning commit (27 commits ahead of base, 0 behind) — the sound full gate was run on `8fe3802` (25 ahead)
 **Verdict:** CONDITIONAL PASS — every branch-owned gate step is green (one known pre-existing timing flake failed once on the final gate's first attempt and passed on its immediate retry), and every finding raised by the review rounds to date is either fixed in-branch or tracked as an explicit out-of-scope follow-up. Merge-readiness still depends on the final independent-review round on the current HEAD (CodeRabbit round 3 + fresh QA + coverage dispatches), green PR checks, and the user's manual merge — this report does not assert READY TO MERGE ahead of those.
 
 ---
@@ -38,7 +38,7 @@ Seven further real defects that the audit had not originally recorded were disco
 | TypeScript packages | 5 (`shared`, `api`, `realtime`, `admin_host`, `paymob_webhook`) |
 | C# projects | 3 (`PrintServer`, `PrintServer.Linux`, `PrintServer.Tests`, `PrintServer.Linux.Tests`) |
 | First-party source directories audited | 100% accounted for |
-| Files changed by this branch | 55 (19 added, 7 deleted, 29 modified) |
+| Files changed by this branch | 55 (19 added, 7 deleted, 29 modified; +2 853 / −979 as of `130b4d4`) |
 | Files deleted | 7 (the dead `apps/daftari/lib/core/hwid/` tree) |
 | Files introduced | 19 — 2 shared implementations (`print_server_config.dart`, `ip-rate-limiter.ts`), 1 shared C# source file (`PrintServer.Common/ParentPidParser.cs`), 1 CI composite action, 6 test files, 9 audit artifacts |
 | Files modified | 29 |
@@ -47,7 +47,7 @@ Seven further real defects that the audit had not originally recorded were disco
 
 ## Before-and-after metrics
 
-| Metric | Before (`db8fb5a`) | After (`8fe3802` + artifact commit) | Delta |
+| Metric | Before (`db8fb5a`) | After (`130b4d4` + this SHA-pinning commit) | Delta |
 |--------|--------------------|-------------------|-------|
 | Confirmed duplication findings | 4 | 0 open | −4 |
 | Confirmed unused declarations | 1 | 0 open | −1 |
@@ -118,7 +118,7 @@ Driven by the two independent reviewers, which ran once the provider rate-limit 
 - **`ef98e7f` — hardened the CI Hive-lock cleanup.** The composite action now exits 0 when the target directory is missing instead of failing the job, and the `fast-verify` cleanup step was moved **before** `melos run test` so it can actually prevent the stale-lock test failures it exists to prevent.
 - **`313bd72` — re-synced the specs.** 15 spec-drift items were corrected across `specs/ARCHITECTURE.md`, `PRD.md`, `DESIGN.md`, `USER_FLOW.md` and `DEVELOPMENT_ENVIRONMENT.md`: the removed `shorebirdAppId`, the deleted `RefreshLocalPrinters` event (38 → 37 event classes), the four-flavour `landing` flavour that does not exist, the stub's `UnsupportedError` contract, the `:5000`/`:5150` port split, the stale `core/backend/hwid/` tree entry, and `hydrated_bloc`'s dependency placement.
 
-### Round-3 fix wave (`68d0696`, `2b6e0a2`, `d5fa35e`, `73e3db8`, `a4ab4d3`, `8fe3802` + the artifact commit)
+### Round-3 fix wave (`68d0696`, `2b6e0a2`, `d5fa35e`, `73e3db8`, `a4ab4d3`, `8fe3802`, `130b4d4` + this SHA-pinning commit)
 Driven by the round-4 QA report (**STATUS BLOCKED**, Risk High) and the round-5 coverage report (**VERDICT FAIL**). This is **fix round 3 of 3** — the cap set by `implement-review-ship`; anything still open at its end is a human checkpoint, not a fourth round.
 
 - **`68d0696` — covered the Linux and Windows platform clients.** `LinuxPrintService.getLocalPrinters` and `WindowsPrintService.getLocalPrinters` had the same `on PrintException { rethrow; }` branch added in `111a0fe` but no behaviour test. Two new test files (8 + 8 tests) now cover the happy path, the empty list, the endpoint + `Accept` header, a custom base URL, HTTP 503 → `PrintException` with `statusCode == 503`, `ClientException` and `TimeoutException` → `originalError` preserved, and malformed JSON. **Proven first:** with the `rethrow` removed, both 503 tests fail with `statusCode with value <null>` (`MUTATION_TEST_EXIT=1`).
@@ -127,7 +127,7 @@ Driven by the round-4 QA report (**STATUS BLOCKED**, Risk High) and the round-5 
 - **`73e3db8` — corrected the HWID facts in the specs** (QA findings SPEC-1…SPEC-5): the live HWID tree, the Linux-vs-Windows provider selection, the async `getDeviceId()` / `verifyLicense()` contracts, the obsolete WMI / `dmidecode` / `lsblk` algorithms, and the dead `SessionSyncService` citation.
 - **`a4ab4d3` — recorded 8 out-of-scope findings** in `docs/followups.md` #85–#92 and as Plane items DAFTARI-191…198, including the high-priority DAFTARI-191 (the Worker rebuilds limiter state per request — proven pre-existing at base `db8fb5a`, and `backend/api/src/index.ts` is not a changed unit of this branch).
 - **`8fe3802` — removed the trailing whitespace** the QA reviewer flagged at `findings.md:106,141,159`; `git diff --check` is now clean branch-wide.
-- **artifact commit — rewrote the audit artifacts** for truthfulness (AUD-1…AUD-10): no blanket "READY TO MERGE" or "no behaviour changed" claim, the deliberate deltas enumerated above, every gate reported per step (PASSED / FAILED→GREEN ON RETRY / SKIPPED / NOT RUN), and the review-round findings recorded with their dispositions.
+- **`130b4d4` — rewrote the audit artifacts** for truthfulness (AUD-1…AUD-10): no blanket "READY TO MERGE" or "no behaviour changed" claim, the deliberate deltas enumerated above, every gate reported per step (PASSED / FAILED→GREEN ON RETRY / SKIPPED / NOT RUN), and the review-round findings recorded with their dispositions.
 
 ---
 
@@ -152,8 +152,8 @@ The earlier gate was **unsound**: it used `melos run test`, and `melos.yaml` run
 | `dotnet test` (Windows host) | `EXIT_DOTNET_TEST_WIN` | **PASSED** | 0 — 116 passed / 2 skipped |
 | `dotnet test` (Linux host) | `EXIT_DOTNET_TEST_LINUX` | **FAILED → GREEN ON RETRY** | 1 on the first attempt (PNG-collision flake, DAFTARI-185 / #79); isolation 10/10; retry 106/106 |
 | `flutter build linux --debug` | `EXIT_FLUTTER_BUILD_LINUX` | **PASSED** | 0 |
-| Scope audit `git diff origin/development...HEAD --stat` | `EXIT_SCOPE_AUDIT` | **PASSED** | 0 — 55 files, all inside the declared batch domains |
-| Branch sync | — | **PASSED** | 25 ahead / 0 behind of `origin/development` (base `db8fb5a`) |
+| Scope audit `git diff origin/development...HEAD --stat` | `EXIT_SCOPE_AUDIT` | **PASSED** | 0 — 55 files (19 added, 7 deleted, 29 modified; +2 853 / −979 as of `130b4d4`), all inside the declared batch domains |
+| Branch sync | — | **PASSED** | 25 ahead / 0 behind at the gate run (`8fe3802`); 27 ahead / 0 behind after `130b4d4` + this SHA-pinning commit (base `db8fb5a`) |
 
 **Three failures surfaced during sound-gate runs. Each is a race in a file this branch never touches, and each was re-run in isolation and passed. On the final run (`8fe3802`) only flake 3 reproduced — on its first attempt — and the immediate retry of that step was green:**
 
@@ -224,11 +224,11 @@ DAFTARI-188 is the most consequential of these: it means the desktop app's print
 |------|-------|
 | Working branch | `feat/codebase-cleanup-dedup` |
 | Base | `origin/development` @ `db8fb5a` |
-| Commits | 26 — 8 batch commits + 18 review-fix / documentation commits (see `implementation-progress.md` for the full list) |
+| Commits | 27 — 8 batch commits + 18 review-fix / documentation commits + 1 SHA-pinning commit (see `implementation-progress.md` for the full list) |
 | Working tree status | the 9 audit artifacts are committed explicitly (never `git add -A`); the two untracked user files (`enhance-code-prompt.md`, `untitled.excalidraw`) stay untracked and untouched |
 | Scope of changes | Dart printing/config/settings, Dart pubspec, TypeScript API routes + one new service, C# print server + one new shared source file, CI workflow + one composite action, specs, audit artifacts, follow-up registry |
 | Pre-existing user changes preserved | Yes — untracked user files untouched and never staged |
-| Branch state vs `origin/development` | 26 ahead / 0 behind after the artifact commit (already in sync) |
+| Branch state vs `origin/development` | 27 ahead / 0 behind after `130b4d4` + this SHA-pinning commit (already in sync) |
 | Merge policy | The agent does **not** merge. The PR is opened against `development` and the user merges manually. |
 
 ---
