@@ -63,7 +63,7 @@ lib/
 * **Barcode Export:** `RenderRepaintBoundary.toImage()` for PNG capture; `file_picker` for directory selection.
 * **UUID Generation:** `uuid` package for entity IDs (shift entities, receipts).
 * **Cloudflare Workers Backend:** `http` package for REST API calls to daftari-api; WebSocket for daftari-api (admin flavor only). Auth via Bearer Firebase ID tokens.
-* **Build Flavors:** Three flavors via `--dart-define=FLAVOR=<local|cloud|admin>` — local (desktop only), cloud (desktop+web, Turso sync), admin (web/WASM, dashboard). The Jaspr marketing site is a separate package (`landing_page/`), not an app flavor.
+* **Build Flavors:** Three flavors via `--dart-define=FLAVOR=<local|cloud|admin>` — local (desktop only), cloud (desktop only, Turso sync), admin (web/WASM, dashboard). The Jaspr marketing site is a separate package (`landing_page/`), not an app flavor.
 * **Environment Config:** Three environments via `--dart-define=ENV=<development|staging|production>` — each with dedicated Cloudflare Worker URLs and Turso DB.
 * **HWID Provider:** Platform-specific hardware identification for license binding, implemented in `lib/core/licensing/infrastructure/hwid/` (Windows `reg query` MachineGuid, Linux `/etc/machine-id`).
 * **Database Migrations:** 14-version migration framework with dry-run, retry, rollback, and shard limit enforcement.
