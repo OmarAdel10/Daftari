@@ -101,6 +101,7 @@ The security section raised **no** new findings: no auth, payment, PII or crypto
 | 4 | `ses_e1b9090e2ffeTflDiHEy0McwGG` | No report returned (provider error) — superseded by round 5 | — | n/a |
 | 5 | `ses_e1b400d92ffdJtqEie50Kw8Wh4` | **Reported — VERDICT FAIL** (reviewed HEAD `1ed1f7b`) | 3 Medium (M1 `LinuxPrintService.getLocalPrinters`, M2 `WindowsPrintService.getLocalPrinters`, M3 limiter fail-open semantics) + 4 Low | **All 3 Medium closed** in `68d0696` / `2b6e0a2`; 1 of the 4 Low gaps closed by the same limiter test, the other 3 tracked as DAFTARI-194…196; two weak-test notes tracked as DAFTARI-197 / DAFTARI-198 |
 | 6 | `ses_e184bfa2effe9NnBubMDczfV0a` | **Reported — VERDICT FAIL** (reviewed HEAD `a0b195d`) | 6 Low (G1…G6 below), 0 Critical/High/Medium, score 94 | G4 + G6 **closed in wave 4** (`702e26e` / `48523fe`); G1–G3 + G5 deferred by explicit user decision (DAFTARI-194…197, DAFTARI-199) |
+| 7 | `ses_e14908877ffeHMViRS6U0GBkZe` | **Reported — VERDICT FAIL** (reviewed HEAD `8eb73fd`) | 4 Low, 0 Critical/High/Medium, score 96 (strict zero-gap gate FAIL) | The same 4 gaps: the Windows netstat PID parser (`print_server_manager.dart:348-362`), the Linux `ss` PID parser (`print_server_manager_linux.dart:370-387`), the Linux spawn `ASPNETCORE_URLS` seam (`print_server_manager_linux.dart:230-239`) and the Hive-lock cleanup action fixture test (`.github/actions/cleanup-hive-locks/action.yml:15-28`). All stay deferred by explicit user decision as DAFTARI-194…197 / DAFTARI-199 |
 
 **Report (round 3):** the reviewer ran the full analysis on the branch diff and returned **FAIL — the zero-gap gate was not met**. Its measured evidence: Flutter printing tests 6 passed; API route tests 191 passed; Parent PID parser tests 8 passed; the new TypeScript helper at 66.66 % statements / 50 % branches / 78.57 % lines with `ip-rate-limiter.ts:47-49` uncovered; `print_service_desktop.dart` at 2/79 lines with the new `getLocalPrinters()` at 0 %.
 
@@ -202,6 +203,14 @@ Every finding was independently verified against the source before disposition. 
 | 10 | minor | `docs/followups.md:106` | The WebPrintService follow-up lists receipt routes that do not exist on the sidecar | **True** — the entry named `/api/printing/print-receipt`, while `PrintServer/Program.cs` maps `/api/printing/receipt` (:70), `barcode` (:202), `ticket` (:217), `health` (:61) and `local-printers` (:64); `PrintServer.Linux/Program.cs` mirrors them at :93/:249/:277 | Low | **Fixed** in `d095d82` — the entry now lists the real routes |
 | 11 | minor | `specs/ARCHITECTURE.md:66` | The Build Flavors summary listed web as a cloud target | **True** — `flavor_config.dart:76` local → `['windows','linux']`, `:89` cloud → `['windows','linux']`, `:102` admin → `['web']`. The line is inside the branch diff (`313bd72` changed "Four flavors" → "Three flavors" on that exact line and left the pre-existing platform inaccuracy) | Low | **Fixed** in `26321f4` — the line now reads `cloud (desktop only, Turso sync)` |
 
+### Round 5 — 1 finding (`minor`), on the wave-4 artifact commit
+
+`coderabbit review --agent --base origin/development` run on `8eb73fd`; the CLI reported `review_completed` with 1 finding.
+
+| # | CodeRabbit severity | Location | Claim | Verified verdict | Gate class | Action |
+|---|--------------------|----------|-------|------------------|-----------|--------|
+| 12 | minor | `specs/USER_FLOW.md:1818` | The device-session section reads as active app behaviour: the diagram presents registration as an app-startup flow and the following bullets present heartbeat and cleanup as active, while the new note says no live Flutter code starts a device session | **True.** `SessionSyncService` (`apps/daftari/lib/core/backend/workers/session_sync_service.dart:21`) has zero importers (grep over the whole repo finds only its own class declaration), so the flow in section 20c is unwired. The note added by this branch and the surrounding diagram/bullets contradicted each other. | Low | **Fixed** in `72851e3` — section 20c is labelled "planned, not wired", the diagram carries a "no live Flutter caller executes these steps today" banner, and the heartbeat / cleanup / active-sessions bullets are marked as planned |
+
 ### CodeRabbit gate result
 
 | Round | Reviewed commit | Critical | High | Medium | Low | Score (`100 − 25C − 10H − 5M − L`) | Gate |
@@ -211,6 +220,7 @@ Every finding was independently verified against the source before disposition. 
 | 2 | `4782788` | 0 | 0 | 0 | 0 | 100 | PASS |
 | 3 | `a0b195d` (after the artifact wave) | 0 | 0 | 0 | 0 | 100 | PASS — 2 Low fixed, 1 `major` rejected on a false premise |
 | 4 | `4d7fc43` (before wave 4) | 0 | 0 | 0 | 1 | 99 | PASS after fixing the Low in the wave-4 artifact commit (the residual-risk summary now also lists the pending final-QA findings) |
+| 5 | `8eb73fd` (wave-4 artifact commit) | 0 | 0 | 0 | 1 | 99 | PASS after fixing the Low in `72851e3` |
 
 Zero confirmed Critical/High/Medium remain on the current HEAD. CodeRabbit findings were **not** passed to the independent reviewers.
 
@@ -268,7 +278,9 @@ The three scripted fix rounds were spent, so the user was asked for a decision a
 | `702e26e` | apps/daftari | `print_service_test.dart` now compares two `PrintServiceFactory.create()` results and asserts they are distinct instances (closes G4 / DAFTARI-198) | MUTATION: with `create()` returning the cached singleton the test fails (`Expected: not same instance as <Instance of 'PrintServiceStub'>`); source restored | `dart format --set-exit-if-changed lib test` → 510 files, 0 changed; `flutter analyze` → "No issues found!"; `flutter test test/core/printing/print_service_test.dart` → 4 passed |
 | `48523fe` | backend/api | New limiter test mixes an active IP with expired IPs under the soft cap and proves the active entry survives and keeps the budget it already spent (closes G6 / DAFTARI-200) | MUTATION: with the soft-cap sweep deleting active entries the test fails (`expected +0 to be 3`); source restored | `npm run typecheck` → exit 0; `npm test` → 29 files / **493** passed, exit 0 |
 | `a361643` | specs + apps/daftari | SPEC-01 (PRD cloud flavour), SPEC-02 (ARCHITECTURE factory/stub behaviour), SPEC-03 (PERFORMANCE_GUIDELINES HWID caching), CODE-01 (`print_server_config.dart` comment narrowed to the Dart clients) | n/a (documentation) | `git diff --check` → exit 0 |
-| artifact commit | docs | AUD-01…AUD-05 audit corrections, the CodeRabbit round-4 Low fix, the wave-4 authorization record, and the follow-up closures for #92 / #94 | n/a (documentation) | `git diff --check` → exit 0 |
+| artifact commit (`8eb73fd`) | docs | AUD-01…AUD-05 audit corrections, the CodeRabbit round-4 Low fix, the wave-4 authorization record, and the follow-up closures for #92 / #94 | n/a (documentation) | `git diff --check` → exit 0; `dart format --set-exit-if-changed lib test` → 510 files, 0 changed; `flutter analyze` → "No issues found!" |
+| `72851e3` | specs | CodeRabbit round-5 Low fix: the device-session flow in `specs/USER_FLOW.md` is labelled planned and not wired, with its heartbeat / cleanup / active-sessions bullets marked as planned | n/a (documentation) | `git diff --check` → exit 0; `dart format --set-exit-if-changed lib test` → 510 files, 0 changed; `flutter analyze` → "No issues found!" |
+| artifact commit | docs | CodeRabbit round-5 record + wave-4 coverage round-7 record | n/a (documentation) | `git diff --check` → exit 0 |
 
 ## Review discipline
 
