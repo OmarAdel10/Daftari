@@ -68,10 +68,10 @@ describe('createIpRateLimiter', () => {
     expect(limiter.size()).toBe(3);
 
     // Two seconds later every earlier hit is expired, so the next call
-    // sheds the stale entries.
+    // sheds the stale entries and keeps only the fresh IP.
     limiter('4.4.4.4', 2_000);
 
-    expect(limiter.size()).toBeLessThanOrEqual(3);
+    expect(limiter.size()).toBe(1);
   });
 
   it('keeps the tracked IP count within the hard bound', () => {
@@ -86,7 +86,65 @@ describe('createIpRateLimiter', () => {
       limiter(`10.0.0.${i}`, 1_000);
     }
 
-    expect(limiter.size()).toBeLessThanOrEqual(3);
+    expect(limiter.size()).toBe(3);
+  });
+
+  it('fails open with a fresh budget when the hard bound evicts an active IP', () => {
+    const limiter = createIpRateLimiter({
+      windowMs: 60_000,
+      maxPerWindow: 1,
+      maxEntries: 1,
+    });
+
+    expect(limiter('1.1.1.1', 1_000)).toEqual({
+      allowed: true,
+      retryAfterMs: 0,
+    });
+    // The second IP pushes the map past the hard bound, so the oldest
+    // tracked IP is dropped even though its window is still open.
+    expect(limiter('2.2.2.2', 1_000)).toEqual({
+      allowed: true,
+      retryAfterMs: 0,
+    });
+    expect(limiter.size()).toBe(1);
+
+    // The evicted IP is re-admitted with a fresh budget instead of being
+    // denied for a window it can no longer be tracked against.
+    expect(limiter('1.1.1.1', 1_100)).toEqual({
+      allowed: true,
+      retryAfterMs: 0,
+    });
+    expect(limiter('1.1.1.1', 1_200)).toEqual({
+      allowed: false,
+      retryAfterMs: 59_900,
+    });
+  });
+
+  it('bounds expired-entry eviction work per call and finishes it over repeated calls', () => {
+    const limiter = createIpRateLimiter({
+      windowMs: 1_000,
+      maxPerWindow: 100,
+      softCap: 10,
+      maxEntries: 2_000,
+    });
+
+    for (let i = 0; i < 1_500; i += 1) {
+      limiter(`10.0.${Math.floor(i / 256)}.${i % 256}`, 0);
+    }
+    expect(limiter.size()).toBe(1_500);
+
+    // One call must not shed every expired entry: eviction work is bounded
+    // per call so a single request cannot scan the whole map.
+    limiter('192.0.2.1', 2_000);
+    expect(limiter.size()).toBeGreaterThan(1);
+
+    let calls = 1;
+    while (limiter.size() > 1 && calls < 20) {
+      limiter('192.0.2.1', 2_000);
+      calls += 1;
+    }
+
+    expect(limiter.size()).toBe(1);
   });
 
   it('reports how many IPs are currently tracked', () => {
