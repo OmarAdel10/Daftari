@@ -180,6 +180,39 @@ describe('createIpRateLimiter', () => {
     expect(limiter.size()).toBe(2);
   });
 
+  it('keeps an active IP and its remaining budget when the soft cap sheds expired IPs', () => {
+    const limiter = createIpRateLimiter({
+      windowMs: 60_000,
+      maxPerWindow: 2,
+      softCap: 2,
+      maxEntries: 10,
+    });
+
+    limiter('2.2.2.2', 0);
+    limiter('3.3.3.3', 0);
+    limiter('4.4.4.4', 0);
+    expect(limiter.size()).toBe(3);
+
+    // The three earlier IPs are one full window old, so this call sheds
+    // them while the newly-seen IP is still inside its own window.
+    expect(limiter('1.1.1.1', 60_000)).toEqual({
+      allowed: true,
+      retryAfterMs: 0,
+    });
+    expect(limiter.size()).toBe(1);
+
+    // The surviving IP keeps the budget it already spent: the second hit
+    // is admitted and the third is denied against the first hit.
+    expect(limiter('1.1.1.1', 60_001)).toEqual({
+      allowed: true,
+      retryAfterMs: 0,
+    });
+    expect(limiter('1.1.1.1', 60_002)).toEqual({
+      allowed: false,
+      retryAfterMs: 59_998,
+    });
+  });
+
   it('cannot be constructed without a hard entry bound', () => {
     // Compile-time contract: a limiter without maxEntries would grow its
     // map without limit, so the option must stay required and non-optional.
