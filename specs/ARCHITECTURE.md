@@ -1294,7 +1294,8 @@ lib/core/licensing/
 │   │   └── key_store.dart               — Build-time public key via `--dart-define=ED25519_PUBKEY_HEX`
 │   ├── hwid/
 │   │   ├── hwid_provider.dart           — Abstract HWID provider interface
-│   │   └── windows_hwid_provider.dart   — Windows MachineGuid extraction
+│   │   ├── linux_hwid_provider.dart     — Linux machine-id extraction
+│   │   └── windows_hwid_provider.dart    — Windows MachineGuid extraction
 │   └── storage/
 │       ├── license_storage.dart         — Abstract storage interface
 │       ├── secure_storage_adapter.dart   — Primary: flutter_secure_storage
@@ -1313,7 +1314,7 @@ Central class with 4 injected dependencies:
 
 | Dependency | Implementation | Purpose |
 |---|---|---|
-| `HwidProvider` | `WindowsHwidProvider` | Extracts machine-bound HWID via `reg query MachineGuid`, returns `CS-XXXX-XXXX` format |
+| `HwidProvider` | `LinuxHwidProvider` on Linux, `WindowsHwidProvider` otherwise (`LicenseEngine._defaultHwidProvider()`) | Extracts machine-bound HWID via `reg query MachineGuid` (Windows) or `/etc/machine-id` → `/var/lib/dbus/machine-id` (Linux), returns `CS-XXXX-XXXX` format |
 | `LicenseStorage` (primary) | `SecureStorageAdapter` | Encrypted storage via `FlutterSecureStorage` (DPAPI on Windows) |
 | `LicenseStorage` (backup) | `FileBackupAdapter` | XOR-obfuscated file at `getApplicationSupportDirectory()/Daftari/license.lic` |
 | `Ed25519Verifier` | `Ed25519Verifier` | Offline asymmetric signature verification via `cryptography` package |
@@ -1322,10 +1323,10 @@ Central class with 4 injected dependencies:
 
 | Method | Behavior |
 |---|---|
-| `verifyLicense()` → `LicenseStatus` | Checks primary storage first, falls back to backup. Self-heals: if backup valid but primary corrupt, restores primary from backup. Calls `_validateEntity()` which verifies Ed25519 signature (not just device ID match) — if signature fails → `tampered`. Both empty → `invalid`. |
-| `verifyLicense()` → `LicenseStatus` | Runtime gating reuse — `ShiftBloc.StartShift` (`shift_bloc.dart:30`) and `CheckoutBloc.ConfirmSale` (`checkout_bloc.dart:118`) call it directly; any status != `valid` blocks with a `DatabaseFailure`. |
+| `verifyLicense()` → `Future<LicenseStatus>` | Checks primary storage first, falls back to backup. Self-heals: if backup valid but primary corrupt, restores primary from backup. Calls `_validateEntity()` which verifies Ed25519 signature (not just device ID match) — if signature fails → `tampered`. Both empty → `invalid`. |
+| `verifyLicense()` → `Future<LicenseStatus>` | Runtime gating reuse — `ShiftBloc.StartShift` (`shift_bloc.dart:32-45`) and `CheckoutBloc.ConfirmSale` (`checkout_bloc.dart:154-167`) call it directly; any status != `valid` blocks with a `DatabaseFailure`. |
 | `activate(String key)` → `Future<bool>` | Gets device ID, verifies key as Ed25519 signature of device ID, writes `LicenseEntity` to both storage providers. Returns `true` only when the key verifies and both storages are written; `false` on invalid key or failure. |
-| `getDeviceId()` → `String` | Cached wrapper around `HwidProvider.getHardwareId()`. |
+| `getDeviceId()` → `Future<String>` | Cached wrapper around `HwidProvider.getHardwareId()` (`Future<String?>`); caches the first resolved value in `_cachedDeviceId` and returns the `UNKNOWN-MACHINE` sentinel when the provider yields `null`. |
 
 #### License Status Machine
 
@@ -1364,13 +1365,14 @@ ActivationLoading
             └──→ ActivationError(message) (retry)
 ```
 
-#### HWID Binding (Windows)
+#### HWID Binding (Windows and Linux)
 
-- Reads `HKLM\SOFTWARE\Microsoft\Cryptography\MachineGuid` via `reg query`
-- Strips dashes, takes last 8 hex characters
-- Formats as `CS-XXXX-XXXX`
-- Zero admin required — reads standard registry key
-- `HwidProvider` interface is abstract; Windows and Linux are both implemented (`WindowsHwidProvider`, `LinuxHwidProvider`)
+- `HwidProvider` is an abstract interface with one async method: `Future<String?> getHardwareId()`
+- **Windows** (`WindowsHwidProvider`): reads `HKLM\SOFTWARE\Microsoft\Cryptography\MachineGuid` with a single `reg QUERY` process — zero admin required, it reads a standard registry key
+- **Linux** (`LinuxHwidProvider`): reads `/etc/machine-id`, falling back to `/var/lib/dbus/machine-id` — no root required
+- Both providers strip dashes, take the last 8 hex characters and format them as `CS-XXXX-XXXX`
+- `LicenseEngine._defaultHwidProvider()` selects `LinuxHwidProvider` when `Platform.isLinux`, otherwise `WindowsHwidProvider`
+- `LicenseEngine.getDeviceId()` caches the resolved value and returns `UNKNOWN-MACHINE` when the provider yields `null` (that sentinel cannot be activated)
 
 #### Cryptographic Verification
 

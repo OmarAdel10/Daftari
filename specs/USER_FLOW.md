@@ -1795,9 +1795,9 @@ Retention: 90-day rolling
 [ App starts (cloud/admin flavor) → LicenseEngine.verifyLicense() valid ]
               │
               ▼
-[ HWIDProvider.getHwid() ]
-   │  Windows: WMI (MachineGuid + CPU + Motherboard + BIOS + Disk)
-   │  Linux: /etc/machine-id + cpuinfo + dmidecode + lsblk
+[ LicenseEngine.getDeviceId() → HwidProvider.getHardwareId() ]
+   │  Windows: reg QUERY HKLM\SOFTWARE\Microsoft\Cryptography (MachineGuid)
+   │  Linux: /etc/machine-id → /var/lib/dbus/machine-id
    ▼
 [ SessionSyncService.startSession(deviceHwid, deviceName, platform, username, idToken) ]
               │
@@ -1815,6 +1815,7 @@ Retention: 90-day rolling
   & cleanup     Business=4)
 ```
 
+* **Client wiring:** `SessionSyncService` is the only client-side caller of these endpoints and currently has **zero importers** — the server routes exist, but no live Flutter code starts a device session yet (tracked as DAFTARI-184).
 * **Heartbeat:** Periodic `SessionSyncService.heartbeat(sessionId, idToken)` → POST `/sessions/heartbeat`.
 * **Cleanup:** On logout/shift end → `SessionSyncService.endSession(sessionId, idToken)`.
 * **Active Sessions List:** `SessionSyncService.activeSessions(idToken)` → GET `/sessions/active`.

@@ -197,9 +197,10 @@ The behaviors below are **current code reality** and are documented here as ackn
 * **In-Memory Analytics Queue:** `AnalyticsService` batches up to 50 events before flushing -- reduces HTTP overhead. Queue lost on app close (acceptable for analytics).
 
 #### 8.2 HWID Provider Performance
-* **Windows WMI:** `WindowsHwidProvider` runs 5 `wmic` processes sequentially. Cache the HWID after first successful retrieval -- `LicenseEngine.getDeviceId()` already caches.
-* **Linux System Files (Experimental / Development Only):** `LinuxHwidProvider` reads multiple files (`/etc/machine-id`, `/proc/cpuinfo`, etc.) and optionally runs `dmidecode`/`lsblk`. Cache result; avoid `dmidecode` in hot paths (requires root). Linux HWID support is experimental/development only.
-* **Fallback Cost:** Stub providers are O(1) -- no performance concern.
+* **Windows:** `WindowsHwidProvider` runs ONE `reg QUERY` process against `HKLM\SOFTWARE\Microsoft\Cryptography` (no WMI, no `wmic`).
+* **Linux (Experimental / Development Only):** `LinuxHwidProvider` reads ONE file -- `/etc/machine-id`, falling back to `/var/lib/dbus/machine-id`. It performs no `dmidecode`/`lsblk` calls and needs no root.
+* **Caching:** `LicenseEngine.getDeviceId()` resolves the provider at most once per engine instance (`_cachedDeviceId`) and returns the `UNKNOWN-MACHINE` sentinel when the provider yields `null`.
+* **No stub providers:** the licensing tree has no stub/always-null HWID implementation -- both platform providers perform real I/O.
 
 #### 8.3 Theme Manager Performance
 * **ThemeData Construction:** `ThemeManager._loadTheme()` creates new `ThemeData` on each switch. Acceptable for user-initiated theme changes (rare). Do NOT call in build methods.
@@ -229,7 +230,7 @@ The behaviors below are **current code reality** and are documented here as ackn
 
 ### 9. Updated Known Deviations (Hot Paths)
 
-12. **HWID Provider caching (resolved)**: `LicenseEngine.getDeviceId()` caches the resolved device ID (`_cachedDeviceId`) and reuses it, so the provider is queried at most once per engine instance. `SessionSyncService` does not call the HWID provider — it receives `deviceHwid` as a constructor argument.
+12. **HWID Provider caching (resolved)**: `LicenseEngine.getDeviceId()` caches the resolved device ID (`_cachedDeviceId`) and reuses it, so the provider is queried at most once per engine instance. No other live component queries the HWID provider.
 13. **Analytics queue flush on every event**: `AnalyticsService.track()` flushes immediately (no debounce). Consider batching with 5s debounce for high-frequency events.
 14. **PrintServiceFactory.create() called per print operation**: Consumers call `create()` instead of using singleton `instance`. Each call does platform detection (cheap but unnecessary).
 15. **ThemeManager style lists recreated on each access**: `getReceiptStyles()`/`getInvoiceStyles()`/`getExportStyles()` allocate new lists. Cache with `late` initializers if accessed frequently.
