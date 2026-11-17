@@ -611,7 +611,7 @@ Settings surface adapts per business type: read-only business-type card, favorit
 #### R3: Build Flavors (`lib/core/config/flavor_config.dart`)
 * **Three Flavors** (set via `--dart-define=FLAVOR=<name>`):
   * **local**: Desktop only, no cloud sync, license required, max 1 device, platforms: windows/linux
-  * **cloud**: Desktop + web, cloud sync via Turso, tier-dependent device limits (up to 4), platforms: windows/linux
+  * **cloud**: Desktop only, cloud sync via Turso, tier-dependent device limits (up to 4), platforms: windows/linux
   * **admin**: Flutter web WASM, full admin dashboard, cloud sync, platform: web
   (The Jaspr marketing site is a separate package — `landing_page/` — not an app flavor.)
 * **FlavorConfig Properties:** `requiresAuth`, `requiresLicense`, `autoLicenseOnPayment`, `hasCloudSync`, `hasAdminDashboard`, `hasLocalPrinting`, `hasPushNotifications`, `maxDevices`, `supportedPlatforms`.
