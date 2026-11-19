@@ -21,7 +21,7 @@ The cleanup is **deliberately narrow, and it is not a blanket "no behaviour chan
 | 1 | The per-IP rate-limiter map is now **hard-bounded** (`maxEntries`, oldest-seen eviction, fail-open) and the per-call eviction scan is capped; `maxEntries` is a **required** option | Behaviour change — intentional, security hardening of an unbounded map (CWE-400) | The limiter maps are created per `createApp()`; see delta 6 — the bound only takes effect wherever a limiter instance outlives one request |
 | 2 | Print-service base-URL literals `:5000` / `:5001` → the sidecar's real `:5150` | Value change | No consumer reads `PrintService.baseUrl`; the platform services are not wired by the factory (delta 5) |
 | 3 | The dead `apps/daftari/lib/core/hwid/` tree was deleted | Removal of unreachable code (0 importers) | None — proven at the base commit |
-| 4 | `hydrated_bloc` moved to `dev_dependencies` | Packaging change | None — 27 test imports, 0 `lib/` imports |
+| 4 | `hydrated_bloc` moved to `dev_dependencies` | Packaging change | None — 31 test files import it, 0 `lib/` imports |
 | 5 | `PrintServiceFactory` semantics unchanged (the no-op stub was already what the factory returned) | No change | The factory still returns the no-op stub — a pre-existing product defect, tracked as DAFTARI-188 |
 | 6 | The Worker still rebuilds the app (and therefore the limiter state) **per request** | **Pre-existing — not a branch delta** | Verified at base `db8fb5a:backend/api/src/index.ts`; `backend/api/src/index.ts` and `backend/api/src/app.ts` are **not** changed units of this branch — tracked as DAFTARI-191 / #85 |
 
@@ -75,11 +75,11 @@ Seven further real defects that the audit had not originally recorded were disco
 - Corrected `docs/followups.md` #25 to `[REJECTED]`: no `AppFlavor.landing` exists — `AppFlavor` is `{local, cloud, admin}`.
 
 ### Batch 2 — Dependency hygiene (`a8649dc`)
-- Moved `hydrated_bloc` from `dependencies` to `dev_dependencies` in `apps/daftari/pubspec.yaml` (27 test imports, zero `lib/` imports).
+- Moved `hydrated_bloc` from `dependencies` to `dev_dependencies` in `apps/daftari/pubspec.yaml` (31 test files import it, zero `lib/` imports).
 
 ### Batch 3 — Backend rate-limiter deduplication (`67fc1ca`)
 - Added `backend/api/src/application/services/ip-rate-limiter.ts` with a `createIpRateLimiter` factory.
-- `sessions.ts` and `sales.ts` now share it; the `sessions.ts` map-capping semantics (soft cap 10 000 / hard cap 5 000) are preserved exactly.
+- `sessions.ts` and `sales.ts` now share it; both routes bound the map with the required `maxEntries: 10 000` (the base `sessions.ts` constants were `softCap: 10 000` / `hardCap: 5 000`, but the base loop only evicted fully-expired entries, so the map was effectively unbounded — see the deliberate-delta table).
 
 ### Batch 4 — Print service consolidation + port alignment (`d5862b2`)
 - `print_service_interface.dart` is now the single `PrintService` contract; the duplicate interface in `print_service_stub.dart` and the duplicate `StubPrintService` in `print_service_factory.dart` are gone.
