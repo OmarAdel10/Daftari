@@ -4,16 +4,17 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-import 'print_service_stub.dart';
+import 'print_server_config.dart';
+import 'print_service_interface.dart';
 
 /// Desktop Print Service implementation using C# PrintServer sidecar.
 class PrintServiceDesktop implements PrintService {
-  static const String _defaultBaseUrl = 'http://127.0.0.1:5000';
+  @override
   final String baseUrl;
   final http.Client _client;
 
   PrintServiceDesktop({String? baseUrl, http.Client? client})
-    : baseUrl = baseUrl ?? _defaultBaseUrl,
+    : baseUrl = baseUrl ?? kPrintServerBaseUrl,
       _client = client ?? http.Client();
 
   @override
@@ -96,6 +97,42 @@ class PrintServiceDesktop implements PrintService {
       return response.statusCode == 200;
     } catch (_) {
       return false;
+    }
+  }
+
+  @override
+  Future<List<String>> getLocalPrinters() async {
+    try {
+      final response = await _client
+          .get(
+            Uri.parse('$baseUrl/api/printing/local-printers'),
+            headers: {'Accept': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.cast<String>();
+      }
+      throw PrintException(
+        'Failed to fetch printers: ${response.statusCode}',
+        endpoint: '/api/printing/local-printers',
+        statusCode: response.statusCode,
+      );
+    } on PrintException {
+      rethrow;
+    } on http.ClientException catch (e) {
+      throw PrintException(
+        'Network error getting printers: $e',
+        endpoint: '/api/printing/local-printers',
+        originalError: e,
+      );
+    } catch (e) {
+      throw PrintException(
+        'Failed to get local printers: $e',
+        endpoint: '/api/printing/local-printers',
+        originalError: e,
+      );
     }
   }
 

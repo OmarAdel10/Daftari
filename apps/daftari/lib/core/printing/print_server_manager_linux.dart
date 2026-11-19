@@ -3,14 +3,14 @@ import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
 
+import 'print_server_config.dart';
 import 'print_server_interface.dart';
 
 /// Linux implementation of the PrintServer sidecar manager.
 /// Spawns PrintServer.Linux self-contained binary, passes --parent-pid,
 /// and uses Linux-native tools (ss, ps, kill) for stale instance cleanup.
 class PrintServerManagerLinux implements IPrintServerManager {
-  static const String _healthEndpoint =
-      'http://127.0.0.1:5150/api/printing/health';
+  static const String _healthEndpoint = kPrintServerHealthEndpoint;
 
   /// Minimum API version the sidecar must report to be usable.
   static const int requiredServerVersion = 4;
@@ -57,14 +57,14 @@ class PrintServerManagerLinux implements IPrintServerManager {
       _process = null;
       _isRunning = true;
       log(
-        '[PrintServer.Linux] Adopting healthy existing instance on port 5150.',
+        '[PrintServer.Linux] Adopting healthy existing instance on port $kPrintServerPort.',
       );
       return;
     }
 
     if (existing != null) {
       log(
-        '[PrintServer.Linux] Existing instance on 5150 reports API version '
+        '[PrintServer.Linux] Existing instance on $kPrintServerPort reports API version '
         '$existing (need >= $requiredServerVersion) — killing stale instance.',
       );
     }
@@ -234,7 +234,7 @@ class PrintServerManagerLinux implements IPrintServerManager {
               environment: {
                 ...Platform.environment,
                 'DOTNET_hostBuilder:reloadConfigOnChange': 'false',
-                'ASPNETCORE_URLS': 'http://127.0.0.1:5150',
+                'ASPNETCORE_URLS': kPrintServerBaseUrl,
               },
             );
 
@@ -302,8 +302,8 @@ class PrintServerManagerLinux implements IPrintServerManager {
     return last;
   }
 
-  /// Kills any PrintServer.Linux still listening on port 5150 (a stale instance
-  /// from a crashed previous run that is no longer answering).
+  /// Kills any PrintServer.Linux still listening on the PrintServer port (a
+  /// stale instance from a crashed previous run that is no longer answering).
   Future<void> _killStaleInstance() async {
     if (_pidsOnPortOverride == null && !Platform.isLinux) return;
 
@@ -311,9 +311,9 @@ class PrintServerManagerLinux implements IPrintServerManager {
     try {
       pids = _pidsOnPortOverride != null
           ? await _pidsOnPortOverride()
-          : await _pidsListeningOnPort5150();
+          : await _pidsListeningOnPrintServerPort();
     } catch (e) {
-      log('[PrintServer.Linux] Could not inspect port 5150: $e');
+      log('[PrintServer.Linux] Could not inspect port $kPrintServerPort: $e');
       return;
     }
     if (pids.isEmpty) return;
@@ -326,7 +326,7 @@ class PrintServerManagerLinux implements IPrintServerManager {
         if (!isPrintServer) continue;
 
         log(
-          '[PrintServer.Linux] Killing stale instance (PID $processPid) holding port 5150.',
+          '[PrintServer.Linux] Killing stale instance (PID $processPid) holding port $kPrintServerPort.',
         );
         if (_killOverride != null) {
           await _killOverride(processPid);
@@ -366,12 +366,17 @@ class PrintServerManagerLinux implements IPrintServerManager {
     return args.trim().contains('PrintServer.Linux');
   }
 
-  /// Returns PIDs of processes listening on TCP port 5150 (via ss).
-  Future<List<int>> _pidsListeningOnPort5150() async {
-    final result = await Process.run('ss', ['-ltnp', 'sport = :5150']);
+  /// Returns PIDs of processes listening on the PrintServer TCP port (via ss).
+  Future<List<int>> _pidsListeningOnPrintServerPort() async {
+    final result = await Process.run('ss', [
+      '-ltnp',
+      'sport = :$kPrintServerPort',
+    ]);
     final pids = <int>{};
     for (final line in result.stdout.toString().split('\n')) {
-      if (!line.contains(':5150') || !line.contains('LISTEN')) continue;
+      if (!line.contains(':$kPrintServerPort') || !line.contains('LISTEN')) {
+        continue;
+      }
       // Parse PID from: users:(("PrintServer.Linux",pid=12345,fd=6))
       final match = RegExp(r'pid=(\d+)').firstMatch(line);
       if (match != null) {

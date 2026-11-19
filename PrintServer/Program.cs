@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Threading.RateLimiting;
+using PrintServer.Common;
 using PrintServer.Models;
 using PrintServer.Services;
 
@@ -40,7 +41,7 @@ builder.Services.AddSingleton<InvoiceService>();
 builder.Services.AddSingleton<SalesExportService>();
 builder.Services.AddSingleton<SvgValidator>();
 
-var parentPid = ParseParentPid(args);
+var parentPid = ParentPidParser.Parse(args);
 if (parentPid > 0)
 {
     // Kill ourselves when the cashier app exits (crash or close) so the
@@ -224,18 +225,3 @@ app.MapPost("/api/printing/ticket", (TicketRequest request, PrinterService print
 });
 
 app.Run();
-
-static int ParseParentPid(string[] args)
-{
-    const string flag = "--parent-pid";
-    for (var i = 0; i < args.Length; i++)
-    {
-        var arg = args[i];
-        if (arg == flag && i + 1 < args.Length && int.TryParse(args[i + 1], out var next))
-            return next;
-        if (arg.StartsWith(flag + "=", StringComparison.OrdinalIgnoreCase) &&
-            int.TryParse(arg[(flag.Length + 1)..], out var inline))
-            return inline;
-    }
-    return 0;
-}

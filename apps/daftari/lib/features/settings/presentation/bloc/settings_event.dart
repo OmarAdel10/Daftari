@@ -104,10 +104,6 @@ final class BarcodePrinterNameChanged extends SettingsEvent {
   const BarcodePrinterNameChanged(this.printerName);
 }
 
-final class RefreshLocalPrinters extends SettingsEvent {
-  const RefreshLocalPrinters();
-}
-
 final class BarcodeActionPreferenceChanged extends SettingsEvent {
   final String value;
   const BarcodeActionPreferenceChanged(this.value);

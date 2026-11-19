@@ -45,6 +45,13 @@ function(APPLY_STANDARD_SETTINGS TARGET)
   target_compile_definitions(${TARGET} PRIVATE "$<$<CONFIG:Debug>:_DEBUG>")
 endfunction()
 
+# The firebase_auth Windows plugin is compiled with warnings-as-errors and
+# trips MSVC C4238 ("nonstandard extension used: class rvalue used as lvalue")
+# in its own third-party sources, which fails the whole app build. Suppress
+# only that warning: add_compile_options here also reaches the plugin targets
+# created by flutter/generated_plugins.cmake below.
+add_compile_options(/wd4238)
+
 # Flutter library and tool build rules.
 set(FLUTTER_MANAGED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/flutter")
 add_subdirectory(${FLUTTER_MANAGED_DIR})

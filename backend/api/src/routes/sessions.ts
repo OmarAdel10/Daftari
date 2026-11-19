@@ -33,6 +33,7 @@ import type { SessionStartDto } from '../application/dtos/session-start.dto';
 import type { SessionHeartbeatDto } from '../application/dtos/session-heartbeat.dto';
 import type { SessionEndDto } from '../application/dtos/session-end.dto';
 import type { SessionListActiveDto } from '../application/dtos/session-list-active.dto';
+import { createIpRateLimiter } from '../application/services/ip-rate-limiter';
 
 export function registerSessions(
   app: Hono<{ Bindings: Env; Variables: Vars }>,
@@ -59,31 +60,16 @@ export function registerSessions(
     sessionListActive,
   } = deps;
 
-  // Fallback limiter for /sessions/start: 30 starts/min/IP. State is bound to
-  // this app instance (fresh per isolate/createApp), so tests get isolation
-  // for free and production pays only one window per isolate.
-  const SESSION_START_WINDOW_MS = 60_000;
-  const SESSION_START_MAX_PER_WINDOW = 30;
-  const SESSION_START_IP_MAP_SOFT_CAP = 10_000;
-  const SESSION_START_IP_MAP_HARD_CAP = 5_000;
-  const startHits = new Map<string, number[]>();
-  const ipRateLimit = (ip: string, now: number): { allowed: boolean; retryAfterMs: number } => {
-    const hits = (startHits.get(ip) ?? []).filter((t: number) => now - t < SESSION_START_WINDOW_MS);
-    if (hits.length >= SESSION_START_MAX_PER_WINDOW) {
-      const oldest = hits[0] ?? now;
-      return { allowed: false, retryAfterMs: Math.max(0, oldest + SESSION_START_WINDOW_MS - now) };
-    }
-    hits.push(now);
-    startHits.set(ip, hits);
-    // Bounded memory: shed fully-expired IPs once the map grows too large.
-    if (startHits.size > SESSION_START_IP_MAP_SOFT_CAP) {
-      for (const [key, times] of startHits) {
-        if (times.every((t: number) => now - t >= SESSION_START_WINDOW_MS)) startHits.delete(key);
-        if (startHits.size <= SESSION_START_IP_MAP_HARD_CAP) break;
-      }
-    }
-    return { allowed: true, retryAfterMs: 0 };
-  };
+  // Fallback limiter for /sessions/start: 30 starts/min/IP. Shared via
+  // createIpRateLimiter; state is bound to this app instance (fresh per
+  // isolate/createApp), so tests get isolation for free and production pays
+  // only one window per isolate.
+  const ipRateLimit = createIpRateLimiter({
+    windowMs: 60_000,
+    maxPerWindow: 30,
+    softCap: 10_000,
+    maxEntries: 10_000,
+  });
 
   // Middleware gate for all session routes.
   app.use('/sessions/*', requireAuth({

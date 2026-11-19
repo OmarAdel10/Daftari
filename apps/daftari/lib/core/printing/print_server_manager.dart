@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
 
+import 'print_server_config.dart';
 import 'print_server_interface.dart';
 
 /// Launches the PrintServer sidecar process (hermetic-test override hook).
@@ -14,8 +15,7 @@ typedef PrintServerProcessFactory = Future<Process> Function(
 });
 
 class PrintServerManager implements IPrintServerManager {
-  static const String _healthEndpoint =
-      'http://127.0.0.1:5150/api/printing/health';
+  static const String _healthEndpoint = kPrintServerHealthEndpoint;
   static const String _exeName = 'PrintServer.exe';
 
   /// Minimum API version the sidecar must report to be usable. Older binaries must be replaced.
@@ -57,13 +57,15 @@ class PrintServerManager implements IPrintServerManager {
     if (existing != null && existing >= requiredServerVersion) {
       _process = null;
       _isRunning = true;
-      log('[PrintServer] Adopting healthy existing instance on port 5150.');
+      log(
+        '[PrintServer] Adopting healthy existing instance on port $kPrintServerPort.',
+      );
       return;
     }
 
     if (existing != null) {
       log(
-        '[PrintServer] Existing instance on 5150 reports API version '
+        '[PrintServer] Existing instance on $kPrintServerPort reports API version '
         '$existing (need >= $requiredServerVersion) — killing stale instance.',
       );
     }
@@ -291,9 +293,9 @@ class PrintServerManager implements IPrintServerManager {
     return last;
   }
 
-  /// Kills any PrintServer.exe still listening on port 5150 (a stale instance
-  /// from a crashed previous run that is no longer answering). Never touches
-  /// unrelated processes. No-op on non-Windows platforms.
+  /// Kills any PrintServer.exe still listening on the PrintServer port (a
+  /// stale instance from a crashed previous run that is no longer answering).
+  /// Never touches unrelated processes. No-op on non-Windows platforms.
   Future<void> _killStaleInstance() async {
     if (_pidsOnPortOverride == null && !Platform.isWindows) return;
 
@@ -301,9 +303,9 @@ class PrintServerManager implements IPrintServerManager {
     try {
       pids = _pidsOnPortOverride != null
           ? await _pidsOnPortOverride()
-          : await _pidsListeningOnPort5150();
+          : await _pidsListeningOnPrintServerPort();
     } catch (e) {
-      log('[PrintServer] Could not inspect port 5150: $e');
+      log('[PrintServer] Could not inspect port $kPrintServerPort: $e');
       return;
     }
     if (pids.isEmpty) return;
@@ -316,7 +318,7 @@ class PrintServerManager implements IPrintServerManager {
         if (!isPrintServer) continue;
 
         log(
-          '[PrintServer] Killing stale instance (PID $processPid) holding port 5150.',
+          '[PrintServer] Killing stale instance (PID $processPid) holding port $kPrintServerPort.',
         );
         if (_killOverride != null) {
           await _killOverride(processPid);
@@ -341,13 +343,16 @@ class PrintServerManager implements IPrintServerManager {
     return check.stdout.toString().contains(_exeName);
   }
 
-  /// Returns PIDs of processes listening on TCP port 5150 (via netstat).
-  Future<List<int>> _pidsListeningOnPort5150() async {
+  /// Returns PIDs of processes listening on the PrintServer TCP port (via
+  /// netstat).
+  Future<List<int>> _pidsListeningOnPrintServerPort() async {
     final result = await Process.run('netstat', ['-ano', '-p', 'tcp']);
     final pids = <int>{};
     for (final rawLine in result.stdout.toString().split('\n')) {
       final line = rawLine.trim();
-      if (!line.contains(':5150') || !line.contains('LISTENING')) continue;
+      if (!line.contains(':$kPrintServerPort') || !line.contains('LISTENING')) {
+        continue;
+      }
       final tokens = line.split(RegExp(r'\s+'));
       final last = tokens.isEmpty ? '' : tokens.last;
       final pid = int.tryParse(last);

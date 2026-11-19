@@ -54,6 +54,7 @@ docs/*
 .opencode/
 .omo/
 !docs/followups.md
+!docs/audits/
 .superpowers/
 **/.hermes/**
 **/.opencode/**

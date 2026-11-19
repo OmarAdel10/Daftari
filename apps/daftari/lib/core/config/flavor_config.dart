@@ -4,7 +4,7 @@
 ///
 /// Three flavors representing different app configurations:
 /// - `local`: Desktop only, no cloud sync, license required
-/// - `cloud`: Desktop + web (prod), cloud sync via Turso, tier-dependent devices
+/// - `cloud`: Desktop only (`windows`, `linux`), cloud sync via Turso, tier-dependent devices
 /// - `admin`: Flutter web WASM, full admin dashboard, cloud sync
 enum AppFlavor { local, cloud, admin }
 

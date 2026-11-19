@@ -29,6 +29,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\PrintServer.Common\ParentPidParser.cs" Link="ParentPidParser.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="PrintServer.Linux.Tests" />
   </ItemGroup>
 

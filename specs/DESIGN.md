@@ -598,11 +598,11 @@ abstract interface class PrintService {
 #### S4: Platform Implementations
 | Implementation | File | Platform | Backend |
 |---|---|---|---|
-| `PrintServiceDesktop` | `print_service_desktop.dart` | Windows/Linux | HTTP → PrintServer sidecar (port 5000/5150) |
+| `PrintServiceDesktop` | `print_service_desktop.dart` | Windows/Linux | HTTP → PrintServer sidecar (port 5150) |
 | `WindowsPrintService` | `print_service_windows.dart` | Windows | Extended timeouts, PrintException |
 | `LinuxPrintService` | `print_service_linux.dart` | Linux (Experimental) | CUPS, 500KB SVG limit, 10s/30s timeouts |
 | `WebPrintService` | `print_service_web.dart` | Web | HTTP → PrintServer |
-| `PrintServiceStub` | `print_service_stub.dart` | Unsupported | Throws `UnsupportedError` |
+| `PrintServiceStub` | `print_service_stub.dart` | Unsupported | No-op stub — print/export calls resolve without output |
 
 #### S5: Conditional Export (`print_service.dart`)
 ```dart

@@ -4,6 +4,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'print_server_config.dart';
 import 'print_service_interface.dart';
 
 /// Windows Print Service implementation using .NET PrintServer sidecar.
@@ -14,7 +15,7 @@ class WindowsPrintService implements PrintService {
   final http.Client _client;
 
   WindowsPrintService({String? baseUrl, http.Client? client})
-    : baseUrl = baseUrl ?? 'http://127.0.0.1:5150',
+    : baseUrl = baseUrl ?? kPrintServerBaseUrl,
       _client = client ?? http.Client();
 
   @override
@@ -36,6 +37,8 @@ class WindowsPrintService implements PrintService {
         endpoint: '/api/printing/local-printers',
         statusCode: response.statusCode,
       );
+    } on PrintException {
+      rethrow;
     } on http.ClientException catch (e) {
       throw PrintException(
         'Network error getting printers: $e',

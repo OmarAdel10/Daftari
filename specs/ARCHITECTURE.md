@@ -16,8 +16,7 @@ lib/
 ├── core/                         # Shared cross-cutting concerns
 │   ├── audit/                    # AuditService + AuditEntry (encrypted Hive log)
 │   ├── backend/                  # Backend abstraction layer (NEW)
-│   │   ├── config/               # EnvConfig (3 envs), FlavorConfig (4 flavors)
-│   │   ├── hwid/                 # HWID Provider interface + platform impls
+│   │   ├── config/               # EnvConfig (3 envs), FlavorConfig (3 flavors)
 │   │   ├── migrations/           # Migration framework (14 versions, runner)
 │   │   ├── pricing/              # PricingTiers enum + DeviceLimitChecker
 │   │   ├── sharding/             # ShardManager (tiered storage limits)
@@ -58,15 +57,15 @@ lib/
 
 ### 2. Concrete Technology Stack 
 * **UI Framework:** Flutter Desktop (Windows + Linux desktop targets; kiosk fullscreen via `window_manager` — fullScreen, hidden title bar, skipTaskbar).
-* **State Management & Local Cache Engine:** `flutter_bloc` ^9.1.1 with **plain `Bloc`/`Cubit` classes only** — no `HydratedBloc`/`HydratedCubit` is instantiated anywhere in `lib/` (the `hydrated_bloc` package remains in `pubspec.yaml` but is unused). Persistence is explicit: each bloc writes/reads through its Hive-backed repository instead of automatic state hydration.
+* **State Management & Local Cache Engine:** `flutter_bloc` ^9.1.1 with **plain `Bloc`/`Cubit` classes only** — no `HydratedBloc`/`HydratedCubit` is instantiated anywhere in `lib/` (the `hydrated_bloc` package is a dev dependency used by tests only). Persistence is explicit: each bloc writes/reads through its Hive-backed repository instead of automatic state hydration.
 * **Hive Encryption:** All Hive boxes encrypted via `HiveAesCipher` using a 32-byte key generated on first run and persisted in `flutter_secure_storage`. Boxes opened with `encryptionCipher: cipher` parameter (not deprecated `encryptionKey`).
 * **Barcode Layout Engine:** `barcode_widget` package using native vector rendering mechanics.
 * **Barcode Export:** `RenderRepaintBoundary.toImage()` for PNG capture; `file_picker` for directory selection.
 * **UUID Generation:** `uuid` package for entity IDs (shift entities, receipts).
 * **Cloudflare Workers Backend:** `http` package for REST API calls to daftari-api; WebSocket for daftari-api (admin flavor only). Auth via Bearer Firebase ID tokens.
-* **Build Flavors:** Four flavors via `--dart-define=FLAVOR=<local|cloud|landing|admin>` — local (desktop only), cloud (desktop+web, Turso sync), landing (web/Jaspr, marketing), admin (web/WASM, dashboard).
+* **Build Flavors:** Three flavors via `--dart-define=FLAVOR=<local|cloud|admin>` — local (desktop only), cloud (desktop only, Turso sync), admin (web/WASM, dashboard). The Jaspr marketing site is a separate package (`landing_page/`), not an app flavor.
 * **Environment Config:** Three environments via `--dart-define=ENV=<development|staging|production>` — each with dedicated Cloudflare Worker URLs and Turso DB.
-* **HWID Provider:** Platform-specific hardware identification (Windows WMI, Linux system files, Web fingerprinting) for license binding and device tracking.
+* **HWID Provider:** Platform-specific hardware identification for license binding, implemented in `lib/core/licensing/infrastructure/hwid/` (Windows `reg query` MachineGuid, Linux `/etc/machine-id`).
 * **Database Migrations:** 14-version migration framework with dry-run, retry, rollback, and shard limit enforcement.
 * **Pricing Tiers:** Starter (1 device), Professional (2 devices), Business (4 devices) — enforced via DeviceLimitChecker and SessionSyncService.
 * **Theme Manager:** 4 themes (Modern Slate, High-Contrast Dark Emerald, Warm Espresso & Sand, Industrial Blue) with 2 receipt/invoice/export styles each and business-type recommendations.
@@ -584,7 +583,7 @@ main.dart (root, startup sequence):
   ├─ getApplicationSupportDirectory() → Hive.initFlutter(appSupportDir.path)
   ├─ ensureKioskFullscreen() — window_manager: fullScreen, hidden title bar, skipTaskbar
   ├─ **EnvConfig.initializeFromEnv()** — loads environment config (3 envs, Cloudflare URLs)
-  ├─ **FlavorConfig.initializeFromEnv()** — loads flavor config (4 flavors, feature flags)
+  ├─ **FlavorConfig.initializeFromEnv()** — loads flavor config (3 flavors, feature flags)
   ├─ Register all hand-written TypeAdapters: settings(0), product(1), user, shift, receipt(4),
   │   refund(5), receipt_item(6), station(7), session_record(8), zone(11),
   │   table(9), table_round(10), table_order_line(12), expense(13)
@@ -1213,9 +1212,9 @@ The `skipPrint` flag is set when `saveReceiptAsImage == true && !autoPrintEnable
 | `PrintServer.Linux.csproj` | `PrintServer.Linux/PrintServer.Linux.csproj` | Self-contained .NET 8 `linux-x64` sidecar with CUPS printing, SkiaSharp/HarfBuzz rendering, Arabic fonts, SVG validation, and sales/invoice export services **(Experimental / Development Only)** |
 | `Program.cs` | `PrintServer/Program.cs` | Kestrel host on `127.0.0.1:5150`, 9 endpoints (health, local-printers, receipt, save-png, save-pdf, sales-export, validate-svg, barcode, ticket), rate limiter (30 req/s). POST /receipt returns `{ printed, pngPath }` where `printed = !SkipPrint && PrintReceipt(...)` — PNG save errors surface as HTTP 500 and print is still attempted (Program.cs:49-56) |
 
-#### Settings Events (Full SettingsBloc Register — 38 Event Classes)
+#### Settings Events (Full SettingsBloc Register — 37 Event Classes)
 
-All dispatched from settings UI sections and handled by `SettingsBloc` (38 event classes in `settings_event.dart`; `RefreshLocalPrinters` has no handler and no dispatch site — dead/unused):
+All dispatched from settings UI sections and handled by `SettingsBloc` (37 event classes in `settings_event.dart`):
 
 | Event | UI Trigger | Side Effects |
 |---|---|---|
@@ -1239,7 +1238,6 @@ All dispatched from settings UI sections and handled by `SettingsBloc` (38 event
 | `LogoSvgChanged(String?)` | AdminGeneralSection file picker | Persists `logoSvgData` (base64 SVG) |
 | `ReceiptPrinterNameChanged(String)` | PrintingSection dropdown | Persists `receiptPrinterName` |
 | `BarcodePrinterNameChanged(String)` | PrintingSection dropdown | Persists `barcodePrinterName` |
-| `RefreshLocalPrinters` | (declared, settings_event.dart:107) | No handler registered and no dispatch site — dead/unused event class |
 | `BarcodeActionPreferenceChanged(String)` | ProductFormDialog barcode action selector | Persists `barcodeActionPreference` |
 | `PaymentTypeVisibilityChanged(...)` | PaymentTypesSection | Persists `shownPaymentTypeIds` |
 | `PrepCategoryVisibilityChanged(...)` | PrepCategoriesSection | Persists prep-category visibility |
@@ -1296,7 +1294,8 @@ lib/core/licensing/
 │   │   └── key_store.dart               — Build-time public key via `--dart-define=ED25519_PUBKEY_HEX`
 │   ├── hwid/
 │   │   ├── hwid_provider.dart           — Abstract HWID provider interface
-│   │   └── windows_hwid_provider.dart   — Windows MachineGuid extraction
+│   │   ├── linux_hwid_provider.dart     — Linux machine-id extraction
+│   │   └── windows_hwid_provider.dart    — Windows MachineGuid extraction
 │   └── storage/
 │       ├── license_storage.dart         — Abstract storage interface
 │       ├── secure_storage_adapter.dart   — Primary: flutter_secure_storage
@@ -1315,7 +1314,7 @@ Central class with 4 injected dependencies:
 
 | Dependency | Implementation | Purpose |
 |---|---|---|
-| `HwidProvider` | `WindowsHwidProvider` | Extracts machine-bound HWID via `reg query MachineGuid`, returns `CS-XXXX-XXXX` format |
+| `HwidProvider` | `LinuxHwidProvider` on Linux, `WindowsHwidProvider` otherwise (`LicenseEngine._defaultHwidProvider()`) | Extracts machine-bound HWID via `reg query MachineGuid` (Windows) or `/etc/machine-id` → `/var/lib/dbus/machine-id` (Linux), returns `CS-XXXX-XXXX` format |
 | `LicenseStorage` (primary) | `SecureStorageAdapter` | Encrypted storage via `FlutterSecureStorage` (DPAPI on Windows) |
 | `LicenseStorage` (backup) | `FileBackupAdapter` | XOR-obfuscated file at `getApplicationSupportDirectory()/Daftari/license.lic` |
 | `Ed25519Verifier` | `Ed25519Verifier` | Offline asymmetric signature verification via `cryptography` package |
@@ -1324,10 +1323,10 @@ Central class with 4 injected dependencies:
 
 | Method | Behavior |
 |---|---|
-| `verifyLicense()` → `LicenseStatus` | Checks primary storage first, falls back to backup. Self-heals: if backup valid but primary corrupt, restores primary from backup. Calls `_validateEntity()` which verifies Ed25519 signature (not just device ID match) — if signature fails → `tampered`. Both empty → `invalid`. |
-| `verifyLicense()` → `LicenseStatus` | Runtime gating reuse — `ShiftBloc.StartShift` (`shift_bloc.dart:30`) and `CheckoutBloc.ConfirmSale` (`checkout_bloc.dart:118`) call it directly; any status != `valid` blocks with a `DatabaseFailure`. |
+| `verifyLicense()` → `Future<LicenseStatus>` | Checks primary storage first, falls back to backup. Self-heals: if backup valid but primary corrupt, restores primary from backup. Calls `_validateEntity()` which verifies Ed25519 signature (not just device ID match) — if signature fails → `tampered`. Both empty → `invalid`. |
+| `verifyLicense()` → `Future<LicenseStatus>` | Runtime gating reuse — `ShiftBloc.StartShift` (`shift_bloc.dart:32-45`) and `CheckoutBloc.ConfirmSale` (`checkout_bloc.dart:154-167`) call it directly; any status != `valid` blocks with a `DatabaseFailure`. |
 | `activate(String key)` → `Future<bool>` | Gets device ID, verifies key as Ed25519 signature of device ID, writes `LicenseEntity` to both storage providers. Returns `true` only when the key verifies and both storages are written; `false` on invalid key or failure. |
-| `getDeviceId()` → `String` | Cached wrapper around `HwidProvider.getHardwareId()`. |
+| `getDeviceId()` → `Future<String>` | Cached wrapper around `HwidProvider.getHardwareId()` (`Future<String?>`); caches the first resolved value in `_cachedDeviceId` and returns the `UNKNOWN-MACHINE` sentinel when the provider yields `null`. |
 
 #### License Status Machine
 
@@ -1366,13 +1365,14 @@ ActivationLoading
             └──→ ActivationError(message) (retry)
 ```
 
-#### HWID Binding (Windows)
+#### HWID Binding (Windows and Linux)
 
-- Reads `HKLM\SOFTWARE\Microsoft\Cryptography\MachineGuid` via `reg query`
-- Strips dashes, takes last 8 hex characters
-- Formats as `CS-XXXX-XXXX`
-- Zero admin required — reads standard registry key
-- `HwidProvider` interface is abstract; only Windows is implemented
+- `HwidProvider` is an abstract interface with one async method: `Future<String?> getHardwareId()`
+- **Windows** (`WindowsHwidProvider`): reads `HKLM\SOFTWARE\Microsoft\Cryptography\MachineGuid` with a single `reg QUERY` process — zero admin required, it reads a standard registry key
+- **Linux** (`LinuxHwidProvider`): reads `/etc/machine-id`, falling back to `/var/lib/dbus/machine-id` — no root required
+- Both providers strip dashes, take the last 8 hex characters and format them as `CS-XXXX-XXXX`
+- `LicenseEngine._defaultHwidProvider()` selects `LinuxHwidProvider` when `Platform.isLinux`, otherwise `WindowsHwidProvider`
+- `LicenseEngine.getDeviceId()` caches the resolved value and returns `UNKNOWN-MACHINE` when the provider yields `null` (that sentinel cannot be activated)
 
 #### Cryptographic Verification
 
@@ -1587,20 +1587,19 @@ class EnvConfig {
   static late final String firebaseProjectId;
   static late final bool enableLogging;
   static late final bool enableCrashlytics;
-  static late final String shorebirdAppId;
 
   static void initializeFromEnv() { ... }  // reads --dart-define=ENV
 }
 ```
 
 * **Three Environments:** `development`, `staging`, `production` — set via `--dart-define=ENV=<name>`.
-* **Per-Environment Values:** Each environment has dedicated Cloudflare Worker URLs (api, realtime), Turso database URL, Firebase project ID, and feature flags (logging, Crashlytics, Shorebird).
+* **Per-Environment Values:** Each environment has dedicated Cloudflare Worker URLs (api, realtime), Turso database URL, Firebase project ID, and feature flags (logging, Crashlytics).
 * **Initialization:** Called in `main.dart` before Hive box opening.
 
 #### 5k.2 Flavor Configuration (`lib/core/config/flavor_config.dart`)
 
 ```dart
-enum AppFlavor { local, cloud, landing, admin }
+enum AppFlavor { local, cloud, admin }
 
 class FlavorConfig {
   static late final AppFlavor flavor;
@@ -1619,34 +1618,32 @@ class FlavorConfig {
 }
 ```
 
-* **Four Flavors:** `local`, `cloud`, `landing`, `admin` — set via `--dart-define=FLAVOR=<name>`.
+* **Three Flavors:** `local`, `cloud`, `admin` — set via `--dart-define=FLAVOR=<name>`. The Jaspr marketing site is a separate package (`landing_page/`), not an app flavor.
 * **Feature Matrix:**
 
-| Feature | local | cloud | landing | admin |
-|---|---|---|---|---|
-| Auth Required | ✓ | ✓ | ✗ | ✓ |
-| License Required | ✓ | ✓ | ✗ | ✗ |
-| Auto License on Payment | ✓ | ✓ | ✗ | ✗ |
-| Cloud Sync (Turso) | ✗ | ✓ | ✗ | ✓ |
-| Admin Dashboard | ✗ | ✗ | ✗ | ✓ |
-| Local Printing | ✓ | ✓ | ✗ | ✗ |
-| Push Notifications | ✓ | ✓ | ✗ | ✗ |
-| Max Devices | 1 | 4 | 0 | 0 |
-| Platforms | win/linux | win/linux | web | web |
+| Feature | local | cloud | admin |
+|---|---|---|---|
+| Auth Required | ✓ | ✓ | ✓ |
+| License Required | ✓ | ✓ | ✗ |
+| Auto License on Payment | ✓ | ✓ | ✗ |
+| Cloud Sync (Turso) | ✗ | ✓ | ✓ |
+| Admin Dashboard | ✗ | ✗ | ✓ |
+| Local Printing | ✓ | ✓ | ✗ |
+| Push Notifications | ✓ | ✓ | ✗ |
+| Max Devices | 1 | 4 | 0 |
+| Platforms | win/linux | win/linux | web |
 
 * **Usage:** Feature flags gate backend services (e.g., `SessionSyncService` only for cloud/admin), UI elements, and licensing behavior.
 
-#### 5k.3 HWID Provider (`lib/core/backend/hwid/`)
+#### 5k.3 HWID Provider (`lib/core/licensing/infrastructure/hwid/`)
 
-* **Interface:** `HwidProvider` — `getHwid()`, `getHardwareInfo()`, `isAvailable`, `providerName`.
-* **Platform Implementations** (conditional exports via `hwid_provider.dart`):
-  * **Windows** (`hwid_provider_windows.dart`): WMI queries — Machine GUID (Win32_ComputerSystemProduct), CPU ID (Win32_Processor), Motherboard Serial (Win32_BaseBoard), BIOS Serial (Win32_BIOS), Disk Serial (Win32_DiskDrive), Computer Name. Returns `win_<sha256_hash>`.
-  * **Linux** (`hwid_provider_linux.dart`): `/etc/machine-id`, `/var/lib/dbus/machine-id`, `/proc/cpuinfo`, `dmidecode` (motherboard), `lsblk`/`nvme` (disk serial). Returns `lin_<sha256_hash>`.
-  * **Web** (`hwid_provider_web.dart`): Browser fingerprinting stub (`CS-WEB-<timestamp>`).
-  * **Desktop Fallback** (`hwid_provider_desktop.dart`): Windows registry + Linux `/etc/machine-id`.
-  * **Stub** (`hwid_provider_stub.dart`): Unsupported platforms (`CS-STUB-<timestamp>`).
-* **Exception:** `HwidException` with provider name, original error, stack trace.
-* **Consumers:** `LicenseEngine` (machine-bound Ed25519 verification), `SessionSyncService` (device tracking).
+* **Interface:** `HwidProvider` — `Future<String?> getHardwareId()`.
+* **Platform Implementations** (selected at runtime by `LicenseEngine._defaultHwidProvider()`):
+  * **Windows** (`windows_hwid_provider.dart`): reads `HKLM\SOFTWARE\Microsoft\Cryptography\MachineGuid` via `reg query`. Last 8 hex characters formatted as `CS-XXXX-XXXX`.
+  * **Linux** (`linux_hwid_provider.dart`): reads `/etc/machine-id`, then `/var/lib/dbus/machine-id`. Last 8 hex characters formatted as `CS-XXXX-XXXX`.
+* **Selection:** `LinuxHwidProvider` when `Platform.isLinux`, otherwise `WindowsHwidProvider`; a provider may be injected explicitly.
+* **Fallback:** no ID resolves to the `UNKNOWN-MACHINE` sentinel, which cannot be activated.
+* **Consumers:** `LicenseEngine` (machine-bound Ed25519 verification) via `getDeviceId()`.
 
 #### 5k.4 Cloudflare Workers API Client & Services (`lib/core/backend/workers/`)
 
@@ -1706,17 +1703,17 @@ class FlavorConfig {
 
 ### 5l. Print Service Refactor (Interface + Factory Pattern)
 
-The `PrintService` has been refactored from a single `dart:io`-based implementation to a platform-agnostic interface with conditional imports.
+The `PrintService` has been refactored from a single `dart:io`-based implementation to a platform-agnostic interface with per-platform implementations.
 
 * **Interface** (`print_service_interface.dart`): Abstract `PrintService` with all operations (printers, receipt, barcode, ticket, save PNG/PDF, sales export, validate SVG, health check). `PrintException` with endpoint/statusCode/originalError.
-* **Factory** (`print_service_factory.dart`): `PrintServiceFactory.instance` (singleton), `create()` (new instance), `overrideForTesting()`, `reset()`. Platform detection delegates to conditional imports.
-* **Platform Implementations:**
-  * **Desktop** (`print_service_desktop.dart`): Windows/Linux → HTTP to PrintServer sidecar (port 5000/5150).
+* **Factory** (`print_service_factory.dart`): `PrintServiceFactory.instance` (singleton), `create()` (new instance), `overrideForTesting()`, `reset()`. **The factory performs no platform detection and always returns the no-op `PrintServiceStub`**, so the platform implementations below are not reached at runtime. Wiring the real implementations is tracked as Plane **DAFTARI-188**.
+* **Platform Implementations (not currently selected by the factory):**
+  * **Desktop** (`print_service_desktop.dart`): Windows/Linux → HTTP to PrintServer sidecar (port 5150).
   * **Windows** (`print_service_windows.dart`): Extended with timeouts, `PrintException` wrapping.
   * **Linux** (`print_service_linux.dart`): CUPS-backed, 500KB SVG limit, 10s/30s timeouts.
   * **Web** (`print_service_web.dart`): Delegates to PrintServer via HTTP.
-  * **Stub** (`print_service_stub.dart`): Unsupported platforms → `UnsupportedError`.
-* **Conditional Export** (`print_service.dart`): Uses `if (dart.library.io)` / `if (dart.library.html)` for platform selection.
+  * **Stub** (`print_service_stub.dart`): The no-op implementation the factory returns. Its print/export calls complete successfully **without producing output** — it does not throw `UnsupportedError`.
+* **Conditional Export** (`print_service.dart`): Uses `if (dart.library.io)` / `if (dart.library.html)` for platform selection. This barrel currently has **zero importers** — tracked as Plane **DAFTARI-182**.
 * **Updated Consumers:** `ReceiptPrintHelper`, `SalesPdfExporter`, `ProductFormDialog`, `OnboardingBrandingScreen`, `AdminGeneralSection`, `PrinterDropdownField`, `TableModeSections`, `AppShell` — all use `PrintServiceFactory.create()`.
 
 ---
@@ -1742,7 +1739,7 @@ JAAS handle `licenses/<tenant_id>/` (R2). Admin dashboard pulls sales via `/api/
 ### Flutter Integration
 
 * **EnvConfig** (`lib/core/backend/config/env_config.dart`): Three environments (development/staging/production) with per-env Cloudflare Worker URLs, Turso DB URLs, Firebase project IDs.
-* **FlavorConfig** (`lib/core/config/flavor_config.dart`): Four flavors (local/cloud/landing/admin) with feature flags.
+* **FlavorConfig** (`lib/core/config/flavor_config.dart`): Three flavors (local/cloud/admin) with feature flags.
 * **ApiClient** (`lib/core/backend/workers/api_client.dart`): HTTP client with Bearer Firebase ID token auth.
 * **AuthSyncService**: Syncs Firebase user to Workers DB (Option A), fetches profile/license.
 * **SessionSyncService**: Device registration with per-tenant limits, heartbeats, active session listing (cloud/admin flavors only).

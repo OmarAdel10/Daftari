@@ -60,6 +60,11 @@ jobs:
       - name: Verify melos analyze
         run: melos run analyze
 
+      # Stale Hive lock files from an interrupted run make the next test run
+      # fail with a setUpAll timeout, so clean them BEFORE the test step.
+      - name: Clean stale Hive locks (FUSE safety)
+        uses: ./.github/actions/cleanup-hive-locks
+
       - name: Verify melos test
         run: melos run test
 
@@ -72,19 +77,6 @@ jobs:
           dart pub get
           dart pub global activate jaspr_cli 0.23.4
           jaspr build
-
-      - name: Clean stale Hive locks (FUSE safety)
-        working-directory: apps/daftari
-        shell: bash
-        run: |
-          for dir in test/_hive_test*; do
-            [ -d "$dir" ] || continue
-            for lock in "$dir"/*.lock; do
-              [ -e "$lock" ] || continue
-              echo "Removing stale lock: $lock"
-              rm -f "$lock"
-            done
-          done
 
   # TypeScript workers: api, admin_host, shared.
   backend-tests:
@@ -303,17 +295,7 @@ jobs:
             --dart-define=ENV=${{ matrix.env }}
 
       - name: Clean stale Hive locks
-        working-directory: apps/daftari
-        shell: bash
-        run: |
-          for dir in test/_hive_test*; do
-            [ -d "$dir" ] || continue
-            for lock in "$dir"/*.lock; do
-              [ -e "$lock" ] || continue
-              echo "Removing stale lock: $lock"
-              rm -f "$lock"
-            done
-          done
+        uses: ./.github/actions/cleanup-hive-locks
 
   # C# print servers.
   printserver-build:

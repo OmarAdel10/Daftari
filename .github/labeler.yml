@@ -206,7 +206,6 @@ licensing:
   - changed-files:
       - any-glob-to-any-file:
           - 'apps/daftari/lib/core/licensing/**'
-          - 'apps/daftari/lib/core/hwid/**'
           - 'apps/daftari/lib/core/backend/pricing/**'
           - 'backend/shared/src/license*'
 

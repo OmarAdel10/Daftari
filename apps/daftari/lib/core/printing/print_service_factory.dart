@@ -4,6 +4,7 @@
 library;
 
 import 'print_service_interface.dart';
+import 'print_service_stub.dart';
 
 /// Factory for creating PrintService instances.
 class PrintServiceFactory {
@@ -22,9 +23,10 @@ class PrintServiceFactory {
 
   /// Create platform-specific service.
   static PrintService _createService() {
-    // Platform detection would go here
-    // For now, return stub - actual impl in conditional imports
-    return StubPrintService();
+    // Platform detection would go here.
+    // Until then the factory returns the no-op stub, so callers keep the
+    // previous behaviour (successful calls, no output).
+    return PrintServiceStub();
   }
 
   /// Override for testing.
@@ -36,40 +38,4 @@ class PrintServiceFactory {
   static void reset() {
     _instance = null;
   }
-}
-
-/// Stub implementation for unsupported platforms/testing.
-class StubPrintService implements PrintService {
-  @override
-  String get baseUrl => 'http://localhost:5001';
-
-  @override
-  Future<bool> healthCheck() async => false;
-
-  @override
-  Future<List<String>> getLocalPrinters() async => [];
-
-  @override
-  Future<void> printReceipt(Map<String, dynamic> payload) async {}
-
-  @override
-  Future<void> printBarcode(Map<String, dynamic> payload) async {}
-
-  @override
-  Future<void> printTicket(Map<String, dynamic> payload) async {}
-
-  @override
-  Future<String> saveReceiptPng(Map<String, dynamic> payload) async => '';
-
-  @override
-  Future<String> saveReceiptPdf(Map<String, dynamic> payload) async => '';
-
-  @override
-  Future<String> saveSalesPdf(Map<String, dynamic> payload) async => '';
-
-  @override
-  Future<List<String>> validateSvg(String base64Data) async => [];
-
-  @override
-  void dispose() {}
 }

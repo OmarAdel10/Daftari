@@ -1749,7 +1749,7 @@ Retention: 90-day rolling
    │  Sets: apiBaseUrl, realtimeWsUrl, tursoDbUrl, firebaseProjectId, etc.
    ▼
 [ FlavorConfig.initializeFromEnv() ]
-   │  Reads --dart-define=FLAVOR (local|cloud|landing|admin)
+   │  Reads --dart-define=FLAVOR (local|cloud|admin)
    │  Sets: requiresAuth, requiresLicense, hasCloudSync, hasAdminDashboard,
    │         hasLocalPrinting, hasPushNotifications, maxDevices, supportedPlatforms
    ▼
@@ -1759,7 +1759,6 @@ Retention: 90-day rolling
 * **Build Commands:**
   * Local desktop: `--dart-define=ENV=development --dart-define=FLAVOR=local`
   * Cloud desktop: `--dart-define=ENV=production --dart-define=FLAVOR=cloud`
-  * Landing web: `--dart-define=ENV=production --dart-define=FLAVOR=landing`
   * Admin web: `--dart-define=ENV=production --dart-define=FLAVOR=admin`
 
 #### 20b. Authentication Sync Flow (Option A + B)
@@ -1790,15 +1789,16 @@ Retention: 90-day rolling
 
 * **Admin Dashboard / License Check:** `AuthSyncService.fetchProfile(idToken)` → GET `/auth/me` → returns profile + license.
 
-#### 20c. Device Session Registration Flow (Cloud/Admin Flavors Only)
+#### 20c. Device Session Registration Flow (Cloud/Admin Flavors Only) — **planned, not wired**
 
 ```
+[ PLANNED — no live Flutter caller executes these steps today ]
 [ App starts (cloud/admin flavor) → LicenseEngine.verifyLicense() valid ]
               │
               ▼
-[ HWIDProvider.getHwid() ]
-   │  Windows: WMI (MachineGuid + CPU + Motherboard + BIOS + Disk)
-   │  Linux: /etc/machine-id + cpuinfo + dmidecode + lsblk
+[ LicenseEngine.getDeviceId() → HwidProvider.getHardwareId() ]
+   │  Windows: reg QUERY HKLM\SOFTWARE\Microsoft\Cryptography (MachineGuid)
+   │  Linux: /etc/machine-id → /var/lib/dbus/machine-id
    ▼
 [ SessionSyncService.startSession(deviceHwid, deviceName, platform, username, idToken) ]
               │
@@ -1816,9 +1816,10 @@ Retention: 90-day rolling
   & cleanup     Business=4)
 ```
 
-* **Heartbeat:** Periodic `SessionSyncService.heartbeat(sessionId, idToken)` → POST `/sessions/heartbeat`.
-* **Cleanup:** On logout/shift end → `SessionSyncService.endSession(sessionId, idToken)`.
-* **Active Sessions List:** `SessionSyncService.activeSessions(idToken)` → GET `/sessions/active`.
+* **Client wiring (planned, not wired):** `SessionSyncService` is the only client-side caller of these endpoints and currently has **zero importers** — the server routes exist, but no live Flutter code starts a device session yet (tracked as DAFTARI-184). The diagram and the bullets below describe the intended flow, not current app behaviour, so the app does **not** enforce device limits through sessions today.
+* **Heartbeat (planned):** Periodic `SessionSyncService.heartbeat(sessionId, idToken)` → POST `/sessions/heartbeat`.
+* **Cleanup (planned):** On logout/shift end → `SessionSyncService.endSession(sessionId, idToken)`.
+* **Active Sessions List (planned):** `SessionSyncService.activeSessions(idToken)` → GET `/sessions/active`.
 
 #### 20d. Analytics Batching Flow
 
@@ -1867,33 +1868,29 @@ Retention: 90-day rolling
 ### 21. HWID Provider Flow
 
 ```
-[ LicenseEngine.verifyLicense() or SessionSyncService.startSession() ]
+[ LicenseEngine.getDeviceId() ]
               │
               ▼
-[ HwidProvider.getHwid() ]
+[ HwidProvider.getHardwareId() ]
               │
          ┌────┴────┐
          ▼         ▼
    [ Windows ]   [ Linux (Experimental) ]
        │             │
        ▼             ▼
- [ WMI queries: ] [ System files: ]
-   MachineGuid       /etc/machine-id
-   CPU ID            /var/lib/dbus/machine-id
-   Motherboard       /proc/cpuinfo
-   BIOS Serial       dmidecode (root)
-   Disk Serial       lsblk/nvme
+ [ reg query        [ /etc/machine-id
+  MachineGuid ]     /var/lib/dbus/machine-id ]
        │             │
        └──────┬──────┘
               ▼
-     [ Combine components → SHA-256 ]
+ [ Last 8 hex chars → CS-XXXX-XXXX ]
               │
               ▼
-     [ Return: win_<hash32> | lin_<hash32> ]
+ [ Return ID, or null → UNKNOWN-MACHINE ]
 ```
 
-* **Fallback:** Stub provider returns `CS-STUB-<timestamp>` / `CS-WEB-<timestamp>` for unsupported platforms.
-* **Exception:** `HwidException` with provider name, original error, stack trace.
+* **Selection:** `LicenseEngine._defaultHwidProvider()` returns `LinuxHwidProvider` on Linux, `WindowsHwidProvider` otherwise.
+* **Fallback:** devices yielding no ID resolve to the `UNKNOWN-MACHINE` sentinel, which cannot be activated.
 * **Note:** Linux HWID support is experimental/development only and not recommended for production license binding.
 
 ---
