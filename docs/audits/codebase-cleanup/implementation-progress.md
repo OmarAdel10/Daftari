@@ -71,7 +71,8 @@
 | 35 | `8eb73fd` | 📝 docs(audit): record wave-4 fixes and gate proof | W4 |
 | 36 | `72851e3` | 📝 docs(specs): mark device-session flow as unwired (CodeRabbit round-5 Low) | W4 |
 | 37 | `c07ceaf` | 📝 docs(audit): record CodeRabbit round 5 and the wave-4 coverage re-check | W4 |
-| 38 | this commit | 📝 docs(audit): record CodeRabbit round 6 (0 findings) | W4 |
+| 38 | `14767fd` | 📝 docs(audit): record CodeRabbit round 6 (0 findings) | W4 |
+| 39 | this commit | 📝 docs(audit): record coverage round 8 + deferred Lows | W4 |
 
 Base commit: `db8fb5a` (📦 chore(ci): remove duplicated verify jobs (#110)).
 
