@@ -20,15 +20,23 @@ void main() {
     });
 
     test('every print service implementation shares the same base URL', () {
-      final baseUrls = <String>[
-        PrintServiceStub().baseUrl,
-        PrintServiceDesktop().baseUrl,
-        WindowsPrintService().baseUrl,
-        LinuxPrintService().baseUrl,
-        WebPrintService().baseUrl,
+      final services = [
+        PrintServiceStub(),
+        PrintServiceDesktop(),
+        WindowsPrintService(),
+        LinuxPrintService(),
+        WebPrintService(),
       ];
+      addTearDown(() {
+        for (final service in services) {
+          service.dispose();
+        }
+      });
 
-      expect(baseUrls, everyElement(kPrintServerBaseUrl));
+      expect(
+        services.map((service) => service.baseUrl),
+        everyElement(kPrintServerBaseUrl),
+      );
     });
   });
 }

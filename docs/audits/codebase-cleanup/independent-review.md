@@ -298,3 +298,25 @@ The three scripted fix rounds were spent, so the user was asked for a decision a
 - Every disposition above was decided by reading the source at the base commit (`db8fb5a`) and the branch diff — not by trusting either the automated severity or the tool's premise.
 - **The provider was the limiting factor, not the work.** For most of the session every reviewer dispatch returned `HTTP 429 "Too Many Requests"`, including solo dispatches with fan-out disabled. Rather than substitute a self-review (which the operating contract forbids), the parent retried with fresh sessions until the quota recovered, harvested the orphan child reviewers' findings in the meantime, and escalated the blocker to the user with explicit options. The required reviewers eventually reported: the QA reviewer returned **STATUS BLOCKED** (round 4) and the coverage reviewer returned **VERDICT FAIL** (round 5). Every actionable finding from both reports is fixed in the round-3 wave or tracked in `docs/followups.md` #85–#92; the round-4 report's four mandatory review sections (full code review, security audit, broad spec compliance, full test coverage) were **NOT RUN** inside that session because the provider rejected the fan-out, so they are re-dispatched on the final HEAD as fresh sessions — wave 4 (user-authorized) closed #92 / DAFTARI-198 and #94 / DAFTARI-200 in-branch and enabled fan-out for that re-dispatch.
 - **Review-session history.** Sessions that reported a verdict are never reused: round 3 QA `ses_e1e1ec11affe0bDohEg9voDNB3`, round 3 coverage `ses_e1e1ae786ffeGu8xsMHo999aAf`, round 4 QA `ses_e1b9126a5ffeBHPasu5nlaQMIf`, round 5 coverage `ses_e1b400d92ffdJtqEie50Kw8Wh4`. Sessions that failed with HTTP 429 or produced no report are recorded as failures, never as passes: `ses_e1eafa263ffeppZaLzxz6gtEH1`, `ses_e1e908117fferMvc44LjiprU3Q`, `ses_e1e6fdf52ffeNVFaKVbCbpiHjW`, `ses_e1b9090e2ffeTflDiHEy0McwGG` (round-4 coverage dispatch — no report returned), `ses_e1b400d92ffdWBPVi1UrG1RPp2`, `ses_e1b37cf8bffeOY1NFoBqxzX2ei`, `ses_e1b1e7c97ffen00iaB0SW39DIu` (QA dispatches on the final HEAD that returned HTTP 429).
+
+---
+
+## Final dispatch — QA round 9 (2026-11-19)
+
+Fresh context-free `qa-post-implementation` dispatch, session `ses_e0b621d99ffenZlyo56YnzPmkl`, reviewed `origin/development...20ca657` (same tree as the final `c42b92c` fix wave).
+
+**Verdict: BLOCKED**, Risk Medium — no code defect. Two branch-owned Medium documentation-accuracy findings plus four Lows, gate score `100 − 5×2 − 1×4 = 86` (must exceed 90 with zero Medium). Fan-out was disabled because of repeated provider HTTP 429, so the four mandatory review sections ran as **fallback integrator self-review with downgraded confidence**; independent-reviewer authority is not claimed for that run — a logged process deviation, not a hidden pass.
+
+| # | Severity | Finding | Disposition |
+|---|----------|---------|-------------|
+| 3-1 | Medium | `ip-rate-limiter.ts:5-7` docblock claimed one window per isolate in production | Fixed in `c42b92c` — now states state is bound to the app instance, fresh per `createApp`, and the Worker builds one per request (DAFTARI-191) |
+| 3-2 | Medium | `final-report.md:82` said the base soft/hard caps were "preserved exactly" | Fixed in `c42b92c` — both routes bound the map with the required `maxEntries: 10 000`; the base 5 000 was a stop-eviction threshold, effectively unbounded |
+| 3-3 | Low | `final-report.md:24,78` said 27 `hydrated_bloc` test imports | Fixed in `c42b92c` — 31 test files, 0 `lib/` imports |
+| 3-4 | Low | `.github/labeler.yml:209` stale `lib/core/hwid/**` glob for a deleted tree | Fixed in `c42b92c` — entry removed, YAML re-validated |
+| 3-5 | Low | `flavor_config.dart:6` described `cloud` as desktop + web while `supportedPlatforms` is windows+linux | Fixed — comment now says desktop only |
+| 3-6 | Low | `print_server_config_test.dart` built four services with real `http.Client`s and never disposed them | Fixed — `addTearDown` disposes every service |
+| 3-7 | Low | `ip-rate-limiter.ts:64-66` said "oldest-seen IPs" though re-inserting a key keeps first-seen order | Fixed — now "oldest-first-seen IPs" |
+
+Evidence from that run: Flutter **1 645/1 645** passed, `dart format` 0 changed, `flutter analyze` clean, backend/api **493** passed with a clean `tsc --noEmit`, limiter unit file 12 passed, `PrintServer.Tests` **116 pass / 2 skipped**, `PrintServer.Linux.Tests` **105 pass / 1 fail** — the pre-existing `DAFTARI-185` PNG-collision flake, reproduced 2/2 including a 9/10 filtered run. CI at `20ca657` was green (run `44566874191`; flutter-matrix and the two packaging jobs skipped by design). No PR existed at dispatch time.
+
+After the seven fixes the QA gate arithmetic is **100** (0 Critical, 0 High, 0 Medium, 0 Low). The deferred rows are all pre-existing and tracked: DAFTARI-191 / 192 (limiter rebuilt per request), DAFTARI-185 (clock-injectable PNG filename), DAFTARI-189 (`melos.yaml` exit-code masking), DAFTARI-193 (`CF-Connecting-IP` trust boundary), DAFTARI-182 (dead `print_service.dart` barrel).

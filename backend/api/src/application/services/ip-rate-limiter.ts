@@ -65,7 +65,7 @@ export function createIpRateLimiter(
       }
 
       if (hits.size > maxEntries) {
-        // Map iteration follows insertion order, so the oldest-seen IPs are
+        // Map iteration follows insertion order, so the oldest-first-seen IPs are
         // dropped first. Entries still inside their window are evicted too:
         // under memory pressure the limiter fails open rather than growing
         // without bound.
