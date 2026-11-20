@@ -20,7 +20,7 @@ class PrintServiceDesktop implements PrintService {
   @override
   Future<void> printReceipt(Map<String, dynamic> data) async {
     final response = await _client.post(
-      Uri.parse('$baseUrl/api/printing/print-receipt'),
+      Uri.parse('$baseUrl/api/printing/receipt'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(data),
     );
@@ -30,7 +30,7 @@ class PrintServiceDesktop implements PrintService {
   @override
   Future<void> printBarcode(Map<String, dynamic> data) async {
     final response = await _client.post(
-      Uri.parse('$baseUrl/api/printing/print-barcode'),
+      Uri.parse('$baseUrl/api/printing/barcode'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(data),
     );
@@ -40,7 +40,7 @@ class PrintServiceDesktop implements PrintService {
   @override
   Future<void> printTicket(Map<String, dynamic> data) async {
     final response = await _client.post(
-      Uri.parse('$baseUrl/api/printing/print-ticket'),
+      Uri.parse('$baseUrl/api/printing/ticket'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(data),
     );
@@ -49,43 +49,57 @@ class PrintServiceDesktop implements PrintService {
 
   @override
   Future<String> saveReceiptPng(Map<String, dynamic> data) async {
+    const endpoint = '/api/printing/save-png';
     final response = await _client.post(
-      Uri.parse('$baseUrl/api/printing/save-png'),
+      Uri.parse('$baseUrl$endpoint'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(data),
     );
-    return _handleStringResponse(response);
+    final body = _handleJsonResponse(response, endpoint);
+    return _extractPath(body, 'pngPath', endpoint);
   }
 
   @override
   Future<String> saveReceiptPdf(Map<String, dynamic> data) async {
+    const endpoint = '/api/printing/save-pdf';
     final response = await _client.post(
-      Uri.parse('$baseUrl/api/printing/save-pdf'),
+      Uri.parse('$baseUrl$endpoint'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(data),
     );
-    return _handleStringResponse(response);
+    final body = _handleJsonResponse(response, endpoint);
+    return _extractPath(body, 'pdfPath', endpoint);
   }
 
   @override
   Future<String> saveSalesPdf(Map<String, dynamic> data) async {
+    const endpoint = '/api/printing/sales-export';
     final response = await _client.post(
-      Uri.parse('$baseUrl/api/printing/sales-export'),
+      Uri.parse('$baseUrl$endpoint'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(data),
     );
-    return _handleStringResponse(response);
+    final body = _handleJsonResponse(response, endpoint);
+    return _extractPath(body, 'pdfPath', endpoint);
   }
 
   @override
   Future<List<String>> validateSvg(String base64Data) async {
+    const endpoint = '/api/printing/validate-svg';
     final response = await _client.post(
-      Uri.parse('$baseUrl/api/printing/validate-svg'),
+      Uri.parse('$baseUrl$endpoint'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'svg_base64': base64Data}),
+      body: jsonEncode({'data': base64Data}),
     );
-    final data = _handleJsonResponse(response);
-    return (data as List).cast<String>();
+    final body = _handleJsonResponse(response, endpoint);
+    if (body['valid'] == true) {
+      return const <String>[];
+    }
+    final errors = body['errors'];
+    if (errors is List) {
+      return errors.whereType<String>().toList();
+    }
+    return const <String>[];
   }
 
   @override
@@ -149,13 +163,30 @@ class PrintServiceDesktop implements PrintService {
     }
   }
 
-  String _handleStringResponse(http.Response response) {
+  Map<String, dynamic> _handleJsonResponse(
+    http.Response response,
+    String endpoint,
+  ) {
     _handleResponse(response);
-    return response.body;
+    final decoded = jsonDecode(response.body);
+    if (decoded is Map<String, dynamic>) {
+      return decoded;
+    }
+    throw PrintException(
+      'Print server returned an unexpected response payload.',
+      endpoint: endpoint,
+    );
   }
 
-  Map<String, dynamic> _handleJsonResponse(http.Response response) {
-    _handleResponse(response);
-    return jsonDecode(response.body) as Map<String, dynamic>;
+  /// Reads the saved file path from a PrintServer export response.
+  String _extractPath(Map<String, dynamic> body, String key, String endpoint) {
+    final value = body[key];
+    if (value is String && value.isNotEmpty) {
+      return value;
+    }
+    throw PrintException(
+      'Print server response did not include "$key".',
+      endpoint: endpoint,
+    );
   }
 }

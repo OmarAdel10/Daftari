@@ -3,6 +3,10 @@
 /// Factory for creating platform-specific PrintService implementations.
 library;
 
+import 'package:flutter/foundation.dart';
+
+import 'print_service_desktop.dart';
+import 'print_service_health_guard.dart';
 import 'print_service_interface.dart';
 import 'print_service_stub.dart';
 
@@ -22,10 +26,16 @@ class PrintServiceFactory {
   }
 
   /// Create platform-specific service.
+  ///
+  /// Windows and Linux builds talk to the local PrintServer sidecar through
+  /// the health-checked desktop client. Every other target (web, macOS,
+  /// mobile) has no local print server, so the no-op stub is returned.
   static PrintService _createService() {
-    // Platform detection would go here.
-    // Until then the factory returns the no-op stub, so callers keep the
-    // previous behaviour (successful calls, no output).
+    if (!kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux)) {
+      return PrintServiceHealthGuard(PrintServiceDesktop());
+    }
     return PrintServiceStub();
   }
 
