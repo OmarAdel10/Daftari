@@ -176,14 +176,94 @@ void main() {
         expect(await guard.saveReceiptPdf(const {}), '/tmp/receipt.pdf');
       },
     );
+
+    test(
+      'fails with a PrintException when the health check does not respond',
+      () async {
+        final inner = _FakePrintService(healthy: true, hangHealthCheck: true);
+        final guard = PrintServiceHealthGuard(
+          inner,
+          operationTimeout: const Duration(milliseconds: 50),
+        );
+
+        await expectLater(
+          guard.printReceipt(const {'id': 'r1'}),
+          throwsA(
+            isA<PrintException>().having(
+              (e) => e.message,
+              'message',
+              contains('health check'),
+            ),
+          ),
+        );
+        expect(inner.printReceiptCalls, isEmpty);
+      },
+    );
+
+    test('fails with a PrintException when the health check throws', () async {
+      final inner = _FakePrintService(healthy: true, failHealthCheck: true);
+      final guard = PrintServiceHealthGuard(inner);
+
+      await expectLater(
+        guard.printReceipt(const {'id': 'r1'}),
+        throwsA(
+          isA<PrintException>()
+              .having(
+                (e) => e.message,
+                'message',
+                contains('http://127.0.0.1:5150'),
+              )
+              .having((e) => e.originalError, 'originalError', isNotNull),
+        ),
+      );
+      expect(inner.printReceiptCalls, isEmpty);
+    });
+
+    test('propagates the original error when the operation fails', () async {
+      final inner = _FakePrintService(healthy: true, failOperations: true);
+      final guard = PrintServiceHealthGuard(inner);
+
+      await expectLater(
+        guard.printReceipt(const {'id': 'r1'}),
+        throwsA(isA<StateError>().having((e) => e.message, 'message', 'boom')),
+      );
+    });
+
+    test('reports the deadline in seconds', () async {
+      final inner = _FakePrintService(healthy: true, hangOperations: true);
+      final guard = PrintServiceHealthGuard(
+        inner,
+        operationTimeout: const Duration(seconds: 2),
+      );
+
+      await expectLater(
+        guard.printReceipt(const {'id': 'r1'}),
+        throwsA(
+          isA<PrintException>().having(
+            (e) => e.message,
+            'message',
+            contains('2s'),
+          ),
+        ),
+      );
+    });
   });
 }
 
 class _FakePrintService implements PrintService {
-  _FakePrintService({required this.healthy, this.hangOperations = false});
+  _FakePrintService({
+    required this.healthy,
+    this.hangOperations = false,
+    this.hangHealthCheck = false,
+    this.failHealthCheck = false,
+    this.failOperations = false,
+  });
 
   final bool healthy;
   final bool hangOperations;
+  final bool hangHealthCheck;
+  final bool failHealthCheck;
+  final bool failOperations;
 
   final List<Map<String, dynamic>> printReceiptCalls = [];
   final List<Map<String, dynamic>> printBarcodeCalls = [];
@@ -200,6 +280,12 @@ class _FakePrintService implements PrintService {
   @override
   Future<bool> healthCheck() async {
     healthCheckCalls++;
+    if (failHealthCheck) {
+      throw StateError('boom');
+    }
+    if (hangHealthCheck) {
+      await Completer<bool>().future;
+    }
     return healthy;
   }
 
@@ -208,6 +294,9 @@ class _FakePrintService implements PrintService {
 
   @override
   Future<void> printReceipt(Map<String, dynamic> payload) async {
+    if (failOperations) {
+      throw StateError('boom');
+    }
     if (hangOperations) {
       await Completer<void>().future;
       return;

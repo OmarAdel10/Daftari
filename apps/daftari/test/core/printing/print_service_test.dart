@@ -85,6 +85,60 @@ void main() {
       expect(await service.healthCheck(), isFalse);
     });
   });
+
+  group('PrintServiceFactory.createForPlatform', () {
+    test('returns the desktop service on Windows and Linux', () {
+      for (final platform in [TargetPlatform.windows, TargetPlatform.linux]) {
+        final service = PrintServiceFactory.createForPlatform(
+          isWeb: false,
+          targetPlatform: platform,
+        );
+
+        expect(service, isA<PrintServiceHealthGuard>(), reason: '$platform');
+        expect(
+          (service as PrintServiceHealthGuard).inner,
+          isA<PrintServiceDesktop>(),
+          reason: '$platform',
+        );
+        service.dispose();
+      }
+    });
+
+    test('returns the no-op stub on the other desktop targets', () {
+      for (final platform in [
+        TargetPlatform.macOS,
+        TargetPlatform.android,
+        TargetPlatform.iOS,
+        TargetPlatform.fuchsia,
+      ]) {
+        final service = PrintServiceFactory.createForPlatform(
+          isWeb: false,
+          targetPlatform: platform,
+        );
+
+        expect(service, isA<PrintServiceStub>(), reason: '$platform');
+        service.dispose();
+      }
+    });
+
+    test('returns the no-op stub on the web', () {
+      for (final platform in [
+        TargetPlatform.windows,
+        TargetPlatform.linux,
+        TargetPlatform.macOS,
+        TargetPlatform.android,
+        TargetPlatform.iOS,
+      ]) {
+        final service = PrintServiceFactory.createForPlatform(
+          isWeb: true,
+          targetPlatform: platform,
+        );
+
+        expect(service, isA<PrintServiceStub>(), reason: '$platform');
+        service.dispose();
+      }
+    });
+  });
 }
 
 class MockPrintService implements PrintService {

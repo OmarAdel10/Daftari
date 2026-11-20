@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:daftari/core/printing/print_service_desktop.dart';
+import 'package:daftari/core/printing/print_service_health_guard.dart';
 import 'package:daftari/core/printing/print_service_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -339,6 +340,246 @@ void main() {
       final errors = await service.validateSvg('PHN2Zz48L3N2Zz4=');
 
       expect(errors, isEmpty);
+    });
+
+    test('returns no errors when the reply carries no error list', () async {
+      final client = _FakeHttpClient(body: '{"valid":false}');
+      final service = PrintServiceDesktop(
+        baseUrl: 'http://127.0.0.1:5150',
+        client: client,
+      );
+      addTearDown(service.dispose);
+
+      final errors = await service.validateSvg('bad');
+
+      expect(errors, isEmpty);
+    });
+  });
+
+  group('PrintServiceDesktop request contract', () {
+    test('posts the receipt payload as JSON', () async {
+      final client = _FakeHttpClient(body: '{"printed":true}');
+      final service = PrintServiceDesktop(
+        baseUrl: 'http://127.0.0.1:5150',
+        client: client,
+      );
+      addTearDown(service.dispose);
+
+      await service.printReceipt(const {'id': 'r1'});
+
+      final request = client.requests.single as http.Request;
+      expect(request.method, 'POST');
+      expect(request.url.path, '/api/printing/receipt');
+      expect(request.headers['Content-Type'], 'application/json');
+      expect(jsonDecode(request.body), {'id': 'r1'});
+    });
+
+    test('encodes an empty payload as an empty JSON object', () async {
+      final client = _FakeHttpClient(body: '{"printed":true}');
+      final service = PrintServiceDesktop(
+        baseUrl: 'http://127.0.0.1:5150',
+        client: client,
+      );
+      addTearDown(service.dispose);
+
+      await service.printBarcode(const {});
+
+      final request = client.requests.single as http.Request;
+      expect(request.url.path, '/api/printing/barcode');
+      expect(jsonDecode(request.body), isEmpty);
+    });
+
+    test(
+      'fails with a PrintException when the sidecar rejects the ticket',
+      () async {
+        final client = _FakeHttpClient(statusCode: 500, body: 'boom');
+        final service = PrintServiceDesktop(
+          baseUrl: 'http://127.0.0.1:5150',
+          client: client,
+        );
+        addTearDown(service.dispose);
+
+        await expectLater(
+          service.printTicket(const {'table_name': 'T1'}),
+          throwsA(
+            isA<PrintException>()
+                .having((e) => e.endpoint, 'endpoint', '/api/printing/ticket')
+                .having((e) => e.statusCode, 'statusCode', 500)
+                .having((e) => e.message, 'message', contains('boom')),
+          ),
+        );
+      },
+    );
+  });
+
+  group('PrintServiceDesktop response contract', () {
+    test('fails with a PrintException when the reply is malformed', () async {
+      final client = _FakeHttpClient(body: 'not json');
+      final service = PrintServiceDesktop(
+        baseUrl: 'http://127.0.0.1:5150',
+        client: client,
+      );
+      addTearDown(service.dispose);
+
+      await expectLater(
+        service.saveReceiptPdf(const {}),
+        throwsA(
+          isA<PrintException>().having(
+            (e) => e.endpoint,
+            'endpoint',
+            '/api/printing/save-pdf',
+          ),
+        ),
+      );
+    });
+
+    test(
+      'fails with a PrintException when the reply is not an object',
+      () async {
+        final client = _FakeHttpClient(body: '[]');
+        final service = PrintServiceDesktop(
+          baseUrl: 'http://127.0.0.1:5150',
+          client: client,
+        );
+        addTearDown(service.dispose);
+
+        await expectLater(
+          service.saveReceiptPng(const {}),
+          throwsA(
+            isA<PrintException>().having(
+              (e) => e.endpoint,
+              'endpoint',
+              '/api/printing/save-png',
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'fails with a PrintException when the export reply has no path',
+      () async {
+        final client = _FakeHttpClient(body: '{"pdfPath":""}');
+        final service = PrintServiceDesktop(
+          baseUrl: 'http://127.0.0.1:5150',
+          client: client,
+        );
+        addTearDown(service.dispose);
+
+        await expectLater(
+          service.saveSalesPdf(const {}),
+          throwsA(
+            isA<PrintException>().having(
+              (e) => e.endpoint,
+              'endpoint',
+              '/api/printing/sales-export',
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'fails with a PrintException when the sidecar rejects the export',
+      () async {
+        final client = _FakeHttpClient(statusCode: 400, body: 'bad request');
+        final service = PrintServiceDesktop(
+          baseUrl: 'http://127.0.0.1:5150',
+          client: client,
+        );
+        addTearDown(service.dispose);
+
+        await expectLater(
+          service.saveReceiptPdf(const {}),
+          throwsA(
+            isA<PrintException>()
+                .having((e) => e.endpoint, 'endpoint', '/api/printing/save-pdf')
+                .having((e) => e.statusCode, 'statusCode', 400),
+          ),
+        );
+      },
+    );
+  });
+
+  group('PrintServiceDesktop.healthCheck', () {
+    test('reports healthy when the sidecar answers', () async {
+      final client = _FakeHttpClient(body: '{"status":"ok"}');
+      final service = PrintServiceDesktop(
+        baseUrl: 'http://127.0.0.1:5150',
+        client: client,
+      );
+      addTearDown(service.dispose);
+
+      expect(await service.healthCheck(), isTrue);
+      expect(client.requests.single.url.path, '/api/printing/health');
+    });
+
+    test('reports unhealthy when the sidecar answers with an error', () async {
+      final client = _FakeHttpClient(statusCode: 503, body: 'down');
+      final service = PrintServiceDesktop(
+        baseUrl: 'http://127.0.0.1:5150',
+        client: client,
+      );
+      addTearDown(service.dispose);
+
+      expect(await service.healthCheck(), isFalse);
+    });
+
+    test('reports unhealthy when the sidecar cannot be reached', () async {
+      final client = _FakeHttpClient(
+        error: http.ClientException('connection refused'),
+      );
+      final service = PrintServiceDesktop(
+        baseUrl: 'http://127.0.0.1:5150',
+        client: client,
+      );
+      addTearDown(service.dispose);
+
+      expect(await service.healthCheck(), isFalse);
+    });
+  });
+
+  group('PrintServiceHealthGuard with the desktop client', () {
+    test('prints through when the sidecar is healthy', () async {
+      final client = _FakeHttpClient(body: '{"printed":true}');
+      final desktop = PrintServiceDesktop(
+        baseUrl: 'http://127.0.0.1:5150',
+        client: client,
+      );
+      final guard = PrintServiceHealthGuard(desktop);
+      addTearDown(guard.dispose);
+
+      await guard.printReceipt(const {'id': 'r1'});
+
+      expect(client.requests.map((r) => r.url.path), [
+        '/api/printing/health',
+        '/api/printing/receipt',
+      ]);
+    });
+
+    test('fails loudly when the sidecar is not healthy', () async {
+      final client = _FakeHttpClient(statusCode: 503, body: 'down');
+      final desktop = PrintServiceDesktop(
+        baseUrl: 'http://127.0.0.1:5150',
+        client: client,
+      );
+      final guard = PrintServiceHealthGuard(desktop);
+      addTearDown(guard.dispose);
+
+      await expectLater(
+        guard.printReceipt(const {'id': 'r1'}),
+        throwsA(
+          isA<PrintException>().having(
+            (e) => e.message,
+            'message',
+            contains('not running'),
+          ),
+        ),
+      );
+      expect(
+        client.requests.where((r) => r.url.path == '/api/printing/receipt'),
+        isEmpty,
+      );
     });
   });
 }

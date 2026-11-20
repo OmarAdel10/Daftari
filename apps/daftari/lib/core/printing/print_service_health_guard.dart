@@ -18,8 +18,9 @@ import 'print_service_interface.dart';
 class PrintServiceHealthGuard implements PrintService {
   /// Creates a guard around [inner].
   ///
-  /// [operationTimeout] bounds every print, export and save operation so a
-  /// sidecar that stops answering cannot leave the caller loading forever.
+  /// [operationTimeout] bounds the health check and every print, export and
+  /// save operation, so a sidecar that stops answering cannot leave the
+  /// caller loading forever.
   PrintServiceHealthGuard(
     this.inner, {
     this.operationTimeout = const Duration(seconds: 30),
@@ -28,7 +29,7 @@ class PrintServiceHealthGuard implements PrintService {
   /// The wrapped print service.
   final PrintService inner;
 
-  /// Deadline for a single print, export or save operation.
+  /// Deadline applied to the health check and to every output operation.
   final Duration operationTimeout;
 
   @override
@@ -40,37 +41,43 @@ class PrintServiceHealthGuard implements PrintService {
   @override
   Future<void> printReceipt(Map<String, dynamic> payload) async {
     await _ensurePrintServerAvailable();
-    await _withDeadline(inner.printReceipt(payload));
+    await _withDeadline(inner.printReceipt(payload), _operationTimeoutMessage);
   }
 
   @override
   Future<void> printBarcode(Map<String, dynamic> payload) async {
     await _ensurePrintServerAvailable();
-    await _withDeadline(inner.printBarcode(payload));
+    await _withDeadline(inner.printBarcode(payload), _operationTimeoutMessage);
   }
 
   @override
   Future<void> printTicket(Map<String, dynamic> payload) async {
     await _ensurePrintServerAvailable();
-    await _withDeadline(inner.printTicket(payload));
+    await _withDeadline(inner.printTicket(payload), _operationTimeoutMessage);
   }
 
   @override
   Future<String> saveReceiptPng(Map<String, dynamic> payload) async {
     await _ensurePrintServerAvailable();
-    return _withDeadline(inner.saveReceiptPng(payload));
+    return _withDeadline(
+      inner.saveReceiptPng(payload),
+      _operationTimeoutMessage,
+    );
   }
 
   @override
   Future<String> saveReceiptPdf(Map<String, dynamic> payload) async {
     await _ensurePrintServerAvailable();
-    return _withDeadline(inner.saveReceiptPdf(payload));
+    return _withDeadline(
+      inner.saveReceiptPdf(payload),
+      _operationTimeoutMessage,
+    );
   }
 
   @override
   Future<String> saveSalesPdf(Map<String, dynamic> payload) async {
     await _ensurePrintServerAvailable();
-    return _withDeadline(inner.saveSalesPdf(payload));
+    return _withDeadline(inner.saveSalesPdf(payload), _operationTimeoutMessage);
   }
 
   @override
@@ -85,7 +92,8 @@ class PrintServiceHealthGuard implements PrintService {
 
   /// Fails with a [PrintException] when the print server is not reachable.
   Future<void> _ensurePrintServerAvailable() async {
-    if (await inner.healthCheck()) {
+    final healthy = await _runHealthCheck();
+    if (healthy) {
       return;
     }
     throw PrintException(
@@ -94,22 +102,37 @@ class PrintServiceHealthGuard implements PrintService {
     );
   }
 
-  /// Bounds [operation] by [operationTimeout].
-  ///
-  /// The operation is never retried: the sidecar may already have produced
-  /// the output before its response stalled.
-  Future<T> _withDeadline<T>(Future<T> operation) async {
+  /// Runs the health check with a deadline and normalises its failures.
+  Future<bool> _runHealthCheck() async {
     try {
-      return await operation.timeout(operationTimeout);
-    } on TimeoutException catch (e) {
+      return await _withDeadline(inner.healthCheck(), _healthTimeoutMessage);
+    } on PrintException {
+      rethrow;
+    } catch (e) {
       throw PrintException(
-        'Print server did not respond in time ($_deadlineLabel). '
-        'The job may already have been printed - check the printer before '
-        'retrying.',
+        'Print server health check failed at ${inner.baseUrl}. '
+        'Start the print service and try again.',
         originalError: e,
       );
     }
   }
+
+  /// Bounds [operation] and turns a missed deadline into a [PrintException].
+  Future<T> _withDeadline<T>(Future<T> operation, String timeoutMessage) async {
+    try {
+      return await operation.timeout(operationTimeout);
+    } on TimeoutException catch (e) {
+      throw PrintException(timeoutMessage, originalError: e);
+    }
+  }
+
+  String get _healthTimeoutMessage =>
+      'Print server health check did not respond in time ($_deadlineLabel). '
+      'Start the print service and try again.';
+
+  String get _operationTimeoutMessage =>
+      'Print server did not respond in time ($_deadlineLabel). '
+      'The job may already have been printed - check the printer before retrying.';
 
   String get _deadlineLabel => operationTimeout.inMilliseconds >= 1000
       ? '${operationTimeout.inSeconds}s'

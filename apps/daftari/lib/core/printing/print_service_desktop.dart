@@ -9,6 +9,16 @@ import 'print_service_interface.dart';
 
 /// Desktop Print Service implementation using C# PrintServer sidecar.
 class PrintServiceDesktop implements PrintService {
+  static const String _receiptEndpoint = '/api/printing/receipt';
+  static const String _barcodeEndpoint = '/api/printing/barcode';
+  static const String _ticketEndpoint = '/api/printing/ticket';
+  static const String _savePngEndpoint = '/api/printing/save-png';
+  static const String _savePdfEndpoint = '/api/printing/save-pdf';
+  static const String _salesExportEndpoint = '/api/printing/sales-export';
+  static const String _validateSvgEndpoint = '/api/printing/validate-svg';
+  static const String _healthEndpoint = '/api/printing/health';
+  static const String _localPrintersEndpoint = '/api/printing/local-printers';
+
   @override
   final String baseUrl;
   final http.Client _client;
@@ -19,79 +29,40 @@ class PrintServiceDesktop implements PrintService {
 
   @override
   Future<void> printReceipt(Map<String, dynamic> data) async {
-    final response = await _client.post(
-      Uri.parse('$baseUrl/api/printing/receipt'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(data),
-    );
-    _handleResponse(response);
+    await _post(_receiptEndpoint, data);
   }
 
   @override
   Future<void> printBarcode(Map<String, dynamic> data) async {
-    final response = await _client.post(
-      Uri.parse('$baseUrl/api/printing/barcode'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(data),
-    );
-    _handleResponse(response);
+    await _post(_barcodeEndpoint, data);
   }
 
   @override
   Future<void> printTicket(Map<String, dynamic> data) async {
-    final response = await _client.post(
-      Uri.parse('$baseUrl/api/printing/ticket'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(data),
-    );
-    _handleResponse(response);
+    await _post(_ticketEndpoint, data);
   }
 
   @override
   Future<String> saveReceiptPng(Map<String, dynamic> data) async {
-    const endpoint = '/api/printing/save-png';
-    final response = await _client.post(
-      Uri.parse('$baseUrl$endpoint'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(data),
-    );
-    final body = _handleJsonResponse(response, endpoint);
-    return _extractPath(body, 'pngPath', endpoint);
+    final body = await _postJson(_savePngEndpoint, data);
+    return _extractPath(body, 'pngPath', _savePngEndpoint);
   }
 
   @override
   Future<String> saveReceiptPdf(Map<String, dynamic> data) async {
-    const endpoint = '/api/printing/save-pdf';
-    final response = await _client.post(
-      Uri.parse('$baseUrl$endpoint'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(data),
-    );
-    final body = _handleJsonResponse(response, endpoint);
-    return _extractPath(body, 'pdfPath', endpoint);
+    final body = await _postJson(_savePdfEndpoint, data);
+    return _extractPath(body, 'pdfPath', _savePdfEndpoint);
   }
 
   @override
   Future<String> saveSalesPdf(Map<String, dynamic> data) async {
-    const endpoint = '/api/printing/sales-export';
-    final response = await _client.post(
-      Uri.parse('$baseUrl$endpoint'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(data),
-    );
-    final body = _handleJsonResponse(response, endpoint);
-    return _extractPath(body, 'pdfPath', endpoint);
+    final body = await _postJson(_salesExportEndpoint, data);
+    return _extractPath(body, 'pdfPath', _salesExportEndpoint);
   }
 
   @override
   Future<List<String>> validateSvg(String base64Data) async {
-    const endpoint = '/api/printing/validate-svg';
-    final response = await _client.post(
-      Uri.parse('$baseUrl$endpoint'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'data': base64Data}),
-    );
-    final body = _handleJsonResponse(response, endpoint);
+    final body = await _postJson(_validateSvgEndpoint, {'data': base64Data});
     if (body['valid'] == true) {
       return const <String>[];
     }
@@ -106,7 +77,7 @@ class PrintServiceDesktop implements PrintService {
   Future<bool> healthCheck() async {
     try {
       final response = await _client
-          .get(Uri.parse('$baseUrl/api/printing/health'))
+          .get(Uri.parse('$baseUrl$_healthEndpoint'))
           .timeout(const Duration(seconds: 5));
       return response.statusCode == 200;
     } catch (_) {
@@ -119,7 +90,7 @@ class PrintServiceDesktop implements PrintService {
     try {
       final response = await _client
           .get(
-            Uri.parse('$baseUrl/api/printing/local-printers'),
+            Uri.parse('$baseUrl$_localPrintersEndpoint'),
             headers: {'Accept': 'application/json'},
           )
           .timeout(const Duration(seconds: 10));
@@ -130,7 +101,7 @@ class PrintServiceDesktop implements PrintService {
       }
       throw PrintException(
         'Failed to fetch printers: ${response.statusCode}',
-        endpoint: '/api/printing/local-printers',
+        endpoint: _localPrintersEndpoint,
         statusCode: response.statusCode,
       );
     } on PrintException {
@@ -138,13 +109,13 @@ class PrintServiceDesktop implements PrintService {
     } on http.ClientException catch (e) {
       throw PrintException(
         'Network error getting printers: $e',
-        endpoint: '/api/printing/local-printers',
+        endpoint: _localPrintersEndpoint,
         originalError: e,
       );
     } catch (e) {
       throw PrintException(
         'Failed to get local printers: $e',
-        endpoint: '/api/printing/local-printers',
+        endpoint: _localPrintersEndpoint,
         originalError: e,
       );
     }
@@ -155,10 +126,35 @@ class PrintServiceDesktop implements PrintService {
     _client.close();
   }
 
-  void _handleResponse(http.Response response) {
+  /// Posts [data] as JSON and fails on an error response.
+  Future<void> _post(String endpoint, Map<String, dynamic> data) async {
+    final response = await _client.post(
+      Uri.parse('$baseUrl$endpoint'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(data),
+    );
+    _handleResponse(response, endpoint);
+  }
+
+  /// Posts [data] as JSON and returns the decoded JSON object.
+  Future<Map<String, dynamic>> _postJson(
+    String endpoint,
+    Map<String, dynamic> data,
+  ) async {
+    final response = await _client.post(
+      Uri.parse('$baseUrl$endpoint'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(data),
+    );
+    return _handleJsonResponse(response, endpoint);
+  }
+
+  void _handleResponse(http.Response response, String endpoint) {
     if (response.statusCode >= 400) {
-      throw Exception(
+      throw PrintException(
         'Print server error: ${response.statusCode} - ${response.body}',
+        endpoint: endpoint,
+        statusCode: response.statusCode,
       );
     }
   }
@@ -167,8 +163,17 @@ class PrintServiceDesktop implements PrintService {
     http.Response response,
     String endpoint,
   ) {
-    _handleResponse(response);
-    final decoded = jsonDecode(response.body);
+    _handleResponse(response, endpoint);
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } on FormatException catch (e) {
+      throw PrintException(
+        'Print server returned a malformed response payload.',
+        endpoint: endpoint,
+        originalError: e,
+      );
+    }
     if (decoded is Map<String, dynamic>) {
       return decoded;
     }
