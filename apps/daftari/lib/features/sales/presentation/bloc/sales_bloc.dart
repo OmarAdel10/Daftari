@@ -53,6 +53,13 @@ class SalesBloc extends Bloc<SalesEvent, SalesState> {
     on<ExportDayToDay>(_onExportDayToDay);
   }
 
+  /// Releases the print service owned by the sales PDF exporter.
+  @override
+  Future<void> close() {
+    _salesPdfExporter?.dispose();
+    return super.close();
+  }
+
   Future<void> _onLoadTodaySummary(
     LoadTodaySummary event,
     Emitter<SalesState> emit,

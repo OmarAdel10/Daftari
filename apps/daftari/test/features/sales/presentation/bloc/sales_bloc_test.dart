@@ -1060,6 +1060,20 @@ void main() {
         expect(state.exportFormat, 'pdf');
       });
 
+      test('disposes the sales PDF exporter when the bloc closes', () async {
+        final exporter = _FakeSalesPdfExporter();
+        final pdfBloc = SalesBloc(
+          receiptsRepo: receiptsRepo,
+          shiftsRepo: shiftsRepo,
+          sessionRecordsRepo: sessionRecordsRepo,
+          salesPdfExporter: exporter,
+        );
+
+        await pdfBloc.close();
+
+        expect(exporter.disposed, isTrue);
+      });
+
       test('emits error when PDF exporter fails', () async {
         await seedReceipts();
         final failingExporter = _FailingSalesPdfExporter();
@@ -1097,6 +1111,14 @@ class _FakeSalesPdfExporter extends SalesPdfExporter {
     ({List<ReceiptEntity> receipts, String title, String outputDirectory})
   >
   exportCalls = [];
+
+  bool disposed = false;
+
+  @override
+  void dispose() {
+    disposed = true;
+    super.dispose();
+  }
 
   @override
   Future<String> saveAsPdf({
