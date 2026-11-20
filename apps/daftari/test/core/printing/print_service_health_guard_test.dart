@@ -1,5 +1,7 @@
 // Copyright (c) 2024 Daftari POS. All rights reserved.
 
+import 'dart:async';
+
 import 'package:daftari/core/printing/print_service_health_guard.dart';
 import 'package:daftari/core/printing/print_service_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -117,13 +119,71 @@ void main() {
 
       expect(inner.disposed, isTrue);
     });
+
+    test(
+      'fails with a PrintException when an operation exceeds the deadline',
+      () async {
+        final inner = _FakePrintService(healthy: true, hangOperations: true);
+        final guard = PrintServiceHealthGuard(
+          inner,
+          operationTimeout: const Duration(milliseconds: 50),
+        );
+
+        await expectLater(
+          guard.printReceipt(const {'id': 'r1'}),
+          throwsA(
+            isA<PrintException>().having(
+              (e) => e.message,
+              'message',
+              contains('did not respond in time'),
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'fails with a PrintException when a save exceeds the deadline',
+      () async {
+        final inner = _FakePrintService(healthy: true, hangOperations: true);
+        final guard = PrintServiceHealthGuard(
+          inner,
+          operationTimeout: const Duration(milliseconds: 50),
+        );
+
+        await expectLater(
+          guard.saveReceiptPdf(const {'id': 'r1'}),
+          throwsA(
+            isA<PrintException>().having(
+              (e) => e.message,
+              'message',
+              contains('did not respond in time'),
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'returns the result when the operation finishes within the deadline',
+      () async {
+        final inner = _FakePrintService(healthy: true);
+        final guard = PrintServiceHealthGuard(
+          inner,
+          operationTimeout: const Duration(milliseconds: 50),
+        );
+
+        expect(await guard.saveReceiptPdf(const {}), '/tmp/receipt.pdf');
+      },
+    );
   });
 }
 
 class _FakePrintService implements PrintService {
-  _FakePrintService({required this.healthy});
+  _FakePrintService({required this.healthy, this.hangOperations = false});
 
   final bool healthy;
+  final bool hangOperations;
 
   final List<Map<String, dynamic>> printReceiptCalls = [];
   final List<Map<String, dynamic>> printBarcodeCalls = [];
@@ -148,6 +208,10 @@ class _FakePrintService implements PrintService {
 
   @override
   Future<void> printReceipt(Map<String, dynamic> payload) async {
+    if (hangOperations) {
+      await Completer<void>().future;
+      return;
+    }
     printReceiptCalls.add(payload);
   }
 
@@ -169,6 +233,10 @@ class _FakePrintService implements PrintService {
 
   @override
   Future<String> saveReceiptPdf(Map<String, dynamic> payload) async {
+    if (hangOperations) {
+      await Completer<String>().future;
+      return '';
+    }
     saveReceiptPdfCalls.add(payload);
     return '/tmp/receipt.pdf';
   }
