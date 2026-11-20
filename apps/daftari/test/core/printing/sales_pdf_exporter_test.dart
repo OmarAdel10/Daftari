@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:daftari/core/printing/sales_pdf_exporter.dart';
+import 'package:daftari/core/printing/print_service_interface.dart';
 import 'package:daftari/features/receipts/domain/entities/receipt_entity.dart';
 import 'package:daftari/features/receipts/domain/entities/receipt_item.dart';
 import 'package:daftari/features/receipts/domain/entities/receipt_status.dart';
@@ -119,4 +122,88 @@ void main() {
       expect(payload['is_rtl'], isFalse);
     });
   });
+
+  group('SalesPdfExporter disposal', () {
+    test(
+      'keeps the print service alive until an in-flight export ends',
+      () async {
+        final service = _PendingPrintService();
+        final exporter = SalesPdfExporter(
+          printService: service,
+          settingsProvider: () => const AppSettingsEntity(),
+        );
+
+        final export = exporter.saveAsPdf(
+          receipts: const [],
+          title: 'Sales Export',
+          outputDirectory: '/tmp',
+        );
+        exporter.dispose();
+
+        expect(service.disposed, isFalse);
+
+        service.pendingSave.complete('/tmp/sales.pdf');
+
+        expect(await export, '/tmp/sales.pdf');
+        expect(service.disposed, isTrue);
+      },
+    );
+
+    test(
+      'disposes the print service immediately when no export is running',
+      () {
+        final service = _PendingPrintService();
+        final exporter = SalesPdfExporter(
+          printService: service,
+          settingsProvider: () => const AppSettingsEntity(),
+        );
+
+        exporter.dispose();
+
+        expect(service.disposed, isTrue);
+      },
+    );
+  });
+}
+
+/// A print service whose sales export stays pending until the test releases it.
+class _PendingPrintService implements PrintService {
+  final Completer<String> pendingSave = Completer<String>();
+  bool disposed = false;
+
+  @override
+  String get baseUrl => 'http://127.0.0.1:5150';
+
+  @override
+  Future<bool> healthCheck() async => true;
+
+  @override
+  Future<List<String>> getLocalPrinters() async => ['Test Printer'];
+
+  @override
+  Future<void> printReceipt(Map<String, dynamic> payload) async {}
+
+  @override
+  Future<void> printBarcode(Map<String, dynamic> payload) async {}
+
+  @override
+  Future<void> printTicket(Map<String, dynamic> payload) async {}
+
+  @override
+  Future<String> saveReceiptPng(Map<String, dynamic> payload) async => '';
+
+  @override
+  Future<String> saveReceiptPdf(Map<String, dynamic> payload) async => '';
+
+  @override
+  Future<String> saveSalesPdf(Map<String, dynamic> payload) =>
+      pendingSave.future;
+
+  @override
+  Future<List<String>> validateSvg(String base64Data) async => [];
+
+  @override
+  void dispose() {
+    disposed = true;
+  }
 }
