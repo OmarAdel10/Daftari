@@ -157,7 +157,10 @@ describe('Worker default export persists the IP rate-limit window', () => {
       env,
       {} as ExecutionContext,
     );
-    expect(otherIpResponse.status).not.toBe(429);
+    // A separate IP must reach the route handler itself: the request is
+    // authenticated and passes the limiter, then fails on the missing
+    // licence exactly like the allowed requests above (401).
+    expect(otherIpResponse.status).toBe(401);
 
     const otherIpBody = (await otherIpResponse.json()) as RateLimitedBody;
     expect(otherIpBody.error).not.toBe('RATE_LIMITED');
