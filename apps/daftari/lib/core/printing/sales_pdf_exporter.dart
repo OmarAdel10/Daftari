@@ -29,6 +29,12 @@ class SalesPdfExporter {
     required String title,
     required String outputDirectory,
   }) async {
+    if (_disposeRequested) {
+      throw PrintException(
+        'The sales PDF exporter was disposed; the export was not sent to '
+        'the print server.',
+      );
+    }
     final payload = buildPayload(
       receipts: receipts,
       settings: _settingsProvider(),

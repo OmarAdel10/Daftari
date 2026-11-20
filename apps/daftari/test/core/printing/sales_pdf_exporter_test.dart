@@ -163,6 +163,25 @@ void main() {
         expect(service.disposed, isTrue);
       },
     );
+
+    test('refuses to export after disposal', () async {
+      final service = _PendingPrintService();
+      final exporter = SalesPdfExporter(
+        printService: service,
+        settingsProvider: () => const AppSettingsEntity(),
+      );
+
+      exporter.dispose();
+
+      await expectLater(
+        exporter.saveAsPdf(
+          receipts: const [],
+          title: 'Sales Export',
+          outputDirectory: '/tmp',
+        ),
+        throwsA(isA<PrintException>()),
+      );
+    });
   });
 }
 
