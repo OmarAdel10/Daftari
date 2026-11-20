@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:daftari/core/error/either.dart';
+import 'package:daftari/core/error/failure.dart';
 import 'package:daftari/core/exports/csv_writer.dart';
 import 'package:daftari/core/printing/sales_pdf_exporter.dart';
 import 'package:daftari/features/auth/domain/entities/shift_entity.dart';
@@ -1074,6 +1077,33 @@ void main() {
         expect(exporter.disposed, isTrue);
       });
 
+      test('does not reach the print service when the bloc closes during an export', () async {
+        final blockingRepo = _BlockingReceiptsRepository();
+        final exporter = _FakeSalesPdfExporter();
+        final pdfBloc = SalesBloc(
+          receiptsRepo: blockingRepo,
+          shiftsRepo: shiftsRepo,
+          sessionRecordsRepo: sessionRecordsRepo,
+          salesPdfExporter: exporter,
+        );
+
+        pdfBloc.add(
+          ExportByMonth(
+            year: 2026,
+            month: 8,
+            format: 'pdf',
+            exportDirectoryPath: tempDir.path,
+          ),
+        );
+        await blockingRepo.started.future;
+
+        await pdfBloc.close();
+        blockingRepo.gate.complete();
+        await pumpEventQueue();
+
+        expect(exporter.exportCalls, isEmpty);
+      });
+
       test('emits error when PDF exporter fails', () async {
         await seedReceipts();
         final failingExporter = _FailingSalesPdfExporter();
@@ -1146,5 +1176,25 @@ class _FailingSalesPdfExporter extends SalesPdfExporter {
     required String outputDirectory,
   }) async {
     throw Exception('PrintServer is down');
+  }
+}
+
+/// A receipts repository whose monthly read stays pending until the test
+/// releases it, so the export handler can be paused before it reaches the
+/// print service.
+class _BlockingReceiptsRepository extends FakeReceiptsRepository {
+  final Completer<void> started = Completer<void>();
+  final Completer<void> gate = Completer<void>();
+
+  @override
+  Future<Either<Failure, List<ReceiptEntity>>> getByMonth(
+    int year,
+    int month,
+  ) async {
+    if (!started.isCompleted) {
+      started.complete();
+    }
+    await gate.future;
+    return super.getByMonth(year, month);
   }
 }

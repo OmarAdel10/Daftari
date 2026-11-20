@@ -29,6 +29,10 @@ class SalesBloc extends Bloc<SalesEvent, SalesState> {
   final IExpensesRepository? _expensesRepo;
   final SalesPdfExporter? _salesPdfExporter;
 
+  /// True once [close] started, so a handler that resumes after the bloc
+  /// was closed cannot emit or reach the print service anymore.
+  bool _isClosing = false;
+
   SalesBloc({
     required IReceiptsRepository receiptsRepo,
     required IShiftsRepository shiftsRepo,
@@ -56,6 +60,7 @@ class SalesBloc extends Bloc<SalesEvent, SalesState> {
   /// Releases the print service owned by the sales PDF exporter.
   @override
   Future<void> close() {
+    _isClosing = true;
     _salesPdfExporter?.dispose();
     return super.close();
   }
@@ -573,6 +578,12 @@ class SalesBloc extends Bloc<SalesEvent, SalesState> {
     required String title,
     required List<ReceiptEntity> receipts,
   }) async {
+    if (_isClosing) {
+      // The bloc is shutting down: the print service is already released,
+      // so a resumed export handler must not emit or reach the print
+      // server.
+      return;
+    }
     emit(
       state.copyWith(exportProgress: ExportStatus.loading, clearExport: true),
     );
