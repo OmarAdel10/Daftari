@@ -4,21 +4,26 @@
  *
  * The Worker entrypoint used to build a fresh Hono app on every request, so
  * every in-memory `createIpRateLimiter` instance was born and died inside a
- * single request and the 30/min window never accumulated. This test drives
- * the real default export (`api.fetch`) 31 times with the same
- * `CF-Connecting-IP` and asserts:
- *   - the first 30 requests are NOT rate-limited,
+ * single request and the 30/min window never accumulated. The Worker now
+ * builds ONE app per isolate (see `appFor` in `src/index.ts`), so the window
+ * must survive across `api.fetch` calls. This test drives the real default
+ * export (`api.fetch`) 31 times with the same `CF-Connecting-IP` and asserts:
+ *   - the first 30 requests are allowed (they reach the limiter and fail
+ *     later in the use case with 401, because no licence/device rows are
+ *     seeded),
  *   - the 31st request is rate-limited (429 + `RATE_LIMITED` body),
  *   - a different IP is not affected by the first IP's exhausted budget.
  *
- * Requests 1-30 may fail later in the use case (no licence/device rows are
- * seeded), which is irrelevant: the limiter is consulted after the body
- * guards and before `sessionStart.execute`, so those 30 calls must consume
- * the window regardless of their final status.
+ * Scope of the guarantee: the window persists for the lifetime of the cached
+ * app instance, which the Worker keeps for the lifetime of an isolate. A
+ * real `workerd` runtime test (cold start, isolate recycle, concurrent
+ * isolates) is tracked as DAFTARI-205 / follow-up #99.
  *
  * `Date` is faked so the 60 s window cannot expire while the test runs, and
- * each test uses its own client IP because the limiter state lives in the
- * module-level app instance that the Worker caches per isolate.
+ * each test uses its own client IPs (the limiter state lives in the
+ * module-level app instance that the Worker caches per isolate, so the
+ * budgets of the two cases must not overlap and the cases must stay
+ * order-independent).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -72,6 +77,8 @@ const AUTH_HEADERS = {
   'Content-Type': 'application/json',
 };
 
+const WINDOW_MS = 60_000;
+
 function startRequest(ip: string): Request {
   return new Request('http://localhost/sessions/start', {
     method: 'POST',
@@ -115,7 +122,7 @@ describe('Worker default export persists the IP rate-limit window', () => {
     }
 
     const allowed = responses.slice(0, 30);
-    expect(allowed.every((response) => response.status !== 429)).toBe(true);
+    expect(allowed.every((response) => response.status === 401)).toBe(true);
 
     const limited = responses[30];
     expect(limited?.status).toBe(429);
@@ -123,16 +130,30 @@ describe('Worker default export persists the IP rate-limit window', () => {
     const body = (await limited?.json()) as RateLimitedBody;
     expect(body.ok).toBe(false);
     expect(body.error).toBe('RATE_LIMITED');
-    expect(body.retry_after_ms).toBeGreaterThan(0);
+    expect(body.retry_after_ms).toBe(WINDOW_MS);
   });
 
   it('does not rate-limit a different IP after the first IP is limited', async () => {
+    const priming: Response[] = [];
     for (let i = 0; i < 31; i += 1) {
-      await api.fetch(startRequest('203.0.113.90'), env, {} as ExecutionContext);
+      priming.push(
+        await api.fetch(
+          startRequest('203.0.113.92'),
+          env,
+          {} as ExecutionContext,
+        ),
+      );
     }
 
+    // The primed IP must really be limited, otherwise this case would also
+    // pass on the broken base where the app is rebuilt per request.
+    const primed = priming[30];
+    expect(primed?.status).toBe(429);
+    const primedBody = (await primed?.json()) as RateLimitedBody;
+    expect(primedBody.error).toBe('RATE_LIMITED');
+
     const otherIpResponse = await api.fetch(
-      startRequest('203.0.113.91'),
+      startRequest('203.0.113.93'),
       env,
       {} as ExecutionContext,
     );
