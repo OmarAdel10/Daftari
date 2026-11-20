@@ -1,18 +1,26 @@
 /**
- * Worker-level IP rate-limit persistence (DAFTARI-191 / follow-up #85).
+ * Worker-level IP rate-limit persistence (DAFTARI-191 / follow-up #85,
+ * DAFTARI-192 / follow-up #86).
  *
  * The Worker entrypoint used to build a fresh Hono app on every request, so
  * every in-memory `createIpRateLimiter` instance was born and died inside a
  * single request and the 30/min window never accumulated. This test drives
  * the real default export (`api.fetch`) 31 times with the same
- * `CF-Connecting-IP` and asserts the 31st request is rate-limited.
+ * `CF-Connecting-IP` and asserts:
+ *   - the first 30 requests are NOT rate-limited,
+ *   - the 31st request is rate-limited (429 + `RATE_LIMITED` body),
+ *   - a different IP is not affected by the first IP's exhausted budget.
  *
  * Requests 1-30 may fail later in the use case (no licence/device rows are
  * seeded), which is irrelevant: the limiter is consulted after the body
  * guards and before `sessionStart.execute`, so those 30 calls must consume
  * the window regardless of their final status.
+ *
+ * `Date` is faked so the 60 s window cannot expire while the test runs, and
+ * each test uses its own client IP because the limiter state lives in the
+ * module-level app instance that the Worker caches per isolate.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const executeMock = vi.hoisted(() => vi.fn());
 
@@ -59,16 +67,15 @@ const env = {
   ADMIN_JWT_SECRET: 'test-admin-jwt-secret',
 } as unknown as Env;
 
-const authHeaders = {
+const AUTH_HEADERS = {
   Authorization: 'Bearer valid-uid-123',
   'Content-Type': 'application/json',
-  'CF-Connecting-IP': '203.0.113.90',
 };
 
-function startRequest(): Request {
+function startRequest(ip: string): Request {
   return new Request('http://localhost/sessions/start', {
     method: 'POST',
-    headers: authHeaders,
+    headers: { ...AUTH_HEADERS, 'CF-Connecting-IP': ip },
     body: JSON.stringify({
       device_hwid: 'hw-191',
       username: 'owner@daftari.co',
@@ -76,30 +83,62 @@ function startRequest(): Request {
   });
 }
 
+interface RateLimitedBody {
+  ok: boolean;
+  error?: string;
+  retry_after_ms?: number;
+}
+
 describe('Worker default export persists the IP rate-limit window', () => {
   beforeEach(() => {
     executeMock.mockReset();
     executeMock.mockResolvedValue({ rows: [], columns: [], rowsAffected: 0 });
+    // Only `Date` is faked so the 60 s window is frozen for the whole test.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
   });
 
-  it('rate-limits the 31st /sessions/start from the same IP', async () => {
-    const statuses: number[] = [];
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('allows 30 requests from one IP and rate-limits the 31st', async () => {
+    const responses: Response[] = [];
     for (let i = 0; i < 31; i += 1) {
-      const response = await api.fetch(
-        startRequest(),
-        env,
-        {} as ExecutionContext,
+      responses.push(
+        await api.fetch(
+          startRequest('203.0.113.90'),
+          env,
+          {} as ExecutionContext,
+        ),
       );
-      statuses.push(response.status);
     }
 
-    const last = statuses[statuses.length - 1];
-    expect(last).toBe(429);
+    const allowed = responses.slice(0, 30);
+    expect(allowed.every((response) => response.status !== 429)).toBe(true);
 
-    const finalBody = (await (
-      await api.fetch(startRequest(), env, {} as ExecutionContext)
-    ).json()) as { ok: boolean; error?: string };
-    expect(finalBody.ok).toBe(false);
-    expect(finalBody.error).toBe('RATE_LIMITED');
+    const limited = responses[30];
+    expect(limited?.status).toBe(429);
+
+    const body = (await limited?.json()) as RateLimitedBody;
+    expect(body.ok).toBe(false);
+    expect(body.error).toBe('RATE_LIMITED');
+    expect(body.retry_after_ms).toBeGreaterThan(0);
+  });
+
+  it('does not rate-limit a different IP after the first IP is limited', async () => {
+    for (let i = 0; i < 31; i += 1) {
+      await api.fetch(startRequest('203.0.113.90'), env, {} as ExecutionContext);
+    }
+
+    const otherIpResponse = await api.fetch(
+      startRequest('203.0.113.91'),
+      env,
+      {} as ExecutionContext,
+    );
+    expect(otherIpResponse.status).not.toBe(429);
+
+    const otherIpBody = (await otherIpResponse.json()) as RateLimitedBody;
+    expect(otherIpBody.error).not.toBe('RATE_LIMITED');
   });
 });

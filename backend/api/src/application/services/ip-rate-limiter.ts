@@ -3,9 +3,10 @@
  *
  * Extracted so that multiple HTTP routes can share one implementation
  * instead of each defining an inline copy. State is bound to the app
- * instance (fresh per `createApp` call), so tests get isolation for free.
- * The Worker entrypoint currently builds a fresh app per request, so each
- * request also gets a fresh window — tracked as DAFTARI-191.
+ * instance, so tests get isolation for free: each `createApp` call builds
+ * its own limiters. The Worker entrypoint builds ONE app per isolate
+ * (see `appFor` in `src/index.ts`), so the window now persists for the
+ * lifetime of the isolate instead of being rebuilt per request.
  */
 
 /** Maximum number of tracked IPs inspected per call while evicting expired
