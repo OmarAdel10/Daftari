@@ -184,6 +184,12 @@ class PrintServiceDesktop implements PrintService {
   }
 
   /// Reads the saved file path from a PrintServer export response.
+  ///
+  /// The sidecar always answers with a json object: the save png endpoint
+  /// returns `{ pngPath }` and the save pdf and sales export endpoints
+  /// return `{ pdfPath, saved }` (PrintServer/Program.cs and
+  /// PrintServer.Linux/Program.cs). A raw path body is not part of the
+  /// contract.
   String _extractPath(Map<String, dynamic> body, String key, String endpoint) {
     final value = body[key];
     if (value is String && value.isNotEmpty) {
