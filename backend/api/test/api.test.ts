@@ -3344,7 +3344,7 @@ describe('CORS allowlist (T19)', () => {
     expect(res.headers.get('Access-Control-Allow-Headers')).toBe('Authorization,Content-Type');
   });
 
-  describe('default export fetch / scheduled (request-time env binding)', () => {
+  describe('default export fetch / scheduled (cached app, request-time env binding)', () => {
     it('returns 503 when API credentials are missing (no unhandled 500)', async () => {
       const bare = {
         ...env,
@@ -3358,7 +3358,7 @@ describe('CORS allowlist (T19)', () => {
       expect(body).toEqual({ ok: false, error: 'API not configured' });
     });
 
-    it('serves /health from a request-time-built app', async () => {
+    it('serves /health through the cached Worker app', async () => {
       executeMock.mockResolvedValueOnce({ rows: [{ name: 'auth_users' }, { name: 'sessions' }, { name: 'users' }] });
       executeMock.mockResolvedValueOnce({ rows: [{ name: 'last_owner_login_at' }] });
       const res = await api.fetch(new Request('http://localhost/health'), env as unknown as Env, {} as ExecutionContext);

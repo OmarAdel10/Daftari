@@ -1878,11 +1878,13 @@ All backend worker deployments (admin_host, api) use the **pinned global wrangle
   * `PATCH /admin/users/:username` — Owner only. Patch password/display_name/isActive.
   * `DELETE /admin/users/:username` — Owner only. Soft-deactivates (`is_active = 0`); the row stays for audit.
   * `POST /sessions/start` — POS. Atomic device-slot admission (`admitPosSession`); an over-limit device → 409.
+  * `POST /sales/sync` — POS. Offline sale ingest; per-IP rate limited (see the route limiter below).
   * `POST /sessions/heartbeat`, `POST /sessions/end` — POS. Tenant-scoped by `tenant_id` + session id; a foreign or ghost row → 404 `SESSION_NOT_FOUND`.
   * `POST /sessions/revoke` — Admin. Self for session callers, any username for owners; else 403 `FORBIDDEN`. Broadcasts `session_revoked`.
   * `GET /admin/devices` — Admin. Devices + active session (username, started_at).
   * `GET /admin/activity` — Admin. Bounded via `getRecentSales(tenantId, 5)` selecting only `id`, `total_piastres`, `created_at` with `LIMIT 5` in SQL, then reversed to ascending for the feed.
   * `GET /sessions/active` — Admin. Active POS sessions only (excludes `source='web'` — QA fix).
+* **Route rate limiter** (`ip-rate-limiter.ts`): `POST /sessions/start` and `POST /sales/sync` enforce an in-memory sliding window of **30 requests / 60 s per IP** (key = `CF-Connecting-IP`; `X-Forwarded-For` is deliberately ignored). Each route builds its **own independent** limiter instance, so one IP may send 30 session starts **plus** 30 sales syncs per 60 s — the budgets are not combined. The limiter instance belongs to the Worker app, which is built **once per isolate** (`appFor` in `src/index.ts`), so the window persists for the isolate lifetime and resets when the isolate is recycled. Over the limit → 429 `RATE_LIMITED` + `retry_after_ms` (the remaining window). The IP map is bounded (`maxEntries` required, capped per-call eviction scan) and evicts the oldest-first-seen IP when the bound is reached. The window is **isolate-local**: it does not aggregate across isolates (tracked as DAFTARI-202).
 * **Migrations** (under `backend/shared/migrations/`): 002 — `auth_users` + `users.last_owner_login_at` + `sessions.source` (`pos`|`web`) + `idx_sessions_tenant_username`; 004 — login throttle table; 005 — `idx_sessions_tenant_started`, `idx_devices_tenant_last_seen`; 006 — self-healing dedupe + partial unique index `idx_sessions_live_web` for live web rows.
 
 #### B10.3 Realtime Worker (`backend/realtime/src/index.ts`)

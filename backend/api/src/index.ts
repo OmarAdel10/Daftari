@@ -214,8 +214,26 @@ function servicesFor(env: Env): ApiServices {
   return cachedServices;
 }
 
+let cachedApp: ReturnType<typeof createApp> | null = null;
 let cachedRealtimeApp: ReturnType<typeof createRealtimeApp> | null = null;
 let cachedPaymobApp: ReturnType<typeof createPaymobAppFromEnv> | null = null;
+
+// The API app owns per-instance state (notably the per-IP rate limiters), so
+// it must be built once per isolate, not per request — otherwise every request
+// starts with a fresh window and the limits never apply.
+function appFor(env: Env, services: ApiServices): ReturnType<typeof createApp> {
+  if (!cachedApp) {
+    cachedApp = createApp({
+      adminJwtSecret: env.ADMIN_JWT_SECRET,
+      services,
+      getDb,
+      verifyToken: verifyFirebaseToken,
+      verify: verifyTagged,
+      postHogFetch: fetch,
+    });
+  }
+  return cachedApp;
+}
 
 function realtimeAppFor(env: Env) {
   if (!env.NOTIFIER) throw new Error('realtime not configured: NOTIFIER binding missing');
@@ -269,15 +287,7 @@ export default {
     } catch {
       return Response.json({ ok: false, error: 'API not configured' }, { status: 503 });
     }
-    const app = createApp({
-      adminJwtSecret: env.ADMIN_JWT_SECRET,
-      services,
-      getDb,
-      verifyToken: verifyFirebaseToken,
-      verify: verifyTagged,
-      postHogFetch: fetch,
-    });
-    return app.fetch(request, env, ctx);
+    return appFor(env, services).fetch(request, env, ctx);
   },
   async scheduled(_event: unknown, env: Env, ctx: ExecutionContext): Promise<void> {
     void _event;
