@@ -24,6 +24,7 @@ import type { AuthUserRepository } from '../../../shared/src/domain/repositories
 import type { UserRepository } from '../../../shared/src/domain/repositories/user-repository';
 import type { DurableObjectNamespace } from '@cloudflare/workers-types';
 import { createIpRateLimiter, createGlobalIpRateLimiter } from '../application/services/ip-rate-limiter';
+import { createRateLimitMiddleware, createRateLimiter } from '../middleware/rate-limit';
 
 /** HTTP wire contract: snake_case; shared TypeScript records: camelCase. */
 function toWireSale(sale: Sale) {
@@ -81,8 +82,24 @@ export function registerSales(
         maxEntries: 10_000,
       });
 
-  app.post('/sales/sync', async (c) => {
+  // Rate limit middleware for /sales/sync: runs after auth, before body parsing.
+  // Max body size: 2 MB (sales batch can be large).
+  // Max items: 200 sales per batch.
+  const syncRateLimitMiddleware = createRateLimitMiddleware({
+    ipRateLimiter: createRateLimiter(
+      { windowMs: 60_000, maxPerWindow: 30, softCap: 10_000, maxEntries: 10_000 },
+      deps.ipRateLimiterDO,
+    ),
+    maxBodySize: 2 * 1024 * 1024, // 2 MB
+    maxItems: 200,
+    itemPath: 'sales',
+    bodySizeError: 'REQUEST_BODY_TOO_LARGE',
+    maxItemsError: 'TOO_MANY_SALES',
+  });
+
+  app.post('/sales/sync', syncRateLimitMiddleware, async (c) => {
     const tenantId = c.get('authUid');
+    // Body is pre-parsed by rate limit middleware
     const body = await c.req.json<{
       sales?: Array<{
         id: string;
@@ -98,10 +115,11 @@ export function registerSales(
     }
 
     // Rate-limit per client IP (mirrors /sessions/start, review High #1).
+    // Rate limit already checked by middleware, so we just check injectable.
     const callerIp = c.req.header('CF-Connecting-IP')?.trim() ?? 'unknown';
     const decision = deps.rateLimit
       ? await deps.rateLimit(tenantId, deviceHwid, callerIp, Date.now())
-      : await ipRateLimit(tenantId, callerIp, Date.now());
+      : { allowed: true, retryAfterMs: 0 }; // Rate limit already checked by middleware
     if (!decision.allowed) {
       return c.json({ ok: false, error: 'RATE_LIMITED', retry_after_ms: decision.retryAfterMs ?? 0 }, 429);
     }
@@ -153,17 +171,32 @@ export function registerSales(
   app.get('/sales', async (c) => {
     const tenantId = c.get('authUid');
     const sinceParam = c.req.query('since');
+    const limitParam = c.req.query('limit');
+
     const since = sinceParam ? Number(sinceParam) : 0;
     if (sinceParam !== undefined && (!Number.isFinite(since) || since < 0 || since > Number.MAX_SAFE_INTEGER)) {
       return c.json({ ok: false, error: 'INVALID_FIELDS' }, 400);
     }
 
-    const dto: SaleListDto = { tenantId, since };
+    const limitNum = limitParam ? Number(limitParam) : 50;
+    if (limitParam !== undefined && (!Number.isFinite(limitNum) || limitNum <= 0 || limitNum > 1000)) {
+      return c.json({ ok: false, error: 'INVALID_FIELDS' }, 400);
+    }
+
+    const dto: SaleListDto = {
+      tenantId,
+      since,
+    };
+
     const result = await saleList.execute(dto);
+
     if (!result.ok) {
       return c.json({ ok: false, error: result.error }, 400);
     }
 
-    return c.json({ ok: true, data: { sales: result.data.sales.map(toWireSale) } });
+    return c.json({
+      ok: true,
+      data: { sales: result.data.sales.map(toWireSale) },
+    });
   });
 }
