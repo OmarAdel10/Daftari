@@ -35,6 +35,7 @@ import type { SessionEndDto } from '../application/dtos/session-end.dto';
 import type { SessionListActiveDto } from '../application/dtos/session-list-active.dto';
 import type { DurableObjectNamespace } from '@cloudflare/workers-types';
 import { createIpRateLimiter, createGlobalIpRateLimiter } from '../application/services/ip-rate-limiter';
+import { createRateLimitMiddleware, createRateLimiter } from '../middleware/rate-limit';
 
 export function registerSessions(
   app: Hono<{ Bindings: Env; Variables: Vars }>,
@@ -89,7 +90,20 @@ export function registerSessions(
     userRepository: deps.userRepository,
   }));
 
-  app.post('/sessions/start', async (c) => {
+  // Rate limit middleware for /sessions/start: runs after auth, before body parsing.
+  // Max body size: 64 KB (device info is small). No item count limit (single object).
+  const startRateLimitMiddleware = createRateLimitMiddleware({
+    ipRateLimiter: createRateLimiter(
+      { windowMs: 60_000, maxPerWindow: 30, softCap: 10_000, maxEntries: 10_000 },
+      deps.ipRateLimiterDO,
+    ),
+    maxBodySize: 64 * 1024, // 64 KB
+    maxItems: 0, // No array items to count
+    itemPath: '',
+  });
+
+  app.post('/sessions/start', startRateLimitMiddleware, async (c) => {
+    // Body is pre-parsed by rate limit middleware
     const body = await c.req.json<{
       device_hwid?: string;
       device_name?: string;
@@ -120,7 +134,7 @@ export function registerSessions(
     // and spoofable, so it is intentionally NOT used for rate-limit keying.
     const injectable = deps.rateLimit
       ? await deps.rateLimit(c.get('authUid'), dto.username, c.req.header('CF-Connecting-IP')?.trim() ?? 'unknown', Date.now())
-      : await ipRateLimit(c.get('authUid'), c.req.header('CF-Connecting-IP')?.trim() ?? 'unknown', Date.now());
+      : { allowed: true, retryAfterMs: 0 }; // Rate limit already checked by middleware
     if (!injectable.allowed) {
       return c.json({ ok: false, error: 'RATE_LIMITED', retry_after_ms: injectable.retryAfterMs ?? 0 }, 429);
     }
