@@ -8,6 +8,11 @@
  * Keys are composite: "tenantId:ip" (DAFTARI-203) so tenants behind shared
  * NAT cannot starve each other.
  *
+ * Overflow policy (DAFTARI-204): when the map exceeds maxEntries, the
+ * default behavior is to REJECT new entries (rate-limit them) rather than
+ * evicting active entries. This prevents a flood of new IPs from pushing
+ * out legitimate users who are still inside their window.
+ *
  * We don't import 'cloudflare:workers' because vitest can't resolve it.
  * Wrangler matches the class by name against wrangler.toml's
  * new_sqlite_classes so typing-vs-runtime is a non-issue.
@@ -24,6 +29,8 @@ export interface RateLimitState {
   hits: Record<string, number[]>;
 }
 
+export type OverflowPolicy = 'reject' | 'evict-oldest';
+
 export class IpRateLimiter {
   private readonly state: DurableObjectState;
 
@@ -39,6 +46,7 @@ export class IpRateLimiter {
     maxPerWindow: number,
     maxEntries: number,
     softCap: number | null,
+    overflowPolicy: OverflowPolicy = 'reject',
   ): Promise<RateLimitResult> {
     // Load state from DO storage
     const stored = (await this.state.storage.get('rateLimitState')) as RateLimitState | undefined;
@@ -68,8 +76,23 @@ export class IpRateLimiter {
       }
     }
 
-    // Hard bound: evict oldest-first-seen entries (may evict active ones — fail open)
+    // Hard bound: apply overflow policy when map exceeds maxEntries
     if (hits.size > maxEntries) {
+      if (overflowPolicy === 'reject') {
+        // Reject the new entry we just added - remove it and rate-limit
+        hits.delete(key);
+        // Persist state before returning
+        const hitsObj: Record<string, number[]> = {};
+        for (const [k, times] of hits) {
+          hitsObj[k] = times;
+        }
+        await this.state.storage.put('rateLimitState', { hits: hitsObj });
+        return {
+          allowed: false,
+          retryAfterMs: windowMs, // conservative: full window
+        };
+      }
+      // Legacy 'evict-oldest': evict oldest-first-seen entries (may evict active ones)
       for (const k of hits.keys()) {
         if (hits.size <= maxEntries) break;
         hits.delete(k);
@@ -96,15 +119,16 @@ export class IpRateLimiter {
     const path = url.pathname;
 
     if (path === '/check' && request.method === 'POST') {
-      const { key, now, windowMs, maxPerWindow, maxEntries, softCap } = await request.json() as {
+      const { key, now, windowMs, maxPerWindow, maxEntries, softCap, overflowPolicy } = await request.json() as {
         key: string;
         now: number;
         windowMs: number;
         maxPerWindow: number;
         maxEntries: number;
         softCap: number | null;
+        overflowPolicy: OverflowPolicy;
       };
-      const result = await this.check(key, now, windowMs, maxPerWindow, maxEntries, softCap ?? null);
+      const result = await this.check(key, now, windowMs, maxPerWindow, maxEntries, softCap ?? null, overflowPolicy ?? 'reject');
       return Response.json(result);
     }
 

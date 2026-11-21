@@ -11,6 +11,11 @@
  *
  * Both variants now partition by composite key (tenantId:IP) so tenants
  * behind shared NAT cannot starve each other (DAFTARI-203).
+ *
+ * Overflow policy (DAFTARI-204): when the map exceeds maxEntries, the
+ * default behavior is to REJECT new entries (rate-limit them) rather than
+ * evicting active entries. This prevents a flood of new IPs from pushing
+ * out legitimate users who are still inside their window.
  */
 
 import type { DurableObjectNamespace } from '@cloudflare/workers-types';
@@ -20,6 +25,9 @@ import type { DurableObjectNamespace } from '@cloudflare/workers-types';
  *  soft cap. */
 const MAX_EVICTION_SCAN_PER_CALL = 1000;
 
+/** Overflow policy when the limiter map exceeds maxEntries. */
+export type OverflowPolicy = 'reject' | 'evict-oldest';
+
 export interface IpRateLimiterOptions {
   windowMs: number;
   maxPerWindow: number;
@@ -27,12 +35,17 @@ export interface IpRateLimiterOptions {
   softCap?: number;
   /**
    * Hard upper bound on the number of tracked entries. REQUIRED: a limiter
-   * without a bound can grow without limit. When the map exceeds it, the
-   * oldest entries are evicted even if they are still inside the window
-   * (the limiter fails open under memory pressure rather than growing
-   * without bound).
+   * without a bound can grow without limit.
    */
   maxEntries: number;
+  /**
+   * Behavior when the map is at maxEntries and a new entry would be added.
+   * - 'reject' (default): rate-limit the new entry (return 429), preserving
+   *   all existing entries and their budgets.
+   * - 'evict-oldest': evict the oldest-first-seen entries (may evict active
+   *   ones). This is the legacy "fail open" behavior.
+   */
+  overflowPolicy?: OverflowPolicy;
 }
 
 /** Result of a rate-limit check. */
@@ -68,7 +81,7 @@ export function makeRateLimitKey(tenantId: string, ip: string): string {
 export function createIpRateLimiter(
   options: IpRateLimiterOptions,
 ): IpRateLimiter {
-  const { windowMs, maxPerWindow, softCap, maxEntries } = options;
+  const { windowMs, maxPerWindow, softCap, maxEntries, overflowPolicy = 'reject' } = options;
   const hits = new Map<string, number[]>();
 
   const limiter = (tenantId: string, ip: string, now: number): RateLimitResult => {
@@ -95,11 +108,17 @@ export function createIpRateLimiter(
       }
     }
 
+    // Hard bound: apply overflow policy when map exceeds maxEntries
     if (hits.size > maxEntries) {
-      // Map iteration follows insertion order, so the oldest-first-seen entries are
-      // dropped first. Entries still inside their window are evicted too:
-      // under memory pressure the limiter fails open rather than growing
-      // without bound.
+      if (overflowPolicy === 'reject') {
+        // Reject the new entry we just added - remove it and rate-limit
+        hits.delete(key);
+        return {
+          allowed: false,
+          retryAfterMs: windowMs, // conservative: full window
+        };
+      }
+      // Legacy 'evict-oldest': evict oldest-first-seen entries (may evict active ones)
       for (const k of hits.keys()) {
         if (hits.size <= maxEntries) break;
         hits.delete(k);
@@ -122,7 +141,7 @@ export function createGlobalIpRateLimiter(
   options: IpRateLimiterOptions,
   doNamespace: DurableObjectNamespace,
 ): IpRateLimiter {
-  const { windowMs, maxPerWindow, softCap, maxEntries } = options;
+  const { windowMs, maxPerWindow, softCap, maxEntries, overflowPolicy = 'reject' } = options;
   const stub = doNamespace.get(doNamespace.idFromName('global'));
 
   const limiter = async (tenantId: string, ip: string, now: number): Promise<RateLimitResult> => {
@@ -130,7 +149,7 @@ export function createGlobalIpRateLimiter(
     const res = await stub.fetch('https://internal/check', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key, now, windowMs, maxPerWindow, softCap: softCap ?? null, maxEntries }),
+      body: JSON.stringify({ key, now, windowMs, maxPerWindow, softCap: softCap ?? null, maxEntries, overflowPolicy }),
     });
     return res.json() as Promise<RateLimitResult>;
   };

@@ -98,26 +98,57 @@ describe('createIpRateLimiter', () => {
     expect(limiter.size()).toBe(1);
   });
 
-  it('keeps the tracked entry count within the hard bound', async () => {
+  it('keeps the tracked entry count within the hard bound (default reject policy)', async () => {
     const limiter = createIpRateLimiter({
       windowMs: 600_000,
       maxPerWindow: 5,
       softCap: 2,
       maxEntries: 3,
+      // default overflowPolicy: 'reject'
     });
 
     for (let i = 0; i < 20; i += 1) {
       await limiter(`tenant-${i}`, `10.0.0.${i}`, 1_000);
     }
 
+    // With 'reject' policy, only the first 3 entries are admitted
+    // The rest are rejected, so map size stays at 3
     expect(limiter.size()).toBe(3);
   });
 
-  it('fails open with a fresh budget when the hard bound evicts an active entry', async () => {
+  it('rejects new entries when at capacity with default reject policy', async () => {
+    const limiter = createIpRateLimiter({
+      windowMs: 60_000,
+      maxPerWindow: 1,
+      maxEntries: 2,
+    });
+
+    // First two entries admitted
+    expect((await limiter('tenant-1', '1.1.1.1', 1_000)).allowed).toBe(true);
+    expect((await limiter('tenant-1', '2.2.2.2', 1_000)).allowed).toBe(true);
+    expect(limiter.size()).toBe(2);
+
+    // Third entry should be rejected (map at capacity)
+    const third = await limiter('tenant-1', '3.3.3.3', 1_000);
+    expect(third.allowed).toBe(false);
+    expect(third.retryAfterMs).toBe(60_000);
+    // Map size unchanged
+    expect(limiter.size()).toBe(2);
+
+    // Existing entries still work - first entry at its per-window limit
+    expect((await limiter('tenant-1', '1.1.1.1', 1_100)).allowed).toBe(false); // per-window limit
+    // Different tenant with SAME IP still rejected (map at capacity)
+    expect((await limiter('tenant-2', '1.1.1.1', 1_100)).allowed).toBe(false); // at capacity, reject
+    // Different tenant, DIFFERENT IP also rejected (map at capacity)
+    expect((await limiter('tenant-3', '3.3.3.3', 1_100)).allowed).toBe(false); // at capacity, reject
+  });
+
+  it('evicts active entries with legacy evict-oldest policy', async () => {
     const limiter = createIpRateLimiter({
       windowMs: 60_000,
       maxPerWindow: 1,
       maxEntries: 1,
+      overflowPolicy: 'evict-oldest',
     });
 
     expect(await limiter('tenant-1', '1.1.1.1', 1_000)).toEqual({
@@ -230,5 +261,52 @@ describe('makeRateLimitKey', () => {
   it('builds a composite key from tenantId and ip', () => {
     expect(makeRateLimitKey('tenant-1', '1.2.3.4')).toBe('tenant-1:1.2.3.4');
     expect(makeRateLimitKey('tenant-a', '192.168.1.1')).toBe('tenant-a:192.168.1.1');
+  });
+});
+
+describe('overflowPolicy', () => {
+  it('defaults to reject when not specified', async () => {
+    const limiter = createIpRateLimiter({
+      windowMs: 60_000,
+      maxPerWindow: 10,
+      maxEntries: 1,
+    });
+
+    await limiter('tenant-1', '1.1.1.1', 1_000);
+    const result = await limiter('tenant-1', '2.2.2.2', 1_000);
+
+    expect(result.allowed).toBe(false);
+    expect(result.retryAfterMs).toBe(60_000);
+  });
+
+  it('can be explicitly set to reject', async () => {
+    const limiter = createIpRateLimiter({
+      windowMs: 60_000,
+      maxPerWindow: 10,
+      maxEntries: 1,
+      overflowPolicy: 'reject',
+    });
+
+    await limiter('tenant-1', '1.1.1.1', 1_000);
+    const result = await limiter('tenant-1', '2.2.2.2', 1_000);
+
+    expect(result.allowed).toBe(false);
+    expect(result.retryAfterMs).toBe(60_000);
+  });
+
+  it('can be set to evict-oldest for legacy behavior', async () => {
+    const limiter = createIpRateLimiter({
+      windowMs: 60_000,
+      maxPerWindow: 1,
+      maxEntries: 1,
+      overflowPolicy: 'evict-oldest',
+    });
+
+    await limiter('tenant-1', '1.1.1.1', 1_000);
+    const result = await limiter('tenant-2', '2.2.2.2', 1_000);
+
+    // With evict-oldest, the second entry is admitted (first is evicted)
+    expect(result.allowed).toBe(true);
+    expect(limiter.size()).toBe(1);
   });
 });
