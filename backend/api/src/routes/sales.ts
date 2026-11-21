@@ -101,7 +101,7 @@ export function registerSales(
     const callerIp = c.req.header('CF-Connecting-IP')?.trim() ?? 'unknown';
     const decision = deps.rateLimit
       ? await deps.rateLimit(tenantId, deviceHwid, callerIp, Date.now())
-      : await ipRateLimit(callerIp, Date.now());
+      : await ipRateLimit(tenantId, callerIp, Date.now());
     if (!decision.allowed) {
       return c.json({ ok: false, error: 'RATE_LIMITED', retry_after_ms: decision.retryAfterMs ?? 0 }, 429);
     }
