@@ -22,7 +22,8 @@ import type { Sale } from '../../../shared/src/domain/entities/sale';
 import type { SessionRepository } from '../../../shared/src/domain/repositories/session-repository';
 import type { AuthUserRepository } from '../../../shared/src/domain/repositories/auth-user-repository';
 import type { UserRepository } from '../../../shared/src/domain/repositories/user-repository';
-import { createIpRateLimiter } from '../application/services/ip-rate-limiter';
+import type { DurableObjectNamespace } from '@cloudflare/workers-types';
+import { createIpRateLimiter, createGlobalIpRateLimiter } from '../application/services/ip-rate-limiter';
 
 /** HTTP wire contract: snake_case; shared TypeScript records: camelCase. */
 function toWireSale(sale: Sale) {
@@ -49,6 +50,10 @@ export function registerSales(
      *  sliding window — a single-isolate budget, so a multi-deploy must
      *  inject a shared limiter for cross-isolate throttling (follow-up). */
     rateLimit?: (tenantId: string, username: string, ip: string, at: number) => Promise<{ allowed: boolean; retryAfterMs?: number }>;
+    /** Optional Durable Object namespace for global IP rate limiting.
+     *  When provided, createGlobalIpRateLimiter is used so the window
+     *  persists across cold starts, isolate recycles, and concurrent isolates. */
+    ipRateLimiterDO?: DurableObjectNamespace;
   },
 ): void {
   const { saleRecord, saleList } = deps;
@@ -60,16 +65,21 @@ export function registerSales(
     userRepository: deps.userRepository,
   }));
 
-  // Fallback limiter for /sales/sync: 30 writes/min/IP. Shared via
-  // createIpRateLimiter; state is bound to this app instance (fresh per
-  // isolate/createApp). The map caps mirror /sessions/start so a single
-  // isolate cannot retain an entry for every IP it has ever seen.
-  const ipRateLimit = createIpRateLimiter({
-    windowMs: 60_000,
-    maxPerWindow: 30,
-    softCap: 10_000,
-    maxEntries: 10_000,
-  });
+  // Rate limiter for /sales/sync: 30 writes/min/IP.
+  // If a Durable Object namespace is provided, use the global limiter so the
+  // window persists across cold starts, isolate recycles, and concurrent isolates.
+  // Otherwise fall back to the in-memory limiter (tests get isolation for free).
+  const ipRateLimit = deps.ipRateLimiterDO
+    ? createGlobalIpRateLimiter(
+        { windowMs: 60_000, maxPerWindow: 30, softCap: 10_000, maxEntries: 10_000 },
+        deps.ipRateLimiterDO,
+      )
+    : createIpRateLimiter({
+        windowMs: 60_000,
+        maxPerWindow: 30,
+        softCap: 10_000,
+        maxEntries: 10_000,
+      });
 
   app.post('/sales/sync', async (c) => {
     const tenantId = c.get('authUid');
@@ -91,7 +101,7 @@ export function registerSales(
     const callerIp = c.req.header('CF-Connecting-IP')?.trim() ?? 'unknown';
     const decision = deps.rateLimit
       ? await deps.rateLimit(tenantId, deviceHwid, callerIp, Date.now())
-      : ipRateLimit(callerIp, Date.now());
+      : await ipRateLimit(callerIp, Date.now());
     if (!decision.allowed) {
       return c.json({ ok: false, error: 'RATE_LIMITED', retry_after_ms: decision.retryAfterMs ?? 0 }, 429);
     }

@@ -33,7 +33,8 @@ import type { SessionStartDto } from '../application/dtos/session-start.dto';
 import type { SessionHeartbeatDto } from '../application/dtos/session-heartbeat.dto';
 import type { SessionEndDto } from '../application/dtos/session-end.dto';
 import type { SessionListActiveDto } from '../application/dtos/session-list-active.dto';
-import { createIpRateLimiter } from '../application/services/ip-rate-limiter';
+import type { DurableObjectNamespace } from '@cloudflare/workers-types';
+import { createIpRateLimiter, createGlobalIpRateLimiter } from '../application/services/ip-rate-limiter';
 
 export function registerSessions(
   app: Hono<{ Bindings: Env; Variables: Vars }>,
@@ -51,6 +52,10 @@ export function registerSessions(
      *  in-memory sliding window — a single-isolate budget, so a multi-deploy
      *  must inject a shared limiter for cross-isolate throttling (follow-up). */
     rateLimit?: (tenantId: string, username: string, ip: string, at: number) => Promise<{ allowed: boolean; retryAfterMs?: number }>;
+    /** Optional Durable Object namespace for global IP rate limiting.
+     *  When provided, createGlobalIpRateLimiter is used so the window
+     *  persists across cold starts, isolate recycles, and concurrent isolates. */
+    ipRateLimiterDO?: DurableObjectNamespace;
   },
 ): void {
   const {
@@ -60,16 +65,21 @@ export function registerSessions(
     sessionListActive,
   } = deps;
 
-  // Fallback limiter for /sessions/start: 30 starts/min/IP. Shared via
-  // createIpRateLimiter; state is bound to this app instance (fresh per
-  // isolate/createApp), so tests get isolation for free and production pays
-  // only one window per isolate.
-  const ipRateLimit = createIpRateLimiter({
-    windowMs: 60_000,
-    maxPerWindow: 30,
-    softCap: 10_000,
-    maxEntries: 10_000,
-  });
+  // Rate limiter for /sessions/start: 30 starts/min/IP.
+  // If a Durable Object namespace is provided, use the global limiter so the
+  // window persists across cold starts, isolate recycles, and concurrent isolates.
+  // Otherwise fall back to the in-memory limiter (tests get isolation for free).
+  const ipRateLimit = deps.ipRateLimiterDO
+    ? createGlobalIpRateLimiter(
+        { windowMs: 60_000, maxPerWindow: 30, softCap: 10_000, maxEntries: 10_000 },
+        deps.ipRateLimiterDO,
+      )
+    : createIpRateLimiter({
+        windowMs: 60_000,
+        maxPerWindow: 30,
+        softCap: 10_000,
+        maxEntries: 10_000,
+      });
 
   // Middleware gate for all session routes.
   app.use('/sessions/*', requireAuth({
@@ -110,7 +120,7 @@ export function registerSessions(
     // and spoofable, so it is intentionally NOT used for rate-limit keying.
     const injectable = deps.rateLimit
       ? await deps.rateLimit(c.get('authUid'), dto.username, c.req.header('CF-Connecting-IP')?.trim() ?? 'unknown', Date.now())
-      : ipRateLimit(c.req.header('CF-Connecting-IP')?.trim() ?? 'unknown', Date.now());
+      : await ipRateLimit(c.req.header('CF-Connecting-IP')?.trim() ?? 'unknown', Date.now());
     if (!injectable.allowed) {
       return c.json({ ok: false, error: 'RATE_LIMITED', retry_after_ms: injectable.retryAfterMs ?? 0 }, 429);
     }
