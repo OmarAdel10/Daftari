@@ -2030,21 +2030,23 @@ Retention: 90-day rolling
 [ PrintServiceFactory.create() ]
               │
               ▼
-[ Platform detection via conditional imports ]
-   ┌──────────┼──────────┐
-   ▼          ▼          ▼
-[ Windows ]  [ Linux (Experimental) ]  [ Web ]
+[ Platform detection: kIsWeb + defaultTargetPlatform ]
+   ┌──────────┼──────────────┐
+   ▼          ▼              ▼
+[ Windows ]  [ Linux ]  [ Web / macOS / Mobile ]
    │          │          │
    ▼          ▼          ▼
-WindowsPrint LinuxPrint WebPrint
-Service      Service    Service
+HealthGuard  HealthGuard  PrintService
+(Desktop)     (Desktop)    Stub (no-op)
    │          │          │
    └──────────┼──────────┘
                ▼
 [ Returns PrintService implementation ]
 ```
 
-**Note:** Linux print service is experimental/development only and requires a working CUPS installation.
+**Note:** On Windows and Linux the factory returns the desktop client wrapped in `PrintServiceHealthGuard`: every print/export/save call first verifies the PrintServer sidecar is reachable and fails with a `PrintException` when it is not, so printing can no longer complete silently without output. Unsupported targets (web, macOS, mobile) get the no-op stub.
+
+**Note:** The dedicated `WindowsPrintService` / `LinuxPrintService` (CUPS) implementations are experimental/development-only and are not selected by the factory — their route drift is tracked as Plane **DAFTARI-187**.
 
 #### 25b. Receipt Auto-Print with New Factory
 

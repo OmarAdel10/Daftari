@@ -1706,13 +1706,14 @@ class FlavorConfig {
 The `PrintService` has been refactored from a single `dart:io`-based implementation to a platform-agnostic interface with per-platform implementations.
 
 * **Interface** (`print_service_interface.dart`): Abstract `PrintService` with all operations (printers, receipt, barcode, ticket, save PNG/PDF, sales export, validate SVG, health check). `PrintException` with endpoint/statusCode/originalError.
-* **Factory** (`print_service_factory.dart`): `PrintServiceFactory.instance` (singleton), `create()` (new instance), `overrideForTesting()`, `reset()`. **The factory performs no platform detection and always returns the no-op `PrintServiceStub`**, so the platform implementations below are not reached at runtime. Wiring the real implementations is tracked as Plane **DAFTARI-188**.
-* **Platform Implementations (not currently selected by the factory):**
-  * **Desktop** (`print_service_desktop.dart`): Windows/Linux → HTTP to PrintServer sidecar (port 5150).
-  * **Windows** (`print_service_windows.dart`): Extended with timeouts, `PrintException` wrapping.
-  * **Linux** (`print_service_linux.dart`): CUPS-backed, 500KB SVG limit, 10s/30s timeouts.
-  * **Web** (`print_service_web.dart`): Delegates to PrintServer via HTTP.
-  * **Stub** (`print_service_stub.dart`): The no-op implementation the factory returns. Its print/export calls complete successfully **without producing output** — it does not throw `UnsupportedError`.
+* **Factory** (`print_service_factory.dart`): `PrintServiceFactory.instance` (singleton), `create()` (new instance), `overrideForTesting()`, `reset()`. **The factory performs platform detection** via `kIsWeb` + `defaultTargetPlatform` from `package:flutter/foundation.dart` (no `dart:io`, so the factory stays web-safe): on Windows and Linux it returns the real desktop client wrapped in the health guard, on web/macOS/mobile it returns the no-op stub.
+* **Health Guard** (`print_service_health_guard.dart`): Decorator around the platform client. Every print/export/save call first awaits `healthCheck()`; when the sidecar is unreachable it throws `PrintException` naming the sidecar URL instead of completing silently without output. Read-only calls (`getLocalPrinters()`, `validateSvg()`) and `healthCheck()` itself pass straight through.
+* **Platform Implementations:**
+  * **Desktop** (`print_service_desktop.dart`): Windows/Linux → HTTP to PrintServer sidecar (port 5150). **Selected by the factory** on Windows/Linux (routes `/api/printing/receipt|barcode|ticket`).
+  * **Windows** (`print_service_windows.dart`): Extended with timeouts, `PrintException` wrapping. Not selected by the factory — route drift tracked as Plane **DAFTARI-187**.
+  * **Linux** (`print_service_linux.dart`): CUPS-backed, 500KB SVG limit, 10s/30s timeouts. Not selected by the factory — route drift tracked as Plane **DAFTARI-187**.
+  * **Web** (`print_service_web.dart`): Delegates to PrintServer via HTTP. Not selected by the factory — route drift tracked as Plane **DAFTARI-183**.
+  * **Stub** (`print_service_stub.dart`): The no-op implementation the factory returns on unsupported platforms (web, macOS, mobile). Its print/export calls complete successfully **without producing output** — it does not throw `UnsupportedError`.
 * **Conditional Export** (`print_service.dart`): Uses `if (dart.library.io)` / `if (dart.library.html)` for platform selection. This barrel currently has **zero importers** — tracked as Plane **DAFTARI-182**.
 * **Updated Consumers:** `ReceiptPrintHelper`, `SalesPdfExporter`, `ProductFormDialog`, `OnboardingBrandingScreen`, `AdminGeneralSection`, `PrinterDropdownField`, `TableModeSections`, `AppShell` — all use `PrintServiceFactory.create()`.
 

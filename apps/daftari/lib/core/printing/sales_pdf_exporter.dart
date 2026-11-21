@@ -19,22 +19,56 @@ class SalesPdfExporter {
   final PrintService _printService;
   final AppSettingsEntity Function() _settingsProvider;
 
+  int _inFlightOperations = 0;
+  bool _disposeRequested = false;
+  bool _disposed = false;
+
   /// Renders the report via PrintServer and returns the saved PDF path.
   Future<String> saveAsPdf({
     required List<ReceiptEntity> receipts,
     required String title,
     required String outputDirectory,
   }) async {
+    if (_disposeRequested) {
+      throw PrintException(
+        'The sales PDF exporter was disposed; the export was not sent to '
+        'the print server.',
+      );
+    }
     final payload = buildPayload(
       receipts: receipts,
       settings: _settingsProvider(),
       title: title,
       outputDirectory: outputDirectory,
     );
-    return _printService.saveSalesPdf(payload);
+    _inFlightOperations++;
+    try {
+      return await _printService.saveSalesPdf(payload);
+    } finally {
+      _inFlightOperations--;
+      _disposeIfIdle();
+    }
   }
 
-  void dispose() => _printService.dispose();
+  /// Releases the print service once no export is running.
+  ///
+  /// The bloc that owns this exporter can be closed while an export handler
+  /// is still waiting for data, so the service stays alive until the
+  /// in-flight export has finished.
+  void dispose() {
+    _disposeRequested = true;
+    _disposeIfIdle();
+  }
+
+  /// Disposes the print service when disposal was requested and no export
+  /// is running anymore.
+  void _disposeIfIdle() {
+    if (!_disposeRequested || _inFlightOperations > 0 || _disposed) {
+      return;
+    }
+    _disposed = true;
+    _printService.dispose();
+  }
 
   /// Builds the JSON payload for POST /api/printing/sales-export.
   /// The period is derived from the earliest/latest receipt date; the

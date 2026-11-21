@@ -732,14 +732,15 @@ Settings surface adapts per business type: read-only business-type card, favorit
 
 #### W1: Platform-Agnostic Architecture
 * **Interface:** `PrintService` (abstract) — defines all print operations.
-* **Factory:** `PrintServiceFactory` — singleton + create() for platform-specific instances.
+* **Factory:** `PrintServiceFactory` — singleton + create() for platform-specific instances; selects the platform implementation at runtime via `kIsWeb` + `defaultTargetPlatform` (no `dart:io`, so the factory stays web-safe).
 * **Platform Implementations:**
-  * **Desktop** (`print_service_desktop.dart`): Windows/Linux via HTTP to PrintServer sidecar (port 5150).
-  * **Windows** (`print_service_windows.dart`): Extended with PrintException handling.
-  * **Linux (Experimental / Development Only)** (`print_service_linux.dart`): CUPS-backed, 500KB SVG limit, timeouts. Linux print service is experimental and requires a working CUPS installation.
-  * **Web** (`print_service_web.dart`): Delegates to PrintServer via HTTP.
-  * **Stub** (`print_service_stub.dart`): No-op stub used until platform detection is wired up — print and export calls resolve without output, printer enumeration is empty and the health check reports the sidecar as unavailable.
-* **Conditional Export:** `print_service.dart` uses `if (dart.library.io)` / `if (dart.library.html)` for platform selection.
+  * **Desktop** (`print_service_desktop.dart`): Windows/Linux via HTTP to PrintServer sidecar (port 5150) — selected by the factory.
+  * **Health Guard** (`print_service_health_guard.dart`): Wraps the desktop client on Windows/Linux; every print/export/save call verifies the sidecar is reachable and throws `PrintException` when it is not, so printing can no longer silently no-op.
+  * **Windows** (`print_service_windows.dart`): Extended with PrintException handling — not selected by the factory.
+  * **Linux (Experimental / Development Only)** (`print_service_linux.dart`): CUPS-backed, 500KB SVG limit, timeouts. Linux print service is experimental and requires a working CUPS installation — not selected by the factory.
+  * **Web** (`print_service_web.dart`): Delegates to PrintServer via HTTP — not selected by the factory.
+  * **Stub** (`print_service_stub.dart`): No-op stub used on unsupported platforms (web, macOS, mobile) — print and export calls resolve without output, printer enumeration is empty and the health check reports the sidecar as unavailable.
+* **Conditional Export:** `print_service.dart` uses `if (dart.library.io)` / `if (dart.library.html)` for platform selection. Dead barrel with zero importers — tracked as Plane **DAFTARI-182**.
 * **Updated Consumers:** `ReceiptPrintHelper`, `SalesPdfExporter`, `ProductFormDialog`, `OnboardingBrandingScreen`, `AdminGeneralSection`, `PrinterDropdownField`, `TableModeSections`, `AppShell` all use `PrintServiceFactory.create()`.
 
 ---

@@ -569,7 +569,7 @@ class ThemeManager {
 
 #### S1: Architecture Change
 * **Before:** Single `PrintService` class using `dart:io` HttpClient directly.
-* **After:** Abstract `PrintService` interface + `PrintServiceFactory` + platform-specific implementations via conditional imports.
+* **After:** Abstract `PrintService` interface + `PrintServiceFactory` + platform-specific implementations selected by runtime platform detection.
 
 #### S2: Interface (`print_service_interface.dart`)
 ```dart
@@ -593,16 +593,17 @@ abstract interface class PrintService {
 * `PrintServiceFactory.instance` — singleton accessor.
 * `PrintServiceFactory.create()` — new instance per call.
 * `overrideForTesting(PrintService)` / `reset()` — test utilities.
-* Platform detection delegates to conditional exports.
+* Platform detection via `kIsWeb` + `defaultTargetPlatform` (`package:flutter/foundation.dart` — no `dart:io`, so the factory stays web-safe). Windows/Linux → `PrintServiceHealthGuard(PrintServiceDesktop())`; web/macOS/mobile → `PrintServiceStub`.
 
 #### S4: Platform Implementations
 | Implementation | File | Platform | Backend |
 |---|---|---|---|
-| `PrintServiceDesktop` | `print_service_desktop.dart` | Windows/Linux | HTTP → PrintServer sidecar (port 5150) |
-| `WindowsPrintService` | `print_service_windows.dart` | Windows | Extended timeouts, PrintException |
-| `LinuxPrintService` | `print_service_linux.dart` | Linux (Experimental) | CUPS, 500KB SVG limit, 10s/30s timeouts |
-| `WebPrintService` | `print_service_web.dart` | Web | HTTP → PrintServer |
-| `PrintServiceStub` | `print_service_stub.dart` | Unsupported | No-op stub — print/export calls resolve without output |
+| `PrintServiceHealthGuard` | `print_service_health_guard.dart` | Windows/Linux (decorator) | Health-checks the sidecar before every print/export; throws `PrintException` when unreachable |
+| `PrintServiceDesktop` | `print_service_desktop.dart` | Windows/Linux | HTTP → PrintServer sidecar (port 5150) — selected by the factory |
+| `WindowsPrintService` | `print_service_windows.dart` | Windows | Extended timeouts, PrintException — not selected by the factory |
+| `LinuxPrintService` | `print_service_linux.dart` | Linux (Experimental) | CUPS, 500KB SVG limit, 10s/30s timeouts — not selected by the factory |
+| `WebPrintService` | `print_service_web.dart` | Web | HTTP → PrintServer — not selected by the factory |
+| `PrintServiceStub` | `print_service_stub.dart` | Web/macOS/mobile | No-op stub — print/export calls resolve without output |
 
 #### S5: Conditional Export (`print_service.dart`)
 ```dart
@@ -611,6 +612,7 @@ export 'print_service_stub.dart';
 export 'print_service_desktop.dart' if (dart.library.io) 'print_service_desktop.dart';
 export 'print_service_web.dart' if (dart.library.html) 'print_service_web.dart';
 ```
+* Dead barrel — zero importers (tracked as Plane **DAFTARI-182**); platform selection happens in the factory.
 
 #### S6: Updated Consumers
 All print consumers now use `PrintServiceFactory.create()`:
