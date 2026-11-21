@@ -51,6 +51,8 @@ export { TenantNotifier } from '../../realtime/src/index';
 import { createRealtimeServices, type RealtimeEnv } from '../../realtime/src/runtime';
 import { RateLimiter } from '../../shared/src/domain/services/rate-limiter';
 import type { RealtimeTicketRepository } from '../../shared/src/domain/repositories/realtime-ticket-repository';
+import { IpRateLimiter } from './application/services/ip-rate-limiter-do';
+export { IpRateLimiter } from './application/services/ip-rate-limiter-do';
 
 export interface ApiDeps {
   verifyToken?: FirebaseTokenVerifier;
@@ -61,6 +63,10 @@ export interface ApiDeps {
   verify?: typeof verifyTagged;
   /** Injectable login rate limiter (T17): default is the real sliding window. */
   rateLimit?: (tenantId: string, username: string, ip: string, at: number) => Promise<{ allowed: boolean; retryAfterMs?: number }>;
+  /** Optional Durable Object namespace for global IP rate limiting.
+   *  When provided, createGlobalIpRateLimiter is used so the window
+   *  persists across cold starts, isolate recycles, and concurrent isolates. */
+  ipRateLimiterDO?: DurableObjectNamespace;
   /** Shared admin JWT secret used for signing session JWTs. Required — no fallback. */
   adminJwtSecret: string;
   /** Service container built from the real Worker bindings (`env`), not module
@@ -155,6 +161,7 @@ export function createApp(deps: ApiDeps) {
     authUserRepository: deps.services.auth.authUserRepository,
     userRepository: deps.services.auth.userRepository,
     rateLimit: deps.rateLimit,
+    ipRateLimiterDO: deps.ipRateLimiterDO,
   });
   registerSales(app, {
     verifyToken: deps.verifyToken,
@@ -164,6 +171,7 @@ export function createApp(deps: ApiDeps) {
     saleRecord: useCases.saleRecord,
     saleList: useCases.saleList,
     rateLimit: deps.rateLimit,
+    ipRateLimiterDO: deps.ipRateLimiterDO,
   });
   registerAdmin(app, {
     verifyToken: deps.verifyToken,
@@ -230,6 +238,7 @@ function appFor(env: Env, services: ApiServices): ReturnType<typeof createApp> {
       verifyToken: verifyFirebaseToken,
       verify: verifyTagged,
       postHogFetch: fetch,
+      ipRateLimiterDO: env.IP_RATE_LIMITER,
     });
   }
   return cachedApp;

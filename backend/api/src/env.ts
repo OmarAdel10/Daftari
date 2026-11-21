@@ -1,4 +1,6 @@
 /** Environment bindings + request-scoped variables for the api worker. */
+import type { DurableObjectNamespace } from '@cloudflare/workers-types';
+
 export interface Env {
   ENVIRONMENT: string;
   FIREBASE_PROJECT_ID: string;
@@ -12,6 +14,8 @@ export interface Env {
     idFromName: (name: string) => string;
     get: (id: string) => { fetch: (req: Request) => Promise<Response>; notify: (tenantId: string, event: Record<string, unknown>) => Promise<void>; };
   };
+  /** Durable Object binding for global IP rate limiting (IpRateLimiter). */
+  IP_RATE_LIMITER?: DurableObjectNamespace;
   /** Paymob HMAC secret for webhook signature validation. */
   PAYMOB_HMAC_SECRET: string;
   /** Ed25519 private key for license signing. */

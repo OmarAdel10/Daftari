@@ -19,9 +19,15 @@ bucket_name = "daftari-branding"
 name = "NOTIFIER"
 class_name = "TenantNotifier"
 
+# Durable Object binding — IpRateLimiter lives in src/application/services/ip-rate-limiter-do.ts
+# and is exported by this worker's entrypoint (src/index.ts).
+[[durable_objects.bindings]]
+name = "IP_RATE_LIMITER"
+class_name = "IpRateLimiter"
+
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["TenantNotifier"]
+new_sqlite_classes = ["TenantNotifier", "IpRateLimiter"]
 
 [env.staging]
 name = "api-staging"
@@ -40,6 +46,10 @@ bucket_name = "daftari-branding"
 name = "NOTIFIER"
 class_name = "TenantNotifier"
 
+[[env.staging.durable_objects.bindings]]
+name = "IP_RATE_LIMITER"
+class_name = "IpRateLimiter"
+
 [env.production]
 name = "api"
 
@@ -56,6 +66,10 @@ bucket_name = "daftari-branding"
 [[env.production.durable_objects.bindings]]
 name = "NOTIFIER"
 class_name = "TenantNotifier"
+
+[[env.production.durable_objects.bindings]]
+name = "IP_RATE_LIMITER"
+class_name = "IpRateLimiter"
 
 # Secrets (set via `wrangler secret put` per env):
 # TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, POSTHOG_API_KEY, ADMIN_JWT_SECRET,

@@ -2,12 +2,15 @@
  * Per-IP sliding-window rate limiter factory.
  *
  * Extracted so that multiple HTTP routes can share one implementation
- * instead of each defining an inline copy. State is bound to the app
- * instance, so tests get isolation for free: each `createApp` call builds
- * its own limiters. The Worker entrypoint builds ONE app per isolate
- * (see `appFor` in `src/index.ts`), so the window now persists for the
- * lifetime of the isolate instead of being rebuilt per request.
+ * instead of each defining an inline copy. Two variants exist:
+ * - In-memory (createIpRateLimiter): state bound to the app instance.
+ *   Used by tests (each `createApp` call builds its own limiters).
+ * - Durable Object (createGlobalIpRateLimiter): state lives in a global DO.
+ *   Used by the deployed Worker so the window persists across cold starts,
+ *   isolate recycles, and concurrent isolates.
  */
+
+import type { DurableObjectNamespace } from '@cloudflare/workers-types';
 
 /** Maximum number of tracked IPs inspected per call while evicting expired
  *  entries. Keeps the per-request CPU cost bounded when the map sits at its
@@ -29,55 +32,103 @@ export interface IpRateLimiterOptions {
   maxEntries: number;
 }
 
-export interface IpRateLimiter {
-  (ip: string, now: number): { allowed: boolean; retryAfterMs: number };
-  /** Number of IPs currently tracked by this limiter. */
-  size(): number;
+/** Result of a rate-limit check. */
+export interface RateLimitResult {
+  allowed: boolean;
+  retryAfterMs: number;
 }
 
+/** Sync or async rate limiter function. */
+export type IpRateLimiterFn = (
+  ip: string,
+  now: number,
+) => RateLimitResult | Promise<RateLimitResult>;
+
+/** Rate limiter with a size method. */
+export interface IpRateLimiter {
+  (ip: string, now: number): RateLimitResult | Promise<RateLimitResult>;
+  /** Number of IPs currently tracked by this limiter. */
+  size(): number | Promise<number>;
+}
+
+/**
+ * Creates an IN-MEMORY rate limiter. State lives in a Map bound to the
+ * returned function. Use this for tests or local development where a
+ * Durable Object is not available.
+ */
 export function createIpRateLimiter(
   options: IpRateLimiterOptions,
 ): IpRateLimiter {
   const { windowMs, maxPerWindow, softCap, maxEntries } = options;
   const hits = new Map<string, number[]>();
 
-  return Object.assign(
-    (ip: string, now: number): { allowed: boolean; retryAfterMs: number } => {
-      const ipHits = (hits.get(ip) ?? []).filter((t) => now - t < windowMs);
-      if (ipHits.length >= maxPerWindow) {
-        const oldest = ipHits[0] ?? now;
-        return {
-          allowed: false,
-          retryAfterMs: Math.max(0, oldest + windowMs - now),
-        };
-      }
-      ipHits.push(now);
-      hits.set(ip, ipHits);
+  const limiter = (ip: string, now: number): RateLimitResult => {
+    const ipHits = (hits.get(ip) ?? []).filter((t) => now - t < windowMs);
+    if (ipHits.length >= maxPerWindow) {
+      const oldest = ipHits[0] ?? now;
+      return {
+        allowed: false,
+        retryAfterMs: Math.max(0, oldest + windowMs - now),
+      };
+    }
+    ipHits.push(now);
+    hits.set(ip, ipHits);
 
-      if (softCap != null && hits.size > softCap) {
-        // Shed fully-expired IPs first, inspecting only a bounded slice of
-        // the map per call so the per-request cost stays flat.
-        let scanned = 0;
-        for (const [key, times] of hits) {
-          if (scanned >= MAX_EVICTION_SCAN_PER_CALL) break;
-          scanned += 1;
-          if (times.every((t) => now - t >= windowMs)) hits.delete(key);
-        }
+    if (softCap != null && hits.size > softCap) {
+      // Shed fully-expired IPs first, inspecting only a bounded slice of
+      // the map per call so the per-request cost stays flat.
+      let scanned = 0;
+      for (const [key, times] of hits) {
+        if (scanned >= MAX_EVICTION_SCAN_PER_CALL) break;
+        scanned += 1;
+        if (times.every((t) => now - t >= windowMs)) hits.delete(key);
       }
+    }
 
-      if (hits.size > maxEntries) {
-        // Map iteration follows insertion order, so the oldest-first-seen IPs are
-        // dropped first. Entries still inside their window are evicted too:
-        // under memory pressure the limiter fails open rather than growing
-        // without bound.
-        for (const key of hits.keys()) {
-          if (hits.size <= maxEntries) break;
-          hits.delete(key);
-        }
+    if (hits.size > maxEntries) {
+      // Map iteration follows insertion order, so the oldest-first-seen IPs are
+      // dropped first. Entries still inside their window are evicted too:
+      // under memory pressure the limiter fails open rather than growing
+      // without bound.
+      for (const key of hits.keys()) {
+        if (hits.size <= maxEntries) break;
+        hits.delete(key);
       }
+    }
 
-      return { allowed: true, retryAfterMs: 0 };
+    return { allowed: true, retryAfterMs: 0 };
+  };
+
+  return Object.assign(limiter, { size: () => hits.size });
+}
+
+/**
+ * Creates a GLOBAL rate limiter backed by a Durable Object. State lives in
+ * the DO's SQLite storage, shared across all isolates. Use this in the
+ * deployed Worker (production, staging, dev) so cold starts and concurrent
+ * isolates see the same window.
+ */
+export function createGlobalIpRateLimiter(
+  options: IpRateLimiterOptions,
+  doNamespace: DurableObjectNamespace,
+): IpRateLimiter {
+  const { windowMs, maxPerWindow, softCap, maxEntries } = options;
+  const stub = doNamespace.get(doNamespace.idFromName('global'));
+
+  const limiter = async (ip: string, now: number): Promise<RateLimitResult> => {
+    const res = await stub.fetch('https://internal/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ip, now, windowMs, maxPerWindow, softCap: softCap ?? null, maxEntries }),
+    });
+    return res.json() as Promise<RateLimitResult>;
+  };
+
+  return Object.assign(limiter, {
+    async size(): Promise<number> {
+      const res = await stub.fetch('https://internal/size', { method: 'GET' });
+      const { size } = await res.json() as { size: number };
+      return size;
     },
-    { size: () => hits.size },
-  );
+  });
 }
