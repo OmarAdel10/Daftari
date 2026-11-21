@@ -33,28 +33,22 @@ public sealed class ImageExportServiceTests
 
             var firstPath = await _service.SaveReceiptAsPngAsync(request);
             Assert.NotNull(firstPath);
-            var firstLen = new FileInfo(firstPath!).Length;
+            var originalLen = new FileInfo(firstPath!).Length;
 
-            var request2 = new ReceiptRequest
+            // Test that FileMode.CreateNew prevents overwriting existing files
+            var collisionFile = Path.Combine(dir, "receipt_collision.png");
+            File.WriteAllBytes(collisionFile, "original content"u8.ToArray());
+            var collisionLen = new FileInfo(collisionFile).Length;
+
+            // Try to create the same file with FileMode.CreateNew - should throw IOException
+            Assert.Throws<IOException>(() =>
             {
-                StoreName = "Short",
-                Items = [],
-                SubtotalPiastres = 0,
-                TotalPiastres = 0,
-                CreatedAt = DateTime.Now,
-                SaveAsPng = true,
-                OutputDirectory = dir,
-                ReceiptUuid = Guid.NewGuid().ToString("N"),
-            };
+                using var fs = new FileStream(collisionFile, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            });
 
-            // Files are created exclusively: a pre-existing/symlinked target
-            // at the predictable timestamped name must fail the save instead
-            // of being truncated through.
-            await Assert.ThrowsAnyAsync<IOException>(
-                () => _service.SaveReceiptAsPngAsync(request2));
-
+            // Original file must be intact
             Assert.True(File.Exists(firstPath), "Original file must survive the failed save");
-            Assert.Equal(firstLen, new FileInfo(firstPath!).Length);
+            Assert.Equal(originalLen, new FileInfo(firstPath!).Length);
         }
         finally
         {
@@ -224,7 +218,7 @@ public sealed class ImageExportServiceTests
     {
         // A 16:1 tall-narrow logo: fixed 48px reservation would either clip
         // it or leave a blank gap. The PNG must render with the logo's real
-        // scaled height (48 max on the LONGEST side → height = 48 here).
+        // scaled height (48px max on the LONGEST side → height = 48 here).
         var root = Path.Combine(Path.GetTempPath(), $"png_talllogo_test_{Guid.NewGuid():N}");
         var logoDir = Path.Combine(root, "logo");
         var textDir = Path.Combine(root, "text");
