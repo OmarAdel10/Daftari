@@ -2,8 +2,11 @@
  * IpRateLimiter — Durable Object for global per-IP rate limiting.
  *
  * One DO instance (id = "global") holds the sliding-window state for all
- * tracked IPs. The Worker calls it via a service binding, so the window
+ * tracked entries. The Worker calls it via a service binding, so the window
  * persists across cold starts, isolate recycles, and concurrent isolates.
+ *
+ * Keys are composite: "tenantId:ip" (DAFTARI-203) so tenants behind shared
+ * NAT cannot starve each other.
  *
  * We don't import 'cloudflare:workers' because vitest can't resolve it.
  * Wrangler matches the class by name against wrangler.toml's
@@ -30,7 +33,7 @@ export class IpRateLimiter {
   }
 
   async check(
-    ip: string,
+    key: string,
     now: number,
     windowMs: number,
     maxPerWindow: number,
@@ -40,43 +43,43 @@ export class IpRateLimiter {
     // Load state from DO storage
     const stored = (await this.state.storage.get('rateLimitState')) as RateLimitState | undefined;
     const hits = new Map<string, number[]>(
-      Object.entries(stored?.hits ?? {}).map(([ip, times]) => [ip, [...times]]),
+      Object.entries(stored?.hits ?? {}).map(([k, times]) => [k, [...times]]),
     );
 
-    const ipHits = (hits.get(ip) ?? []).filter((t) => now - t < windowMs);
-    if (ipHits.length >= maxPerWindow) {
-      const oldest = ipHits[0] ?? now;
+    const keyHits = (hits.get(key) ?? []).filter((t) => now - t < windowMs);
+    if (keyHits.length >= maxPerWindow) {
+      const oldest = keyHits[0] ?? now;
       return {
         allowed: false,
         retryAfterMs: Math.max(0, oldest + windowMs - now),
       };
     }
-    ipHits.push(now);
-    hits.set(ip, ipHits);
+    keyHits.push(now);
+    hits.set(key, keyHits);
 
-    // Soft cap eviction: shed fully-expired IPs first
+    // Soft cap eviction: shed fully-expired entries first
     if (softCap != null && hits.size > softCap) {
       const MAX_EVICTION_SCAN_PER_CALL = 1000;
       let scanned = 0;
-      for (const [key, times] of hits) {
+      for (const [k, times] of hits) {
         if (scanned >= MAX_EVICTION_SCAN_PER_CALL) break;
         scanned += 1;
-        if (times.every((t) => now - t >= windowMs)) hits.delete(key);
+        if (times.every((t) => now - t >= windowMs)) hits.delete(k);
       }
     }
 
-    // Hard bound: evict oldest-first-seen IPs (may evict active ones — fail open)
+    // Hard bound: evict oldest-first-seen entries (may evict active ones — fail open)
     if (hits.size > maxEntries) {
-      for (const key of hits.keys()) {
+      for (const k of hits.keys()) {
         if (hits.size <= maxEntries) break;
-        hits.delete(key);
+        hits.delete(k);
       }
     }
 
     // Persist state back to DO storage
     const hitsObj: Record<string, number[]> = {};
-    for (const [key, times] of hits) {
-      hitsObj[key] = times;
+    for (const [k, times] of hits) {
+      hitsObj[k] = times;
     }
     await this.state.storage.put('rateLimitState', { hits: hitsObj });
 
@@ -93,15 +96,15 @@ export class IpRateLimiter {
     const path = url.pathname;
 
     if (path === '/check' && request.method === 'POST') {
-      const { ip, now, windowMs, maxPerWindow, maxEntries, softCap } = await request.json() as {
-        ip: string;
+      const { key, now, windowMs, maxPerWindow, maxEntries, softCap } = await request.json() as {
+        key: string;
         now: number;
         windowMs: number;
         maxPerWindow: number;
         maxEntries: number;
         softCap: number | null;
       };
-      const result = await this.check(ip, now, windowMs, maxPerWindow, maxEntries, softCap ?? null);
+      const result = await this.check(key, now, windowMs, maxPerWindow, maxEntries, softCap ?? null);
       return Response.json(result);
     }
 

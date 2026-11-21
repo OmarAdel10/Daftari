@@ -120,7 +120,7 @@ export function registerSessions(
     // and spoofable, so it is intentionally NOT used for rate-limit keying.
     const injectable = deps.rateLimit
       ? await deps.rateLimit(c.get('authUid'), dto.username, c.req.header('CF-Connecting-IP')?.trim() ?? 'unknown', Date.now())
-      : await ipRateLimit(c.req.header('CF-Connecting-IP')?.trim() ?? 'unknown', Date.now());
+      : await ipRateLimit(c.get('authUid'), c.req.header('CF-Connecting-IP')?.trim() ?? 'unknown', Date.now());
     if (!injectable.allowed) {
       return c.json({ ok: false, error: 'RATE_LIMITED', retry_after_ms: injectable.retryAfterMs ?? 0 }, 429);
     }

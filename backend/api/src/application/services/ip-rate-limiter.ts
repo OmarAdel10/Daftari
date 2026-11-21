@@ -8,11 +8,14 @@
  * - Durable Object (createGlobalIpRateLimiter): state lives in a global DO.
  *   Used by the deployed Worker so the window persists across cold starts,
  *   isolate recycles, and concurrent isolates.
+ *
+ * Both variants now partition by composite key (tenantId:IP) so tenants
+ * behind shared NAT cannot starve each other (DAFTARI-203).
  */
 
 import type { DurableObjectNamespace } from '@cloudflare/workers-types';
 
-/** Maximum number of tracked IPs inspected per call while evicting expired
+/** Maximum number of tracked entries inspected per call while evicting expired
  *  entries. Keeps the per-request CPU cost bounded when the map sits at its
  *  soft cap. */
 const MAX_EVICTION_SCAN_PER_CALL = 1000;
@@ -20,10 +23,10 @@ const MAX_EVICTION_SCAN_PER_CALL = 1000;
 export interface IpRateLimiterOptions {
   windowMs: number;
   maxPerWindow: number;
-  /** Start evicting fully-expired IPs once the map exceeds this size. */
+  /** Start evicting fully-expired entries once the map exceeds this size. */
   softCap?: number;
   /**
-   * Hard upper bound on the number of tracked IPs. REQUIRED: a limiter
+   * Hard upper bound on the number of tracked entries. REQUIRED: a limiter
    * without a bound can grow without limit. When the map exceeds it, the
    * oldest entries are evicted even if they are still inside the window
    * (the limiter fails open under memory pressure rather than growing
@@ -40,15 +43,21 @@ export interface RateLimitResult {
 
 /** Sync or async rate limiter function. */
 export type IpRateLimiterFn = (
+  tenantId: string,
   ip: string,
   now: number,
 ) => RateLimitResult | Promise<RateLimitResult>;
 
 /** Rate limiter with a size method. */
 export interface IpRateLimiter {
-  (ip: string, now: number): RateLimitResult | Promise<RateLimitResult>;
-  /** Number of IPs currently tracked by this limiter. */
+  (tenantId: string, ip: string, now: number): RateLimitResult | Promise<RateLimitResult>;
+  /** Number of entries currently tracked by this limiter. */
   size(): number | Promise<number>;
+}
+
+/** Builds the composite key used for partitioning: "tenantId:ip". */
+export function makeRateLimitKey(tenantId: string, ip: string): string {
+  return `${tenantId}:${ip}`;
 }
 
 /**
@@ -62,37 +71,38 @@ export function createIpRateLimiter(
   const { windowMs, maxPerWindow, softCap, maxEntries } = options;
   const hits = new Map<string, number[]>();
 
-  const limiter = (ip: string, now: number): RateLimitResult => {
-    const ipHits = (hits.get(ip) ?? []).filter((t) => now - t < windowMs);
-    if (ipHits.length >= maxPerWindow) {
-      const oldest = ipHits[0] ?? now;
+  const limiter = (tenantId: string, ip: string, now: number): RateLimitResult => {
+    const key = makeRateLimitKey(tenantId, ip);
+    const keyHits = (hits.get(key) ?? []).filter((t) => now - t < windowMs);
+    if (keyHits.length >= maxPerWindow) {
+      const oldest = keyHits[0] ?? now;
       return {
         allowed: false,
         retryAfterMs: Math.max(0, oldest + windowMs - now),
       };
     }
-    ipHits.push(now);
-    hits.set(ip, ipHits);
+    keyHits.push(now);
+    hits.set(key, keyHits);
 
     if (softCap != null && hits.size > softCap) {
-      // Shed fully-expired IPs first, inspecting only a bounded slice of
+      // Shed fully-expired entries first, inspecting only a bounded slice of
       // the map per call so the per-request cost stays flat.
       let scanned = 0;
-      for (const [key, times] of hits) {
+      for (const [k, times] of hits) {
         if (scanned >= MAX_EVICTION_SCAN_PER_CALL) break;
         scanned += 1;
-        if (times.every((t) => now - t >= windowMs)) hits.delete(key);
+        if (times.every((t) => now - t >= windowMs)) hits.delete(k);
       }
     }
 
     if (hits.size > maxEntries) {
-      // Map iteration follows insertion order, so the oldest-first-seen IPs are
+      // Map iteration follows insertion order, so the oldest-first-seen entries are
       // dropped first. Entries still inside their window are evicted too:
       // under memory pressure the limiter fails open rather than growing
       // without bound.
-      for (const key of hits.keys()) {
+      for (const k of hits.keys()) {
         if (hits.size <= maxEntries) break;
-        hits.delete(key);
+        hits.delete(k);
       }
     }
 
@@ -115,11 +125,12 @@ export function createGlobalIpRateLimiter(
   const { windowMs, maxPerWindow, softCap, maxEntries } = options;
   const stub = doNamespace.get(doNamespace.idFromName('global'));
 
-  const limiter = async (ip: string, now: number): Promise<RateLimitResult> => {
+  const limiter = async (tenantId: string, ip: string, now: number): Promise<RateLimitResult> => {
+    const key = makeRateLimitKey(tenantId, ip);
     const res = await stub.fetch('https://internal/check', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ip, now, windowMs, maxPerWindow, softCap: softCap ?? null, maxEntries }),
+      body: JSON.stringify({ key, now, windowMs, maxPerWindow, softCap: softCap ?? null, maxEntries }),
     });
     return res.json() as Promise<RateLimitResult>;
   };
