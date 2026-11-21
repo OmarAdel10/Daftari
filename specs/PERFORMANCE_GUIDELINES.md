@@ -223,7 +223,7 @@ The behaviors below are **current code reality** and are documented here as ackn
 * **Integration Point:** Call before large writes (e.g., bulk CSV import, sales export) to prevent quota exhaustion.
 
 #### 8.7 Pricing Tier Device Limits
-* **Client-Side Pre-Check:** `DeviceLimitChecker.checkDeviceLimit()` is O(1) -- use before calling `SessionSyncService.startSession()` to avoid 409 round-trip.
+* **Client-Side Pre-Check:** `DeviceLimitChecker.checkDeviceLimit()` is O(1) -- use before calling session start to avoid 409 round-trip.
 * **Server-Side Enforcement:** Actual limit enforced at `/sessions/start` -- client check is optimization only.
 
 ---

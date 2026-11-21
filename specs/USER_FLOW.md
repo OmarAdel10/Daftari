@@ -1817,10 +1817,10 @@ Retention: 90-day rolling
 ```
 
 * **Route rate limit (server-side, active):** `POST /sessions/start` and `POST /sales/sync` enforce 30 requests / 60 s per IP (key = `CF-Connecting-IP`) inside the Worker app instance, which is built once per isolate; over the limit → 429 `RATE_LIMITED` + `retry_after_ms`. Each route owns its **own independent** limiter instance, so one IP may send 30 session starts **plus** 30 sales syncs per 60 s — the budgets are not combined. The window resets when the isolate is recycled and is isolate-local (it does not aggregate across isolates). This limit is enforced by the route today even though no live client calls these endpoints yet.
-* **Client wiring (planned, not wired):** `SessionSyncService` is the only client-side caller of these endpoints and currently has **zero importers** — the server routes exist, but no live Flutter code starts a device session yet (tracked as DAFTARI-184). The diagram and the bullets below describe the intended flow, not current app behaviour, so the app does **not** enforce device limits through sessions today.
-* **Heartbeat (planned):** Periodic `SessionSyncService.heartbeat(sessionId, idToken)` → POST `/sessions/heartbeat`.
-* **Cleanup (planned):** On logout/shift end → `SessionSyncService.endSession(sessionId, idToken)`.
-* **Active Sessions List (planned):** `SessionSyncService.activeSessions(idToken)` → GET `/sessions/active`.
+* **Client wiring (planned, not wired):** The server routes exist, but no live Flutter code starts a device session yet (tracked as DAFTARI-184). The diagram and the bullets below describe the intended flow, not current app behaviour, so the app does **not** enforce device limits through sessions today.
+* **Heartbeat (planned):** Periodic heartbeat(sessionId, idToken) → POST `/sessions/heartbeat`.
+* **Cleanup (planned):** On logout/shift end → endSession(sessionId, idToken).
+* **Active Sessions List (planned):** activeSessions(idToken) → GET `/sessions/active`.
 
 #### 20d. Analytics Batching Flow
 
