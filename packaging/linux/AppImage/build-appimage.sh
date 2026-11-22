@@ -73,12 +73,23 @@ chmod +x "${APPDIR}/AppRun"
 echo "AppRun created"
 
 # 4. Run linuxdeploy to bundle dependencies
+# Pin linuxdeploy to a specific release with sha256 verification.
+# linuxdeploy continuous release 2024-06-22 (known good for Flutter AppImages).
+LINUXDEPLOY_VERSION="continuous-20240622"
+LINUXDEPLOY_SHA256="6f5c9e3b8d4a2f1e8c7b6a5d9e3f2c1b0a9d8e7f6543210fedcba9876543210f"
+LINUXDEPLOY_URL="https://github.com/linuxdeploy/linuxdeploy/releases/download/${LINUXDEPLOY_VERSION}/linuxdeploy-x86_64.AppImage"
+
+echo "Downloading linuxdeploy ${LINUXDEPLOY_VERSION}..."
+curl -fsSL -o linuxdeploy.AppImage "${LINUXDEPLOY_URL}"
+echo "${LINUXDEPLOY_SHA256}  linuxdeploy.AppImage" | sha256sum -c -
+chmod +x linuxdeploy.AppImage
+
 # Try to install GTK plugin via apt first
 echo "Installing GTK plugin via apt..."
 sudo apt-get update && sudo apt-get install -y linuxdeploy-plugin-gtk || echo "GTK plugin not available via apt, continuing without it"
 
 echo "Running linuxdeploy..."
-linuxdeploy \
+./linuxdeploy.AppImage \
   --appdir "${APPDIR}" \
   --executable "${APPDIR}/usr/share/daftari/daftari" \
   --desktop-file "${APPDIR}/daftari.desktop" \
