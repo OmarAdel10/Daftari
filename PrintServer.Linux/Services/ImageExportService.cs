@@ -55,7 +55,9 @@ public sealed class ImageExportService : IDisposable
         if (!Directory.Exists(dir))
             Directory.CreateDirectory(dir);
 
-        var filename = $"receipt_{DateTime.Now:yyyyMMdd_HHmmss}.png";
+        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", CultureInfo.InvariantCulture);
+        var shortGuid = Guid.NewGuid().ToString("N")[..8];
+        var filename = $"receipt_{timestamp}_{shortGuid}.png";
         var fullPath = Path.GetFullPath(Path.Combine(dir, filename));
 
         // Exclusive create: a pre-planted symlink or colliding file at the
