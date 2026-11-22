@@ -75,7 +75,7 @@ async function createMiniflareWithDO(): Promise<{
 }
 
 describe('IpRateLimiter Durable Object (Miniflare workerd runtime)', { timeout: 15000 }, () => {
-  let mf: Miniflare;
+  let mf: Miniflare | undefined;
   let doNamespace: any;
   let testCounter = 0;
 
@@ -86,7 +86,9 @@ describe('IpRateLimiter Durable Object (Miniflare workerd runtime)', { timeout: 
   });
 
   afterAll(async () => {
-    await mf.dispose();
+    if (mf) {
+      await mf.dispose();
+    }
   });
 
   beforeEach(() => {
