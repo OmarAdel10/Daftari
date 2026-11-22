@@ -1649,7 +1649,6 @@ class FlavorConfig {
 
 * **ApiClient:** HTTP client for daftari-api REST endpoints. Bearer Firebase ID token auth. Methods: `post(path, body, idToken)`, `get(path, idToken, query?)` → `Either<Failure, Map<String, dynamic>>`. Base URL from `EnvConfig.apiBaseUrl`.
 * **AuthSyncService:** `syncUser(idToken)` → POST `/auth/sync-user` (Option A: explicit sync after login). `fetchProfile(idToken)` → GET `/auth/me` (admin dashboard + license).
-* **SessionSyncService:** `startSession(deviceHwid, deviceName?, platform?, username?, idToken)` → POST `/sessions/start` (enforces per-tenant device limit, 409 on limit). `heartbeat(sessionId, idToken)`, `endSession(sessionId, idToken)`, `activeSessions(idToken)`. **Flavor-gated:** Only `cloud`/`admin` flavors.
 * **AnalyticsService:** `track(event, props, idToken)` → POST `/events` (max batch 50). Flutter keeps in-memory queue; no local persistence.
 * **PostHogAnalytics** (`lib/core/backend/api/posthog_analytics.dart`): Local stub implementation for development/testing. Provides `track()`, `identify()`, and `captureException()` methods that print to console. In production, analytics are batched and sent via `AnalyticsService` to the Cloudflare Workers `/events` endpoint which forwards to PostHog.
 * **Shared Backend** (`backend/shared/`): Turso client, JWT, license crypto, analytics batching, base64 utils — 40 unit tests.
@@ -1672,7 +1671,7 @@ class FlavorConfig {
 
 * **PricingTiers Enum:** Starter (1 device), Professional (2 devices), Business (4 devices). Each with flags: `hasAdvancedReports`, `hasMultiLocation`, `hasApiAccess`, `prioritySupport`.
 * **DeviceLimitChecker:** `checkDeviceLimit(currentCount, maxDevices)` → bool; `getMaxDevices(tier)` → int.
-* **Integration:** `FlavorConfig.maxDevices` reflects tier (local=Starter=1, cloud=Business=4). `SessionSyncService.startSession` enforces limit server-side.
+* **Integration:** `FlavorConfig.maxDevices` reflects tier (local=Starter=1, cloud=Business=4). Server-side limit enforced at `/sessions/start`.
 
 #### 5k.8 Session Management (`lib/core/backend/session/session_manager.dart`)
 
