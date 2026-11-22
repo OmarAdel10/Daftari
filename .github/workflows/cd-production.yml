@@ -28,6 +28,7 @@ jobs:
     permissions:
       contents: read
       deployments: write
+    environment: production
     uses: ./.github/workflows/deploy-cloud.yml
     with:
       pages_project: daftari
