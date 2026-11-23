@@ -20,7 +20,7 @@ class WebPrintService implements PrintService {
   @override
   Future<bool> healthCheck() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/health'));
+      final response = await http.get(Uri.parse('$baseUrl/api/printing/health'));
       return response.statusCode == 200;
     } catch (_) {
       return false;
@@ -30,7 +30,7 @@ class WebPrintService implements PrintService {
   @override
   Future<List<String>> getLocalPrinters() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/api/printers'));
+      final response = await http.get(Uri.parse('$baseUrl/api/printing/local-printers'));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as List<dynamic>;
         return data.cast<String>();
@@ -41,42 +41,42 @@ class WebPrintService implements PrintService {
 
   @override
   Future<void> printReceipt(Map<String, dynamic> payload) async {
-    await _post('$baseUrl/api/print/receipt', payload);
+    await _post('$baseUrl/api/printing/receipt', payload);
   }
 
   @override
   Future<void> printBarcode(Map<String, dynamic> payload) async {
-    await _post('$baseUrl/api/print/barcode', payload);
+    await _post('$baseUrl/api/printing/barcode', payload);
   }
 
   @override
   Future<void> printTicket(Map<String, dynamic> payload) async {
-    await _post('$baseUrl/api/print/ticket', payload);
+    await _post('$baseUrl/api/printing/ticket', payload);
   }
 
   @override
   Future<String> saveReceiptPng(Map<String, dynamic> payload) async {
-    final response = await _post('$baseUrl/api/print/receipt/png', payload);
+    final response = await _post('$baseUrl/api/printing/receipt/png', payload);
     return response.body;
   }
 
   @override
   Future<String> saveReceiptPdf(Map<String, dynamic> payload) async {
-    final response = await _post('$baseUrl/api/print/receipt/pdf', payload);
+    final response = await _post('$baseUrl/api/printing/receipt/pdf', payload);
     return response.body;
   }
 
   @override
   Future<String> saveSalesPdf(Map<String, dynamic> payload) async {
-    final response = await _post('$baseUrl/api/print/sales/pdf', payload);
+    final response = await _post('$baseUrl/api/printing/sales/pdf', payload);
     return response.body;
   }
 
   @override
   Future<List<String>> validateSvg(String base64Data) async {
     try {
-      final response = await _post('$baseUrl/api/print/validate-svg', {
-        'svg': base64Data,
+      final response = await _post('$baseUrl/api/printing/validate-svg', {
+        'data': base64Data,
       });
       final data = jsonDecode(response.body) as List<dynamic>;
       return data.cast<String>();
