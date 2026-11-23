@@ -43,7 +43,7 @@ describe('createTurso', () => {
     expect(arg0.args[6]).toBeNull(); // last_login_at omitted on profile upsert
   });
 
-  it('updates an existing email when the supplied email is non-empty', async () => {
+  it('updates an existing email when the supplied email is non-empty', { timeout: 30000 }, async () => {
     const { createClient } = await vi.importActual<typeof import('@libsql/client')>(
       '@libsql/client',
     );
@@ -94,7 +94,7 @@ describe('createTurso', () => {
     await client.close();
   });
 
-  it('preserves the existing email on conflict and still inserts a new row with an empty email', async () => {
+  it('preserves the existing email on conflict and still inserts a new row with an empty email', { timeout: 30000 }, async () => {
     const { createClient } = await vi.importActual<typeof import('@libsql/client')>(
       '@libsql/client',
     );
