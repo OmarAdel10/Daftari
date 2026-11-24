@@ -246,12 +246,16 @@ jobs:
           echo "yq installed successfully"
           yq --version
           # Add to PATH for subsequent steps
-          echo "C:/ProgramData/chocolatey/bin" >> $GITHUB_PATH
+          echo "C:/ProgramData/chocolatey/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       # Flutter Linux desktop build prerequisites (gtk+-3.0 etc. are NOT preinstalled on runners).
       - name: Install Linux desktop prerequisites
         if: matrix.platform == 'linux'
         run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libcups2-dev libgtk-3-dev libsecret-1-dev libblkid-dev liblzma-dev \
+            clang cmake ninja-build pkg-config libstdc++-12-dev
           sudo apt-get update
           sudo apt-get install -y \
             libcups2-dev libgtk-3-dev libsecret-1-dev libblkid-dev liblzma-dev \
