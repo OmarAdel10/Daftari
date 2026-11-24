@@ -52,4 +52,4 @@ else
   exit 1
 fi
 echo "Admin WASM build copied to $OUT_DIR/ (from $SRC)"
-ls "$OUT_DIR/" | head -5
+find "$OUT_DIR/" -mindepth 1 -maxdepth 1 | head -5
