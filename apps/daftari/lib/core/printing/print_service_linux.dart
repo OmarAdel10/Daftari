@@ -56,17 +56,17 @@ class LinuxPrintService implements PrintService {
 
   @override
   Future<void> printReceipt(Map<String, dynamic> payload) async {
-    await _post('/api/printing/print-receipt', payload);
+    await _post('/api/printing/receipt', payload);
   }
 
   @override
   Future<void> printBarcode(Map<String, dynamic> payload) async {
-    await _post('/api/printing/print-barcode', payload);
+    await _post('/api/printing/barcode', payload);
   }
 
   @override
   Future<void> printTicket(Map<String, dynamic> payload) async {
-    await _post('/api/printing/print-ticket', payload);
+    await _post('/api/printing/ticket', payload);
   }
 
   @override
@@ -141,7 +141,7 @@ class LinuxPrintService implements PrintService {
     try {
       final response = await _client
           .get(
-            Uri.parse('$baseUrl/health'),
+            Uri.parse('$baseUrl/api/printing/health'),
             headers: {'Accept': 'application/json'},
           )
           .timeout(const Duration(seconds: 5));
