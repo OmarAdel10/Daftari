@@ -14,10 +14,17 @@ APPDIR="${PROJECT_ROOT}/build/appimage/daftari.AppDir"
 OUTPUT_DIR="${PROJECT_ROOT}/build/appimage/output"
 
 echo "Building AppImage v${VERSION}..."
+echo "PROJECT_ROOT: ${PROJECT_ROOT}"
+echo "APP_DIR: ${APP_DIR}"
+echo "BUILD_DIR: ${BUILD_DIR}"
+echo "APPDIR: ${APPDIR}"
+echo "OUTPUT_DIR: ${OUTPUT_DIR}"
 
 # 1. Flutter Linux release build
 cd "${APP_DIR}"
+echo "Building Flutter Linux release..."
 flutter build linux --release --dart-define=ED25519_PUBKEY_HEX="${ED25519_PUBKEY_HEX}"
+echo "Flutter build exit code: $?"
 
 # 2. Build PrintServer.Linux (self-contained)
 cd "${PROJECT_ROOT}/PrintServer.Linux"
@@ -94,7 +101,8 @@ echo "Running linuxdeploy..."
   --executable "${APPDIR}/usr/share/daftari/daftari" \
   --desktop-file "${APPDIR}/daftari.desktop" \
   --icon-file "${APPDIR}/daftari.png" \
-  --output appimage
+  --output appimage \
+  --verbose
 echo "linuxdeploy exit code: $?"
 
 # 5. Move result
@@ -102,6 +110,8 @@ mkdir -p "${OUTPUT_DIR}"
 mapfile -t APPIMAGE_FILES < <(find . -maxdepth 1 -name "*.AppImage" -type f -print)
 if [[ "${#APPIMAGE_FILES[@]}" -eq 0 ]]; then
   echo "No AppImage was produced by linuxdeploy" >&2
+  echo "Current directory contents:" >&2
+  ls -la >&2
   exit 1
 fi
 if [[ "${#APPIMAGE_FILES[@]}" -gt 1 ]]; then
