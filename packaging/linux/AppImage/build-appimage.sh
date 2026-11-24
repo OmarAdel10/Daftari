@@ -12,6 +12,7 @@ APP_DIR="${PROJECT_ROOT}/apps/daftari"
 BUILD_DIR="${APP_DIR}/build/linux/x64/release/bundle"
 APPDIR="${PROJECT_ROOT}/build/appimage/daftari.AppDir"
 OUTPUT_DIR="${PROJECT_ROOT}/build/appimage/output"
+TOOLS_DIR="${PROJECT_ROOT}/build/appimage/tools"
 
 echo "Building AppImage v${VERSION}..."
 echo "PROJECT_ROOT: ${PROJECT_ROOT}"
@@ -85,24 +86,26 @@ echo "AppRun created"
 LINUXDEPLOY_VERSION="1-alpha-20251107-1"
 LINUXDEPLOY_SHA256="c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d"
 LINUXDEPLOY_URL="https://github.com/linuxdeploy/linuxdeploy/releases/download/${LINUXDEPLOY_VERSION}/linuxdeploy-x86_64.AppImage"
+LINUXDEPLOY_PATH="${TOOLS_DIR}/linuxdeploy.AppImage"
 
+mkdir -p "${TOOLS_DIR}"
 echo "Downloading linuxdeploy ${LINUXDEPLOY_VERSION}..."
-curl -fsSL -o linuxdeploy.AppImage "${LINUXDEPLOY_URL}"
-echo "${LINUXDEPLOY_SHA256}  linuxdeploy.AppImage" | sha256sum -c -
-chmod +x linuxdeploy.AppImage
+curl -fsSL -o "${LINUXDEPLOY_PATH}" "${LINUXDEPLOY_URL}"
+echo "${LINUXDEPLOY_SHA256}  ${LINUXDEPLOY_PATH}" | sha256sum -c -
+chmod +x "${LINUXDEPLOY_PATH}"
 
 # Try to install GTK plugin via apt first
 echo "Installing GTK plugin via apt..."
 sudo apt-get update && sudo apt-get install -y linuxdeploy-plugin-gtk || echo "GTK plugin not available via apt, continuing without it"
 
 echo "Running linuxdeploy..."
-./linuxdeploy.AppImage \
+"${LINUXDEPLOY_PATH}" \
   --appdir "${APPDIR}" \
   --executable "${APPDIR}/usr/share/daftari/daftari" \
   --desktop-file "${APPDIR}/daftari.desktop" \
   --icon-file "${APPDIR}/daftari.png" \
   --output appimage \
-  --verbose
+  --verbosity=0
 echo "linuxdeploy exit code: $?"
 
 # 5. Move result
