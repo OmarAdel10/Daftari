@@ -1,0 +1,31 @@
+name: Shell Lint
+
+on:
+  push:
+    branches: [development, main]
+    paths:
+      - 'packaging/**/*.sh'
+      - 'backend/admin_host/build.sh'
+  pull_request:
+    branches: [development, main]
+    paths:
+      - 'packaging/**/*.sh'
+      - 'backend/admin_host/build.sh'
+
+jobs:
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Lint build scripts
+        run: |
+          shellcheck \
+            backend/admin_host/build.sh \
+            packaging/linux/AppImage/build-appimage.sh \
+            packaging/linux/RPM/build-rpm.sh
