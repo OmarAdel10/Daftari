@@ -78,6 +78,7 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: write
+    environment: production
     strategy:
       fail-fast: false
       matrix:
