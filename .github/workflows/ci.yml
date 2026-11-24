@@ -245,6 +245,8 @@ jobs:
           mv yq.exe "C:/ProgramData/chocolatey/bin/yq.exe"
           echo "yq installed successfully"
           yq --version
+          # Add to PATH for subsequent steps
+          echo "C:/ProgramData/chocolatey/bin" >> $GITHUB_PATH
 
       # Flutter Linux desktop build prerequisites (gtk+-3.0 etc. are NOT preinstalled on runners).
       - name: Install Linux desktop prerequisites

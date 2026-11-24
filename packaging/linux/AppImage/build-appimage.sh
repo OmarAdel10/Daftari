@@ -81,9 +81,9 @@ echo "AppRun created"
 
 # 4. Run linuxdeploy to bundle dependencies
 # Pin linuxdeploy to a specific release with sha256 verification.
-# linuxdeploy continuous release 2024-06-22 (known good for Flutter AppImages).
-LINUXDEPLOY_VERSION="continuous-20240622"
-LINUXDEPLOY_SHA256="6f5c9e3b8d4a2f1e8c7b6a5d9e3f2c1b0a9d8e7f6543210fedcba9876543210f"
+# linuxdeploy release 1-alpha-20251107-1 (known good for Flutter AppImages).
+LINUXDEPLOY_VERSION="1-alpha-20251107-1"
+LINUXDEPLOY_SHA256="c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d"
 LINUXDEPLOY_URL="https://github.com/linuxdeploy/linuxdeploy/releases/download/${LINUXDEPLOY_VERSION}/linuxdeploy-x86_64.AppImage"
 
 echo "Downloading linuxdeploy ${LINUXDEPLOY_VERSION}..."
