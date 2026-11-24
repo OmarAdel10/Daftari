@@ -20,7 +20,9 @@ class WebPrintService implements PrintService {
   @override
   Future<bool> healthCheck() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/api/printing/health'));
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/printing/health'),
+      );
       return response.statusCode == 200;
     } catch (_) {
       return false;
@@ -30,7 +32,9 @@ class WebPrintService implements PrintService {
   @override
   Future<List<String>> getLocalPrinters() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/api/printing/local-printers'));
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/printing/local-printers'),
+      );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as List<dynamic>;
         return data.cast<String>();
