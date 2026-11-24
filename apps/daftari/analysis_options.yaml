@@ -44,3 +44,7 @@ analyzer:
     - linux/**
     # Tool scripts may use print for CLI output
     - tool/**
+    # PrintServer build orchestration
+    - lib/main.dart
+    # PostHog analytics (development only, no PII)
+    - lib/core/backend/api/posthog_analytics.dart
