@@ -11,9 +11,6 @@
 name: CI Checks
 
 on:
-  push:
-    branches: ['**']
-    tags: ['v*']
   pull_request:
     branches: ['**']
   workflow_dispatch:
