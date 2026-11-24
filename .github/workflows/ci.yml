@@ -231,6 +231,24 @@ jobs:
             libcups2-dev libgtk-3-dev libsecret-1-dev libblkid-dev liblzma-dev \
             clang cmake ninja-build pkg-config libstdc++-12-dev
 
+      # Flutter Windows yq prerequisite (Chocolatey times out on community feed).
+      - name: Install Windows yq prerequisite
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          # Install yq directly from GitHub releases to avoid Chocolatey timeout
+          YQ_VERSION="v4.44.3"
+          YQ_URL="https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_windows_amd64.exe"
+          echo "Downloading yq ${YQ_VERSION}..."
+          curl -fsSL -o yq.exe "${YQ_URL}"
+          echo "Installing yq to C:/ProgramData/chocolatey/bin..."
+          mkdir -p "C:/ProgramData/chocolatey/bin"
+          mv yq.exe "C:/ProgramData/chocolatey/bin/yq.exe"
+          echo "yq installed successfully"
+          "C:/ProgramData/chocolatey/bin/yq.exe" --version
+          # Add to PATH for subsequent steps
+          echo "C:/ProgramData/chocolatey/bin" >> "$GITHUB_PATH"
+
       - name: Setup Flutter
         uses: subosito/flutter-action@f2c4f6686ca8e8d6e6d0f28410eeef506ed66aff  # v2.18.0
         with:
@@ -393,11 +411,6 @@ jobs:
             clang cmake ninja-build pkg-config libstdc++-12-dev rpm libfuse2 \
             wget curl xvfb desktop-file-utils \
             libappstream-glib8 libappstream-glib-dev
-      - name: Install linuxdeploy
-        run: |
-          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-          chmod +x linuxdeploy-x86_64.AppImage
-          sudo mv linuxdeploy-x86_64.AppImage /usr/local/bin/linuxdeploy
       - name: Install appimagetool
         run: |
           wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage

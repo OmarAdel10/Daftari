@@ -32,7 +32,9 @@ public sealed class ImageExportService
         if (!Directory.Exists(dir))
             Directory.CreateDirectory(dir);
 
-        var filename = $"receipt_{DateTime.Now:yyyyMMdd_HHmmss}.png";
+        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", CultureInfo.InvariantCulture);
+        var shortGuid = Guid.NewGuid().ToString("N")[..8];
+        var filename = $"receipt_{timestamp}_{shortGuid}.png";
         var fullPath = Path.Combine(dir, filename);
 
         return await Task.Run(() =>
