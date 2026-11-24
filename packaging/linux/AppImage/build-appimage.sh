@@ -12,12 +12,20 @@ APP_DIR="${PROJECT_ROOT}/apps/daftari"
 BUILD_DIR="${APP_DIR}/build/linux/x64/release/bundle"
 APPDIR="${PROJECT_ROOT}/build/appimage/daftari.AppDir"
 OUTPUT_DIR="${PROJECT_ROOT}/build/appimage/output"
+TOOLS_DIR="${PROJECT_ROOT}/build/appimage/tools"
 
 echo "Building AppImage v${VERSION}..."
+echo "PROJECT_ROOT: ${PROJECT_ROOT}"
+echo "APP_DIR: ${APP_DIR}"
+echo "BUILD_DIR: ${BUILD_DIR}"
+echo "APPDIR: ${APPDIR}"
+echo "OUTPUT_DIR: ${OUTPUT_DIR}"
 
 # 1. Flutter Linux release build
 cd "${APP_DIR}"
+echo "Building Flutter Linux release..."
 flutter build linux --release --dart-define=ED25519_PUBKEY_HEX="${ED25519_PUBKEY_HEX}"
+echo "Flutter build exit code: $?"
 
 # 2. Build PrintServer.Linux (self-contained)
 cd "${PROJECT_ROOT}/PrintServer.Linux"
@@ -39,7 +47,7 @@ echo "cp exit code: $?"
 # Rename binary to match expected name (flutter uses underscore, we want dash).
 # No-op removed: Flutter already emits the dash-named binary; the mv source==dest
 # was a no-op. Keep this step documented in case the bundle naming changes.
-echo "Binary name check: $(ls "${APPDIR}/usr/share/daftari/" | head -5)"
+echo "Binary name check: $(find "${APPDIR}/usr/share/daftari/" -mindepth 1 -maxdepth 1 | head -5)"
 
 # Desktop entry
 echo "Copying desktop file..."
@@ -73,17 +81,31 @@ chmod +x "${APPDIR}/AppRun"
 echo "AppRun created"
 
 # 4. Run linuxdeploy to bundle dependencies
+# Pin linuxdeploy to a specific release with sha256 verification.
+# linuxdeploy release 1-alpha-20251107-1 (known good for Flutter AppImages).
+LINUXDEPLOY_VERSION="1-alpha-20251107-1"
+LINUXDEPLOY_SHA256="c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d"
+LINUXDEPLOY_URL="https://github.com/linuxdeploy/linuxdeploy/releases/download/${LINUXDEPLOY_VERSION}/linuxdeploy-x86_64.AppImage"
+LINUXDEPLOY_PATH="${TOOLS_DIR}/linuxdeploy.AppImage"
+
+mkdir -p "${TOOLS_DIR}"
+echo "Downloading linuxdeploy ${LINUXDEPLOY_VERSION}..."
+curl -fsSL -o "${LINUXDEPLOY_PATH}" "${LINUXDEPLOY_URL}"
+echo "${LINUXDEPLOY_SHA256}  ${LINUXDEPLOY_PATH}" | sha256sum -c -
+chmod +x "${LINUXDEPLOY_PATH}"
+
 # Try to install GTK plugin via apt first
 echo "Installing GTK plugin via apt..."
 sudo apt-get update && sudo apt-get install -y linuxdeploy-plugin-gtk || echo "GTK plugin not available via apt, continuing without it"
 
 echo "Running linuxdeploy..."
-linuxdeploy \
+"${LINUXDEPLOY_PATH}" \
   --appdir "${APPDIR}" \
   --executable "${APPDIR}/usr/share/daftari/daftari" \
   --desktop-file "${APPDIR}/daftari.desktop" \
   --icon-file "${APPDIR}/daftari.png" \
-  --output appimage
+  --output appimage \
+  --verbosity=0
 echo "linuxdeploy exit code: $?"
 
 # 5. Move result
@@ -91,6 +113,8 @@ mkdir -p "${OUTPUT_DIR}"
 mapfile -t APPIMAGE_FILES < <(find . -maxdepth 1 -name "*.AppImage" -type f -print)
 if [[ "${#APPIMAGE_FILES[@]}" -eq 0 ]]; then
   echo "No AppImage was produced by linuxdeploy" >&2
+  echo "Current directory contents:" >&2
+  ls -la >&2
   exit 1
 fi
 if [[ "${#APPIMAGE_FILES[@]}" -gt 1 ]]; then
